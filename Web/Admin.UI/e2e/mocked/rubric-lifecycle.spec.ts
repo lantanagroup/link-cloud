@@ -231,7 +231,7 @@ test.describe('retiring', () => {
 
     const confirmation = page.getByRole('region', { name: 'Retire version 1.1.0?' });
     await expect(confirmation).toContainText('No published version will remain');
-    await expect(confirmation).toContainText('With no published version, pipeline validation has nothing to run.');
+    await expect(confirmation).toContainText('With no published version, that comparison has nothing to run.');
     const retire = confirmation.getByRole('button', { name: 'Retire' });
     await expect(retire).toBeDisabled();
 

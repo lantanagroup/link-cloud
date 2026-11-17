@@ -287,9 +287,21 @@ describe('RubricService', () => {
     service.deleteDraft('piqi.core', '1.1.0').subscribe({ complete: () => completed = true });
     const request = http.expectOne(`${BASE}/piqi.core/versions/1.1.0`);
     expect(request.request.method).toBe('DELETE');
+    expect(request.request.headers.has('If-Match')).toBeFalse();
     request.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(completed).toBeTrue();
+  });
+
+  it('deleteDraft sends the checksum it was given as If-Match, and a draft saved since fails as preconditionFailed', () => {
+    let failure: RubricApiError | undefined;
+
+    service.deleteDraft('piqi.core', '1.1.0', 'sum-1').subscribe({ error: error => failure = error });
+    const request = http.expectOne(`${BASE}/piqi.core/versions/1.1.0`);
+    expect(request.request.headers.get('If-Match')).toBe('"sum-1"');
+    request.flush({ message: 'changed' }, { status: 412, statusText: 'Precondition Failed' });
+
+    expect(failure?.preconditionFailed).toBeTrue();
   });
 
   describe('publish and retire', () => {

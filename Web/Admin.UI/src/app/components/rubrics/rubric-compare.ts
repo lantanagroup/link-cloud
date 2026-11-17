@@ -1,7 +1,6 @@
 import { IRubricCheck, IRubricDefinition } from '../../interfaces/validation/rubric.interface';
 import {
   checkSettings,
-  checkSummary,
   checkTypeLabel,
   dimensionLabel,
   isCheckEnabled,
@@ -51,15 +50,27 @@ function change(label: string, before: string, after: string): RubricChange[] {
 
 const list = (values?: string[] | null): string => (values ?? []).join(', ');
 
-/** The child checks of a combined check, one line each, as text that differs when any of them does. */
+/**
+ * The child checks of a combined check, one line each, as text that differs when any of them does: every
+ * setting a child has, not only the ones its summary shows, so a changed code system or failure message is
+ * seen. Settings are put in one order, so two versions that wrote the same ones differently do not differ.
+ */
 function childrenText(check: IRubricCheck): string {
   if (!isCombinedCheck(check)) {
     return '';
   }
   return (check.parameters?.checks ?? [])
     .map(child => {
+      const details = [
+        child.dimension ? `Dimension: ${dimensionLabel(child.dimension)}` : '',
+        child.severityOverride ? `Severity: ${severityLabel(child.severityOverride)}` : '',
+        child.enabled === false ? 'Enabled: No' : '',
+        ...checkSettings(child)
+          .sort((a, b) => a.key.localeCompare(b.key))
+          .map(setting => `${setting.label}: ${setting.value.replace(/\n/g, ', ')}`)
+      ].filter(Boolean);
       const nested = isCombinedCheck(child) ? ` [${childrenText(child).replace(/\n/g, '; ')}]` : '';
-      return `${child.id} (${checkTypeLabel(child.type)}): ${checkSummary(child)}${nested}`;
+      return `${child.id} (${checkTypeLabel(child.type)}): ${details.join('; ')}${nested}`;
     })
     .join('\n');
 }

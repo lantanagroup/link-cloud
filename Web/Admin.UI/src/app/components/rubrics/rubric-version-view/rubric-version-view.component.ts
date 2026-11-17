@@ -229,6 +229,11 @@ export class RubricVersionViewComponent implements OnInit, OnDestroy {
   }
 
   cancelAction(): void {
+    // A request already sent is carried out whether or not its answer is awaited, so it is not abandoned: the
+    // page would go on showing the version as it was.
+    if (this.acting) {
+      return;
+    }
     this.actionRequest?.unsubscribe();
     this.closePlan();
     this.forgetRequestedAction();

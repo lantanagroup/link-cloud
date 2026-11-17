@@ -166,14 +166,14 @@ describe('rubric display', () => {
       return { id: 'r', semver: '1.0.0', dimensions: ['CONFORMANCE'], scoringPolicy: { type: 'piqi-pass-fail' }, checks };
     }
 
-    it('orders by ordinal, with checks that have none last in the order written', () => {
+    it('orders by ordinal, with checks that have none first in the order written, as the service runs them', () => {
       const ordered = orderedChecks(definition([
         check({ id: 'no-ordinal-1' }),
         check({ id: 'third', ordinal: 3 }),
         check({ id: 'no-ordinal-2' }),
         check({ id: 'first', ordinal: 0 })
       ]));
-      expect(ordered.map(c => c.id)).toEqual(['first', 'third', 'no-ordinal-1', 'no-ordinal-2']);
+      expect(ordered.map(c => c.id)).toEqual(['no-ordinal-1', 'no-ordinal-2', 'first', 'third']);
     });
 
     it('does not reorder the definition it was given', () => {

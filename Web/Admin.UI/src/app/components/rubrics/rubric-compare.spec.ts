@@ -1,4 +1,4 @@
-import { IRubricDefinition } from '../../interfaces/validation/rubric.interface';
+import { IRubricCheck, IRubricCheckParameters, IRubricDefinition } from '../../interfaces/validation/rubric.interface';
 import { compareDefinitions } from './rubric-compare';
 
 const base: IRubricDefinition = {
@@ -105,9 +105,39 @@ describe('compareDefinitions', () => {
       { label: 'Passes when', before: 'Any of its checks passes', after: 'All of its checks pass' });
     expect(result.changed[0].changes[1]).toEqual({
       label: 'Child checks',
-      before: 'a (FHIRPath): true',
-      after: 'a (FHIRPath): true\nb (FHIRPath): false'
+      before: 'a (FHIRPath): Expression: true',
+      after: 'a (FHIRPath): Expression: true\nb (FHIRPath): Expression: false'
     });
+  });
+
+  it('sees a change to any setting of a child check, not only those its summary shows', () => {
+    const child: IRubricCheck = { id: 'g', type: 'VALUESET', parameters: { path: 'Patient.gender', valueSet: 'http://vs', system: 'http://old' } };
+    const withChild = (only: IRubricCheck) => changed(definition => definition.checks[2].parameters = { matchMode: 'ANY', checks: [only] });
+    const edited = (edit: IRubricCheckParameters) => withChild({ ...child, parameters: { ...child.parameters, ...edit } });
+
+    for (const edit of [{ system: 'http://new' }, { failureMessage: 'Not a gender' }, { code: 'GENDER' }, { validateCodings: true }]) {
+      const result = compareDefinitions(withChild(child), edited(edit));
+      expect(result.changed.map(found => found.id)).withContext(JSON.stringify(edit)).toEqual(['either']);
+      expect(result.changed[0].changes.map(found => found.label)).withContext(JSON.stringify(edit)).toEqual(['Child checks']);
+    }
+
+    expect(compareDefinitions(withChild(child), edited({ system: 'http://new' })).changed[0].changes[0]).toEqual({
+      label: 'Child checks',
+      before: 'g (Value set): Path: Patient.gender; Code system: http://old; Value set: http://vs',
+      after: 'g (Value set): Path: Patient.gender; Code system: http://new; Value set: http://vs'
+    });
+  });
+
+  it('does not see a change where a child check only has its settings written in another order', () => {
+    const withChild = (parameters: IRubricCheckParameters) => changed(definition => definition.checks[2].parameters = {
+      matchMode: 'ANY', checks: [{ id: 'g', type: 'VALUESET', parameters }]
+    });
+
+    const result = compareDefinitions(
+      withChild({ path: 'p', valueSet: 'http://vs', system: 'http://s' }),
+      withChild({ system: 'http://s', valueSet: 'http://vs', path: 'p' }));
+
+    expect(result.identical).toBeTrue();
   });
 
   it('says when the checks both have run in another order, and not when one was only added or removed', () => {

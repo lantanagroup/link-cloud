@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, Observable, of, Subscription, switchMap, tap } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, Subscription, switchMap, tap, throwError } from 'rxjs';
 
 import {
   IRubricCheck,
@@ -31,6 +31,7 @@ import {
   newCheck,
   newDefinition,
   nextVersion,
+  normalizeDefinition,
   placeServerError,
   readOnlyReason,
   rollupRequired,
@@ -252,9 +253,7 @@ export class RubricEditorComponent implements OnInit, OnDestroy {
   }
 
   private open(start: EditorStart): void {
-    this.definition = cloneDefinition(start.definition);
-    this.definition.title ??= '';
-    this.definition.owner ??= '';
+    this.definition = normalizeDefinition(start.definition);
     this.locked = start.locked ?? null;
     this.existingVersions = start.existingVersions;
     this.savedChecksum = start.checksum ?? null;
@@ -558,14 +557,15 @@ export class RubricEditorComponent implements OnInit, OnDestroy {
           this.pasteErrors = [
             `This definition is for the rubric "${result.definition.id}", not "${this.rubricId}". To bring in another rubric, use Import.`];
         } else {
-          this.definition = cloneDefinition(result.definition);
-          this.definition.title ??= '';
-          this.definition.owner ??= '';
+          this.definition = normalizeDefinition(result.definition);
           this.pasteOpen = false;
           this.pasteText = '';
           this.onChanged();
           // What the service found wrong with it is shown where it belongs, as after Validate.
           this.serverIssues = result.errors.map(error => placeServerError(error, this.definition));
+          if (this.idEditable && result.rubricExists) {
+            this.serverIssues.push(this.idTaken(this.definition.id));
+          }
           this.showIssues = this.serverIssues.length > 0 || this.formIssues.length > 0;
           this.notice = 'The draft was replaced with the pasted definition. It is not saved yet.';
         }
@@ -600,7 +600,10 @@ export class RubricEditorComponent implements OnInit, OnDestroy {
       next: result => {
         this.busy = null;
         this.serverIssues = result.errors.map(error => placeServerError(error, this.definition));
-        if (result.valid) {
+        if (this.idEditable && result.rubricExists) {
+          this.serverIssues.push(this.idTaken(this.definition.id));
+        }
+        if (this.serverIssues.length === 0) {
           this.notice = 'No problems found. The draft is ready to save.';
         } else {
           this.goToFirstIssue();
@@ -613,6 +616,14 @@ export class RubricEditorComponent implements OnInit, OnDestroy {
         this.changeDetector.markForCheck();
       }
     });
+  }
+
+  /** The problem with a new rubric's id when a rubric already has it. */
+  private idTaken(id: string): RubricIssue {
+    return {
+      path: 'id', field: 'id',
+      message: `A rubric with the id "${id}" already exists. Choose another id, or open that rubric and create a new version there.`
+    };
   }
 
   /** Saves the draft. `overwrite` replaces the saved draft whatever it holds, after a refused save. */
@@ -638,21 +649,42 @@ export class RubricEditorComponent implements OnInit, OnDestroy {
         ? { expectedChecksum: this.savedChecksum }
         : { mustNotExist: true };
     const previousSemver = this.savedSemver;
+    const previousChecksum = this.savedChecksum ?? undefined;
+
+    // A new rubric's id must not be taken. Saving under one would add this draft to that rubric, and its title and
+    // owner would become this draft's; If-None-Match only guards the version number. Checked on every save until
+    // the first succeeds, since the id can be changed until then.
+    const idFree: Observable<boolean> = this.idEditable
+      ? this.rubricService.getRubric(definition.id).pipe(
+        map(() => false),
+        catchError((error: RubricApiError) => error.notFound ? of(true) : throwError(() => error)))
+      : of(true);
 
     this.busy = 'saving';
-    this.action = this.rubricService.saveDraft(definition, precondition).pipe(
+    this.action = idFree.pipe(switchMap(free => !free ? of(null) : this.rubricService.saveDraft(definition, precondition).pipe(
       switchMap(version => {
         if (!moving || !previousSemver) {
-          return of({ version, leftBehind: null as string | null });
+          return of({ version, leftBehind: null as string | null, keptChanged: false });
         }
-        return this.rubricService.deleteDraft(definition.id, previousSemver).pipe(
-          map(() => ({ version, leftBehind: null as string | null })),
-          // The draft is saved under its new number; only tidying up the old one failed.
-          catchError(() => of({ version, leftBehind: previousSemver })));
+        // Only the draft as it was opened is deleted: one someone else has saved since is theirs, and is kept.
+        return this.rubricService.deleteDraft(definition.id, previousSemver, previousChecksum).pipe(
+          map(() => ({ version, leftBehind: null as string | null, keptChanged: false })),
+          // The draft is saved under its new number; only tidying up the old one did not happen. One that is
+          // already gone needs no tidying.
+          catchError((error: RubricApiError) => of(error.notFound
+            ? { version, leftBehind: null, keptChanged: false }
+            : { version, leftBehind: previousSemver, keptChanged: error.preconditionFailed })));
       })
-    ).subscribe({
-      next: ({ version, leftBehind }) => {
+    ))).subscribe({
+      next: outcome => {
         this.busy = null;
+        if (!outcome) {
+          this.serverIssues = [this.idTaken(definition.id)];
+          this.goToFirstIssue();
+          this.changeDetector.markForCheck();
+          return;
+        }
+        const { version, leftBehind, keptChanged } = outcome;
         this.definition = cloneDefinition({ ...definition, semver: version.semver });
         this.definition.title ??= '';
         this.definition.owner ??= '';
@@ -669,7 +701,10 @@ export class RubricEditorComponent implements OnInit, OnDestroy {
         this.serverIssues = [];
         this.showIssues = false;
         this.refreshIssues();
-        this.notice = leftBehind
+        this.notice = leftBehind && keptChanged
+          ? `Draft saved as version ${version.semver}. The draft under ${leftBehind} was kept: someone saved changes to it `
+            + 'after you opened it. Review it on the rubric\'s page, and delete it there if it is not needed.'
+          : leftBehind
           ? `Draft saved as version ${version.semver}. The draft under ${leftBehind} could not be deleted; delete it from the rubric's page.`
           : moving
             ? `Draft saved as version ${version.semver}; the draft under ${previousSemver} was deleted.`

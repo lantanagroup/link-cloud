@@ -7,6 +7,7 @@ import {
   RubricDimension,
   RubricSeverity
 } from '../../interfaces/validation/rubric.interface';
+import { orderedChecks } from './rubric-display';
 
 // What the draft editor and the import know about a rubric definition without asking the service: how to
 // start one, how to number its next version, what the service will refuse, and how to send it. The service
@@ -146,6 +147,87 @@ export function cloneDefinition(definition: IRubricDefinition): IRubricDefinitio
 }
 
 /**
+ * A copy of a definition the editor can work on, whatever shape it arrived in, with its checks in the order
+ * they run. What the service reads back
+ * from pasted or imported text is returned even when it is invalid, so any part of it can be missing or null
+ * (`{"id": "piqi.core", "semver": "1.2.0"}` has no checks, dimensions or scoring policy). Each is given an
+ * empty value here, so the form shows what is missing as issues instead of failing on it.
+ */
+export function normalizeDefinition(definition: IRubricDefinition): IRubricDefinition {
+  const source = (isObject(definition) ? cloneDefinition(definition) : {}) as Partial<Record<keyof IRubricDefinition, unknown>>;
+  const policy = isObject(source.scoringPolicy) ? source.scoringPolicy as Partial<Record<string, unknown>> : {};
+  const normalized: IRubricDefinition = {
+    ...(source as object),
+    id: textOf(source.id),
+    semver: textOf(source.semver),
+    title: textOf(source.title),
+    owner: textOf(source.owner),
+    dimensions: listOf(source.dimensions).filter(isText) as RubricDimension[],
+    scoringPolicy: { type: textOf(policy['type']) },
+    // in the order they run, which saving keeps: the save numbers each check by its place in the list
+    checks: orderedChecks({ checks: listOf(source.checks).filter(isObject).map(normalizeCheck) } as IRubricDefinition)
+  };
+  if (isText(policy['rollup'])) {
+    normalized.scoringPolicy.rollup = policy['rollup'];
+  }
+  if (isObject(source.applicableContext)) {
+    const context = source.applicableContext as Record<string, unknown>;
+    normalized.applicableContext = {};
+    if (context['fhirResources'] != null) {
+      normalized.applicableContext.fhirResources = listOf(context['fhirResources']).filter(isText);
+    }
+    if (context['workflowTags'] != null) {
+      normalized.applicableContext.workflowTags = listOf(context['workflowTags']).filter(isText);
+    }
+  } else {
+    delete normalized.applicableContext;
+  }
+  return normalized;
+}
+
+function normalizeCheck(check: object): IRubricCheck {
+  const source = check as Record<string, unknown>;
+  const normalized = { ...source, id: textOf(source['id']) } as IRubricCheck;
+  for (const key of ['dimension', 'severityOverride', 'ordinal', 'enabled'] as const) {
+    if (source[key] == null) {
+      delete normalized[key];
+    }
+  }
+  if (!isObject(source['parameters'])) {
+    delete normalized.parameters;
+    return normalized;
+  }
+  const parameters = { ...(source['parameters'] as IRubricCheckParameters) };
+  if (parameters.profiles == null) {
+    delete parameters.profiles;
+  } else {
+    parameters.profiles = listOf(parameters.profiles).filter(isText);
+  }
+  if (parameters.checks !== undefined) {
+    // null is read as a combined check with nothing in it yet, since a single value-set check never has the key
+    parameters.checks = listOf(parameters.checks).filter(isObject).map(normalizeCheck);
+  }
+  normalized.parameters = parameters;
+  return normalized;
+}
+
+function isObject(value: unknown): value is object {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function textOf(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function listOf(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
  * The definition as it is sent to the service: text trimmed, what is empty left out (the service refuses
  * an empty list where it accepts none at all), no roll-up for a policy that has none, and each check
  * numbered by its place in the list, which is the order the checks run in.
@@ -216,6 +298,10 @@ function cleanParameters(check: Pick<IRubricCheck, 'type' | 'parameters'>): IRub
       text('path');
       text('valueSet');
       text('system');
+      // the form has no fields for these on a single value-set check, but the service accepts them, so
+      // they are kept: saving must not change what is stored, nor its checksum
+      text('failureMessage');
+      text('code');
       break;
     case 'combined':
       cleaned.matchMode = source.matchMode === 'ALL' ? 'ALL' : 'ANY';

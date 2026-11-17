@@ -28,11 +28,10 @@ value set in a store can never take effect.
 
 ### (unattributed)
 
-11 keys.
+7 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Java:Maven` | dotnet | - | - | `DotNet/Link.AspireAppHost/Extensions/JavaServiceExtensions.cs:32` |
 | `MockDmrpApi` | dotnet | - | - | `DotNet/MockDmrpApi/Program.cs:28` |
 | `MockFhirServer` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
 | `MockFhirServer:ClinicalPeriodEnd` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
@@ -40,45 +39,42 @@ value set in a store can never take effect.
 | `MockFhirServer:GenerationSeed` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
 | `MockFhirServer:PreGeneratedPatientCount` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
 | `MockFhirServer:ResourcesPerPatient` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
-| `Validation:Engine` | dotnet | - | - | `DotNet/Link.AspireAppHost/Extensions/JavaServiceExtensions.cs:199` |
-| `Validation:ExcludedResourceTypes` | dotnet | - | - | `DotNet/Link.AspireAppHost/Extensions/JavaServiceExtensions.cs:68` |
-| `Validation:ShadowComparison` | dotnet | - | - | `DotNet/Link.AspireAppHost/Extensions/JavaServiceExtensions.cs:64` |
 
 ### Account
 
-127 keys.
+129 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:140` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:145` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:146` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:139` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:144` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:145` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:101` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:100` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:164` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:163` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `ConnectionStrings:SqlServer` | dotnet | - | - | `DotNet/Account/Persistence/AccountDbContext.cs:57` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:147` |
-| `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:98` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:146` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:97` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -88,28 +84,28 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:252` |
-| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Account/Program.cs:73` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:251` |
+| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Account/Program.cs:72` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -121,47 +117,49 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:136` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:135` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -175,12 +173,12 @@ value set in a store can never take effect.
 | `Telemetry:OtelCollectorEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:PatientTags` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:PrometheusQueryEndpoint` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
-| `UserManagement` | dotnet | - | - | `DotNet/Account/Program.cs:83` |
-| `UserManagement:EnableAutomaticUserActivation` | dotnet | yes | - | `DotNet/Account/Program.cs:83` |
+| `UserManagement` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
+| `UserManagement:EnableAutomaticUserActivation` | dotnet | yes | - | `DotNet/Account/Program.cs:82` |
 
 ### AdminBFF
 
-153 keys.
+155 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -214,28 +212,28 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:204` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:204` |
-| `Cache` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:93` |
-| `Cache:ConnectionString` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:93` |
-| `Cache:InstanceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:93` |
-| `Cache:Password` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:93` |
-| `Cache:Timeout` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:93` |
-| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:93` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:201` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:201` |
+| `Cache` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
+| `Cache:ConnectionString` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
+| `Cache:InstanceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
+| `Cache:Password` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
+| `Cache:Timeout` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
+| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:90` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:144` |
-| `DataProtection` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:90` |
-| `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:90` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:141` |
+| `DataProtection` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:87` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:87` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:87` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -243,32 +241,32 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:PoolSize` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
-| `EnableIntegrationFeature` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:242` |
+| `EnableIntegrationFeature` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:239` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:99` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:92` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:89` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:207` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:92` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:92` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:92` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:210` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:92` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:328` |
-| `MonitorBackendHealthChecks` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:248` |
-| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:85` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:150` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:325` |
+| `MonitorBackendHealthChecks` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:245` |
+| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:82` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:147` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -281,49 +279,51 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ReverseProxy` | dotnet | - | - | `DotNet/Admin.BFF/Infrastructure/Extensions/YarpProxyExtensioncs.cs:15` |
-| `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:89` |
-| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:170` |
-| `SecretManagement:ManagerUri` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:91` |
+| `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:86` |
+| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:167` |
+| `SecretManagement:ManagerUri` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:86` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -340,41 +340,41 @@ value set in a store can never take effect.
 
 ### Audit
 
-126 keys.
+128 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:167` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:172` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:173` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:166` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:171` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:172` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Audit/Program.cs:71` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Audit/Program.cs:71` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:107` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:106` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `ConnectionStrings:SqlServer` | dotnet | - | - | `DotNet/Audit/Persistance/AuditDbContext.cs:41` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/Audit/Program.cs:71` |
-| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
-| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
-| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:71` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:174` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Audit/Program.cs:102` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/Audit/Program.cs:70` |
+| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
+| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
+| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:173` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Audit/Program.cs:101` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -384,28 +384,28 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Audit/Program.cs:73` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:73` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:73` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:73` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:73` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:73` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:73` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:68` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:72` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:197` |
-| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Audit/Program.cs:65` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:196` |
+| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Audit/Program.cs:64` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -417,46 +417,48 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:70` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -473,7 +475,7 @@ value set in a store can never take effect.
 
 ### AutomationUI
 
-170 keys.
+172 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -514,13 +516,13 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `Dashboard:SeedFakeRuns` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:345` |
 | `DataProtection:ApplicationName` | dotnet | yes | dev | `DotNet/Automation.UI/Program.cs:222` |
 | `DataProtection:KeyCollectionName` | dotnet | yes | - | `DotNet/Automation.UI/Program.cs:224` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -579,7 +581,7 @@ value set in a store can never take effect.
 | `Loki:Url` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:54` |
 | `MongoDB:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:192` |
 | `MongoDB:DatabaseName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:193` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -594,14 +596,14 @@ value set in a store can never take effect.
 | `Serilog:WriteTo` | dotnet | - | - | `DotNet/Automation.UI/Services/AutomationSerilog.cs:17` |
 | `ServiceHealth:CheckIntervalSeconds` | dotnet | - | - | `DotNet/Automation.UI/Services/RunExecutor.cs:93` |
 | `ServiceHealth:OutageThresholdSeconds` | dotnet | - | - | `DotNet/Automation.UI/Services/RunExecutor.cs:94` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:382` |
 | `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:37` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
@@ -610,6 +612,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
@@ -618,6 +621,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
@@ -650,40 +654,40 @@ value set in a store can never take effect.
 
 ### Census
 
-123 keys.
+125 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:186` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:191` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:192` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:185` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:190` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:191` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:85` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/Census/Program.cs:75` |
-| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:75` |
-| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:75` |
-| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:75` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:193` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Census/Program.cs:80` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:84` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/Census/Program.cs:74` |
+| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
+| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
+| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:192` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Census/Program.cs:79` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -693,26 +697,26 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:72` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Census/Program.cs:74` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:73` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -724,46 +728,48 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:71` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -780,15 +786,15 @@ value set in a store can never take effect.
 
 ### DataAcquisition
 
-159 keys.
+161 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
 | `AcquisitionJobSettings` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:62` |
 | `AcquisitionJobSettings:CronSchedule` | dotnet | yes | - | `DotNet/DataAcquisition/Program.cs:62` |
-| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
-| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
-| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
 | `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:102` |
 | `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:107` |
 | `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:108` |
@@ -797,23 +803,23 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:101` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:100` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:164` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:163` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `ConnectionStrings:SqlServer` | dotnet | - | - | `DotNet/Account/Persistence/AccountDbContext.cs:57` |
 | `ConsumerSettings` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:49` |
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:49` |
@@ -821,9 +827,9 @@ value set in a store can never take effect.
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:49` |
 | `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:109` |
 | `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:53` |
-| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:148` |
-| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:148` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -833,8 +839,8 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:149` |
-| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:149` |
+| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
+| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:159` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
@@ -846,15 +852,15 @@ value set in a store can never take effect.
 | `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
 | `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
 | `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:110` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -866,65 +872,67 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:89` |
-| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:136` |
-| `SecretManagement:ManagerUri` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
+| `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:86` |
+| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:135` |
+| `SecretManagement:ManagerUri` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:86` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `TailMessageRecoveryJobSettings` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:63` |
 | `TailMessageRecoveryJobSettings:CronSchedule` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:63` |
 | `TailMessageRecoveryJobSettings:MaxGroupsPerRun` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:63` |
@@ -946,7 +954,7 @@ value set in a store can never take effect.
 
 ### DataAcquisitionWorker
 
-160 keys.
+162 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -958,9 +966,9 @@ value set in a store can never take effect.
 | `AcquisitionWorkerProcessorSettings:StalledQueuedThresholdMinutes` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `AcquisitionWorkerProcessorSettings:TimeBudgetPerRunSeconds` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `AcquisitionWorkerProcessorSettings:WorkChannelCapacity` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
-| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
-| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
-| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
 | `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:42` |
 | `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:47` |
 | `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:48` |
@@ -969,33 +977,33 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:101` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
+| `Cache:Type` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:100` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:164` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:163` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `ConnectionStrings:SqlServer` | dotnet | - | - | `DotNet/Account/Persistence/AccountDbContext.cs:57` |
 | `ConsumerSettings` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
-| `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:98` |
-| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:148` |
-| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:148` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:97` |
+| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1005,8 +1013,8 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:149` |
-| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:149` |
+| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
+| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
@@ -1018,15 +1026,15 @@ value set in a store can never take effect.
 | `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
 | `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
 | `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:50` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:82` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:81` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1038,65 +1046,67 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:89` |
-| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:136` |
-| `SecretManagement:ManagerUri` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:89` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:80` |
-| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:147` |
-| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
-| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
+| `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:86` |
+| `SecretManagement:Manager` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:135` |
+| `SecretManagement:ManagerUri` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:86` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1142,41 +1152,41 @@ value set in a store can never take effect.
 
 ### Normalization
 
-124 keys.
+126 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:134` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:139` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:140` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:133` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:138` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:139` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Normalization/Program.cs:78` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Normalization/Program.cs:78` |
-| `CacheBlobStorage` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
-| `CacheBlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
-| `CacheBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
-| `CacheBlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Normalization/Program.cs:77` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Normalization/Program.cs:77` |
+| `CacheBlobStorage` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `CacheBlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `CacheBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `CacheBlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:154` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/Normalization/Program.cs:71` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:141` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Normalization/Program.cs:149` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:153` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:140` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Normalization/Program.cs:148` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1186,26 +1196,26 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:77` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Normalization/Program.cs:79` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:79` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:79` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:79` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:79` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:79` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:79` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Normalization/Program.cs:78` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:78` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1217,46 +1227,48 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:76` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1273,41 +1285,41 @@ value set in a store can never take effect.
 
 ### Notification
 
-136 keys.
+138 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:161` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:166` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:167` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:160` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:165` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:166` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
-| `Channels` | dotnet | - | - | `DotNet/Notification/Program.cs:119` |
-| `Channels:Email` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
-| `Channels:IncludeTestMessage` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
-| `Channels:SubjectTestMessage` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
-| `Channels:TestMessage` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Notification/Program.cs:119` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:119` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Notification/Program.cs:119` |
+| `Channels` | dotnet | - | - | `DotNet/Notification/Program.cs:118` |
+| `Channels:Email` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
+| `Channels:IncludeTestMessage` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
+| `Channels:SubjectTestMessage` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
+| `Channels:TestMessage` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:184` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:168` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Notification/Program.cs:180` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:183` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:167` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Notification/Program.cs:179` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1316,28 +1328,28 @@ value set in a store can never take effect.
 | `DistributedLockSettings:PoolSize` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Notification/Program.cs:56` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:116` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Notification/Program.cs:121` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:121` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:121` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:121` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:121` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:121` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:121` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Notification/Program.cs:55` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:120` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:266` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:265` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1349,57 +1361,59 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:115` |
-| `SmtpConnection` | dotnet | - | - | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:ClientSecret` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:EmailFrom` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:Host` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:Password` | dotnet | - | - | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:Port` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:TenantId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:UseBasicAuth` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:UseOAuth2` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:Username` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:118` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Notification/Program.cs:80` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `SmtpConnection` | dotnet | - | - | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:ClientSecret` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:EmailFrom` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:Host` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:Password` | dotnet | - | - | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:Port` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:TenantId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:UseBasicAuth` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:UseOAuth2` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
+| `SmtpConnection:Username` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:117` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1416,37 +1430,37 @@ value set in a store can never take effect.
 
 ### QueryDispatch
 
-120 keys.
+122 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:62` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:67` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:68` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:61` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:66` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:67` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:58` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:115` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:76` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:69` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:114` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:75` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:68` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1456,26 +1470,26 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:55` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:59` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:59` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:59` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:59` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:59` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:59` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:59` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:58` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:58` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1487,46 +1501,48 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1543,40 +1559,40 @@ value set in a store can never take effect.
 
 ### Report
 
-138 keys.
+140 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:190` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:195` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:196` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:187` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:192` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:193` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Report/Program.cs:103` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:103` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Report/Program.cs:103` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Report/Program.cs:100` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Report/Program.cs:100` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:108` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/Report/Program.cs:102` |
-| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:102` |
-| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:102` |
-| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:102` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:197` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:105` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/Report/Program.cs:99` |
+| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
+| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
+| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:194` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1585,36 +1601,36 @@ value set in a store can never take effect.
 | `DistributedLockSettings:PoolSize` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `EnhancedQueryLoggingSettings` | dotnet | - | - | `DotNet/Report/Program.cs:112` |
-| `EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging` | dotnet | yes | test | `DotNet/Report/Program.cs:112` |
+| `EnhancedQueryLoggingSettings` | dotnet | - | - | `DotNet/Report/Program.cs:109` |
+| `EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging` | dotnet | yes | test | `DotNet/Report/Program.cs:109` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `InternalBlobStorage` | dotnet | - | - | `DotNet/Report/Program.cs:105` |
-| `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:105` |
-| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Report/Program.cs:105` |
-| `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:105` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:100` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Report/Program.cs:104` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:104` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:104` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:104` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:104` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:104` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:104` |
+| `InternalBlobStorage` | dotnet | - | - | `DotNet/Report/Program.cs:102` |
+| `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:102` |
+| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Report/Program.cs:102` |
+| `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:102` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:97` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Report/Program.cs:101` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:101` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:101` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:101` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:101` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:101` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:101` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `PatientAggregator` | dotnet | - | - | `DotNet/Report/Program.cs:106` |
-| `PatientAggregator:IncludeOrganizationResource` | dotnet | yes | dev, test | `DotNet/Report/Program.cs:106` |
-| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Report/Program.cs:96` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `PatientAggregator` | dotnet | - | - | `DotNet/Report/Program.cs:103` |
+| `PatientAggregator:IncludeOrganizationResource` | dotnet | yes | dev, test | `DotNet/Report/Program.cs:103` |
+| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Report/Program.cs:93` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1632,46 +1648,48 @@ value set in a store can never take effect.
 | `Retention:Schedule:Cron` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
 | `Retention:Schedule:Enabled` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
 | `Retention:Window` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionCheckSettings.cs:89` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1688,40 +1706,40 @@ value set in a store can never take effect.
 
 ### Submission
 
-143 keys.
+145 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:87` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:92` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:93` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:86` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:91` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:92` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Submission/Program.cs:77` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Submission/Program.cs:77` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:144` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/Submission/Program.cs:77` |
-| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
-| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
-| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:77` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:94` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:143` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/Submission/Program.cs:76` |
+| `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
+| `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
+| `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:93` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1730,41 +1748,41 @@ value set in a store can never take effect.
 | `DistributedLockSettings:PoolSize` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalBlobStorage` | dotnet | - | - | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:FlattenHierarchy` | dotnet | yes | test | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:MeasurePrefixesByReportType` | dotnet | yes | test | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:MeasurePrefixesByReportType:{Placeholder}` | dotnet | - | - | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:SuppressManifest` | dotnet | yes | test | `DotNet/Submission/Program.cs:81` |
-| `ExternalBlobStorage:UseMeasurePrefix` | dotnet | yes | test | `DotNet/Submission/Program.cs:81` |
+| `ExternalBlobStorage` | dotnet | - | - | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:FlattenHierarchy` | dotnet | yes | test | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:MeasurePrefixesByReportType` | dotnet | yes | test | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:MeasurePrefixesByReportType:{Placeholder}` | dotnet | - | - | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:SuppressManifest` | dotnet | yes | test | `DotNet/Submission/Program.cs:80` |
+| `ExternalBlobStorage:UseMeasurePrefix` | dotnet | yes | test | `DotNet/Submission/Program.cs:80` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
 | `Features:DownloadReportEnabled` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Application/Middleware/ConditionalEndpoint.cs:32` |
-| `InternalBlobStorage` | dotnet | - | - | `DotNet/Submission/Program.cs:80` |
-| `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:80` |
-| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Submission/Program.cs:80` |
-| `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:80` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Submission/Program.cs:79` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
+| `InternalBlobStorage` | dotnet | - | - | `DotNet/Submission/Program.cs:79` |
+| `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
+| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Submission/Program.cs:79` |
+| `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:79` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:78` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1776,52 +1794,54 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:74` |
-| `SubmissionServiceConfig` | dotnet | - | - | `DotNet/Submission/Program.cs:76` |
-| `SubmissionServiceConfig:MeasureNames:0:MeasureId` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
-| `SubmissionServiceConfig:MeasureNames:0:ShortName` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
-| `SubmissionServiceConfig:MeasureNames:0:Url` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
-| `SubmissionServiceConfig:PatientBundleBatchSize` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
-| `SubmissionServiceConfig:SubmissionDirectory` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:76` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `SubmissionServiceConfig` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
+| `SubmissionServiceConfig:MeasureNames:0:MeasureId` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
+| `SubmissionServiceConfig:MeasureNames:0:ShortName` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
+| `SubmissionServiceConfig:MeasureNames:0:Url` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
+| `SubmissionServiceConfig:PatientBundleBatchSize` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
+| `SubmissionServiceConfig:SubmissionDirectory` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:75` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1838,34 +1858,34 @@ value set in a store can never take effect.
 
 ### Tenant
 
-130 keys.
+132 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:73` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:78` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:79` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:72` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:77` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:78` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Tenant/Program.cs:99` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Tenant/Program.cs:99` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `CORS` | dotnet | - | - | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Tenant/Program.cs:98` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:98` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Tenant/Program.cs:98` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:123` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:122` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `DMRP` | dotnet | - | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DMRP:Api` | dotnet | - | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DMRP:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
@@ -1873,8 +1893,8 @@ value set in a store can never take effect.
 | `DMRP:Scheduling:Concurrency` | dotnet | yes | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DMRP:Scheduling:NightlyCron` | dotnet | yes | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DMRP:Scheduling:ScheduledFireTimeOverride` | dotnet | yes | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:80` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:118` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:79` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:117` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1884,30 +1904,30 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `FacilityIdSettings` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
-| `FacilityIdSettings:NumericOnlyFacilityId` | dotnet | yes | - | `DotNet/Tenant/Program.cs:91` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:97` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Tenant/Program.cs:100` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:100` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:100` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:100` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:100` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:100` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:100` |
+| `FacilityIdSettings` | dotnet | - | - | `DotNet/Tenant/Program.cs:90` |
+| `FacilityIdSettings:NumericOnlyFacilityId` | dotnet | yes | - | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Tenant/Program.cs:99` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:99` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `MeasureConfig` | dotnet | - | - | `DotNet/Tenant/Program.cs:95` |
-| `MeasureConfig:CheckIfMeasureExists` | dotnet | - | - | `DotNet/Tenant/Program.cs:95` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `MeasureConfig` | dotnet | - | - | `DotNet/Tenant/Program.cs:94` |
+| `MeasureConfig:CheckIfMeasureExists` | dotnet | - | - | `DotNet/Tenant/Program.cs:94` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -1919,46 +1939,48 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:96` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1979,19 +2001,19 @@ value set in a store can never take effect.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:42` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:47` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:48` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:41` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:46` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:47` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
+| `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:114` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:49` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
+| `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:48` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -2001,21 +2023,21 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:77` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:50` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:76` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:49` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:23` |
-| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Terminology/Program.cs:62` |
-| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:120` |
+| `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Terminology/Program.cs:61` |
+| `Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:119` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
@@ -2027,14 +2049,14 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
-| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:77` |
+| `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
+| `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -2048,11 +2070,11 @@ value set in a store can never take effect.
 | `Telemetry:OtelCollectorEndpoint` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:PatientTags` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:PrometheusQueryEndpoint` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
-| `Terminology` | dotnet | - | - | `DotNet/Terminology/Program.cs:133` |
-| `Terminology:DefaultExpansionPageSize` | dotnet | yes | - | `DotNet/Terminology/Program.cs:133` |
-| `Terminology:EnableCodeUploadEndpoint` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:133` |
-| `Terminology:MaxExpansionPageSize` | dotnet | yes | - | `DotNet/Terminology/Program.cs:133` |
-| `Terminology:Path` | dotnet | yes | - | `DotNet/Terminology/Program.cs:133` |
+| `Terminology` | dotnet | - | - | `DotNet/Terminology/Program.cs:132` |
+| `Terminology:DefaultExpansionPageSize` | dotnet | yes | - | `DotNet/Terminology/Program.cs:132` |
+| `Terminology:EnableCodeUploadEndpoint` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Terminology/Program.cs:132` |
+| `Terminology:MaxExpansionPageSize` | dotnet | yes | - | `DotNet/Terminology/Program.cs:132` |
+| `Terminology:Path` | dotnet | yes | - | `DotNet/Terminology/Program.cs:132` |
 
 ### Validation
 

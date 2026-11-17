@@ -130,7 +130,8 @@
                 {{ acting ? 'Working…' : plan.confirmLabel }}
               </button>
             }
-            <button type="button" class="rubric-button" (click)="cancelAction()">
+            <!-- not while the request is out: it would still be carried out, but the page would not show it -->
+            <button type="button" class="rubric-button" [disabled]="acting" (click)="cancelAction()">
               {{ plan.blocked ? 'Close' : 'Cancel' }}
             </button>
           </div>

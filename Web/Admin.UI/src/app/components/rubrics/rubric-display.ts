@@ -179,13 +179,15 @@ export function checkSummary(check: IRubricCheck): string {
   }
 }
 
-/** The checks in the order they run: by ordinal, those without one last, otherwise as written. */
+/**
+ * The checks in the order they run: by ordinal, otherwise as written. Those without an ordinal come first,
+ * because the service runs them in its database's ascending order and SQL Server sorts NULL first.
+ */
 export function orderedChecks(definition?: IRubricDefinition | null): IRubricCheck[] {
   const checks = definition?.checks ?? [];
   return checks
     .map((check, index) => ({ check, index }))
-    .sort((a, b) =>
-      (a.check.ordinal ?? Number.MAX_SAFE_INTEGER) - (b.check.ordinal ?? Number.MAX_SAFE_INTEGER) || a.index - b.index)
+    .sort((a, b) => (a.check.ordinal ?? -1) - (b.check.ordinal ?? -1) || a.index - b.index)
     .map(entry => entry.check);
 }
 

@@ -287,6 +287,17 @@ public class RubricRegistryService {
      */
     @Transactional
     public void deleteDraft(String rubricId, String semver, String deletedBy) {
+        deleteDraft(rubricId, semver, deletedBy, null);
+    }
+
+    /**
+     * Deletes a draft as {@link #deleteDraft(String, String, String)} does, but given an expected checksum,
+     * only while the draft is still the one the caller read: one saved again since then, by anyone, is kept
+     * and the delete refused with {@link RubricPreconditionFailedException}. A draft that is already gone is
+     * still not found; there is nothing left to lose.
+     */
+    @Transactional
+    public void deleteDraft(String rubricId, String semver, String deletedBy, String expectedChecksum) {
         final String normalizedSemver = Semver.normalize(semver);
         RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
                 .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
@@ -294,13 +305,23 @@ public class RubricRegistryService {
             throw new RubricLifecycleException(rubricId, normalizedSemver, v.getStatus(), "delete");
         }
         String checksum = v.getChecksum();
+        if (expectedChecksum != null && !expectedChecksum.equalsIgnoreCase(checksum)) {
+            throw RubricPreconditionFailedException.changed(rubricId, normalizedSemver);
+        }
         rubricCheckRepository.deleteByRubricVersionId(v.getRubricVersionId());
-        // guarded like publish and retire: if it stopped being a DRAFT between our read and here, nothing
-        // is deleted, and throwing rolls the checks' deletion back with the transaction
-        int deleted = rubricVersionRepository.deleteIfStatus(v.getRubricVersionId(), RubricVersionStatus.DRAFT);
+        // guarded like publish and retire: if it stopped being a DRAFT between our read and here, or was saved
+        // again when the caller made that a condition, nothing is deleted, and throwing rolls the checks'
+        // deletion back with the transaction
+        int deleted = expectedChecksum != null
+                ? rubricVersionRepository.deleteIfStatusAndChecksum(v.getRubricVersionId(), RubricVersionStatus.DRAFT, checksum)
+                : rubricVersionRepository.deleteIfStatus(v.getRubricVersionId(), RubricVersionStatus.DRAFT);
         if (deleted == 0) {
             RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
                     .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
+            if (expectedChecksum != null && current.getStatus() == RubricVersionStatus.DRAFT) {
+                // still a draft, so only the checksum guard can have stopped it
+                throw RubricPreconditionFailedException.changed(rubricId, normalizedSemver);
+            }
             throw new RubricLifecycleException(rubricId, normalizedSemver, current.getStatus(), "delete");
         }
         boolean lastVersion = rubricVersionRepository.countByRubricId(rubricId) == 0;

@@ -98,6 +98,15 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, Lo
     int deleteIfStatus(@Param("rubricVersionId") Long rubricVersionId,
                        @Param("expected") RubricVersionStatus expected);
 
+    // for a delete made on condition that the draft is the one the caller read: a draft saved in between
+    // changes the checksum and this touches nothing
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from RubricVersion v where v.rubricVersionId = :rubricVersionId and v.status = :expected "
+            + "and v.checksum = :checksum")
+    int deleteIfStatusAndChecksum(@Param("rubricVersionId") Long rubricVersionId,
+                                  @Param("expected") RubricVersionStatus expected,
+                                  @Param("checksum") String checksum);
+
     long countByRubricId(String rubricId);
 
     // a count, not entities, so it reads the database and not versions this transaction already loaded

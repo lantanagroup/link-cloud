@@ -277,6 +277,21 @@ class RubricManagementRepositoriesJpaTest {
     }
 
     @Test
+    @DisplayName("deleteIfStatusAndChecksum deletes a draft only while it holds the checksum given")
+    void deleteIfStatusAndChecksum_guardsTheChecksum() {
+        persistRubric("piqi.core", "PIQI Core", "qa");
+        RubricVersion draft = persistVersion("piqi.core", "1.1.0", RubricVersionStatus.DRAFT);
+
+        assertThat(versionRepository.deleteIfStatusAndChecksum(
+                draft.getRubricVersionId(), RubricVersionStatus.DRAFT, "saved-since")).isZero();
+        assertThat(versionRepository.findByRubricIdAndSemver("piqi.core", "1.1.0")).isPresent();
+
+        assertThat(versionRepository.deleteIfStatusAndChecksum(
+                draft.getRubricVersionId(), RubricVersionStatus.DRAFT, "checksum-1.1.0")).isEqualTo(1);
+        assertThat(versionRepository.findByRubricIdAndSemver("piqi.core", "1.1.0")).isEmpty();
+    }
+
+    @Test
     @DisplayName("a draft with checks, and then its rubric with its history, can be deleted in that order")
     void deletingTheLastDraftAndItsRubric() {
         persistRubric("piqi.core", "PIQI Core", "qa");

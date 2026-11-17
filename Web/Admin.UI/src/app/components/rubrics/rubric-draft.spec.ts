@@ -11,6 +11,7 @@ import {
   newCheck,
   newDefinition,
   nextVersion,
+  normalizeDefinition,
   placeServerError,
   readOnlyReason,
   requiredDimension,
@@ -143,6 +144,20 @@ describe('rubric draft', () => {
       ]);
     });
 
+    it('keeps the failure message and code of a single value-set check, which the service accepts', () => {
+      const valueSetCheck = check({
+        id: 'v', type: 'VALUESET', dimension: 'TERMINOLOGY',
+        parameters: { path: 'Patient.gender', valueSet: 'http://vs', failureMessage: ' Not a gender ', code: 'GENDER' }
+      });
+
+      const cleaned = cleanDefinition(definition({ checks: [valueSetCheck] }));
+
+      expect(cleaned.checks[0].parameters).toEqual(
+        { path: 'Patient.gender', valueSet: 'http://vs', failureMessage: 'Not a gender', code: 'GENDER' });
+      // so opening and saving it changes nothing
+      expect(sameDefinition(definition({ checks: [valueSetCheck] }), cleaned)).toBeTrue();
+    });
+
     it('defaults a check to enabled and a combined check to "any", and cleans its children', () => {
       const cleaned = cleanDefinition(definition({
         checks: [check({
@@ -177,6 +192,63 @@ describe('rubric draft', () => {
       cleanDefinition(original);
 
       expect(original).toEqual(snapshot);
+    });
+  });
+
+  describe('normalizeDefinition', () => {
+    it('gives what a partial definition leaves out an empty value, so the form can work on it', () => {
+      const partial = { id: 'piqi.core', semver: '1.2.0' } as unknown as IRubricDefinition;
+
+      const normalized = normalizeDefinition(partial);
+
+      expect(normalized).toEqual({
+        id: 'piqi.core', semver: '1.2.0', title: '', owner: '', dimensions: [], scoringPolicy: { type: '' }, checks: []
+      });
+      expect(() => findIssues(normalized)).not.toThrow();
+      expect(() => cleanDefinition(normalized)).not.toThrow();
+      expect(findIssues(normalized).map(found => found.field)).toEqual(['dimensions', 'scoringPolicy.type', 'checks']);
+    });
+
+    it('reads null the same as missing, down to the checks and what they combine', () => {
+      const nulls = {
+        id: null, semver: null, title: null, owner: null, dimensions: null, scoringPolicy: null, applicableContext: null,
+        checks: [
+          null,
+          { id: null, type: 'FHIR_CONFORMANCE', dimension: null, severityOverride: null, enabled: null, parameters: { profiles: null } },
+          { id: 'combo', type: 'VALUESET', dimension: 'TERMINOLOGY', parameters: { checks: [{ id: null, type: 'VALUESET', parameters: null }] } }
+        ]
+      } as unknown as IRubricDefinition;
+
+      const normalized = normalizeDefinition(nulls);
+
+      expect(normalized.id).toBe('');
+      expect(normalized.applicableContext).toBeUndefined();
+      expect(normalized.checks.length).toBe(2);
+      expect(normalized.checks[0]).toEqual({ id: '', type: 'FHIR_CONFORMANCE', parameters: {} });
+      expect(normalized.checks[1].parameters?.checks).toEqual([{ id: '', type: 'VALUESET' }]);
+      expect(() => findIssues(normalized)).not.toThrow();
+      expect(() => cleanDefinition(normalized)).not.toThrow();
+    });
+
+    it('puts the checks in the order they run: those without an ordinal first, then by ordinal', () => {
+      const scrambled = definition({
+        checks: [check({ id: 'b', ordinal: 2 }), check({ id: 'none' }), check({ id: 'a', ordinal: 1 })]
+      });
+
+      expect(normalizeDefinition(scrambled).checks.map(found => found.id)).toEqual(['none', 'a', 'b']);
+      // and saving numbers them in that order, so the run order does not change
+      expect(cleanDefinition(normalizeDefinition(scrambled)).checks.map(found => [found.id, found.ordinal]))
+        .toEqual([['none', 1], ['a', 2], ['b', 3]]);
+    });
+
+    it('leaves a whole definition as it was, without sharing anything with it', () => {
+      const whole = definition({ applicableContext: { fhirResources: ['Patient'], workflowTags: ['ach'] } });
+
+      const normalized = normalizeDefinition(whole);
+
+      expect(normalized).toEqual(whole);
+      normalized.checks[0].id = 'changed';
+      expect(whole.checks[0].id).toBe('c1');
     });
   });
 

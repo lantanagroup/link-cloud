@@ -619,14 +619,33 @@ class RubricControllerManagementTest {
                     .andExpect(status().isNoContent())
                     .andExpect(content().string(""));
 
-            verify(registry).deleteDraft("piqi.core", "1.0.0", "anonymous");
+            verify(registry).deleteDraft("piqi.core", "1.0.0", "anonymous", null);
+        }
+
+        @Test
+        @DisplayName("If-Match carries the checksum of the draft the caller read, read as save reads it")
+        void ifMatch() throws Exception {
+            mockMvc.perform(delete(BASE + "/piqi.core/versions/1.0.0").header(HttpHeaders.IF_MATCH, "W/\"abc123\""))
+                    .andExpect(status().isNoContent());
+
+            verify(registry).deleteDraft("piqi.core", "1.0.0", "anonymous", "abc123");
+        }
+
+        @Test
+        @DisplayName("a draft saved again since it was read -> 412")
+        void changedSinceRead() throws Exception {
+            doThrow(RubricPreconditionFailedException.changed("piqi.core", "1.0.0"))
+                    .when(registry).deleteDraft(any(), any(), any(), any());
+
+            mockMvc.perform(delete(BASE + "/piqi.core/versions/1.0.0").header(HttpHeaders.IF_MATCH, "\"stale\""))
+                    .andExpect(status().isPreconditionFailed());
         }
 
         @Test
         @DisplayName("a published or retired version -> 409")
         void notADraft() throws Exception {
             doThrow(new RubricLifecycleException("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED, "delete"))
-                    .when(registry).deleteDraft(any(), any(), any());
+                    .when(registry).deleteDraft(any(), any(), any(), any());
 
             mockMvc.perform(delete(BASE + "/piqi.core/versions/1.0.0"))
                     .andExpect(status().isConflict())
@@ -637,7 +656,7 @@ class RubricControllerManagementTest {
         @DisplayName("unknown version -> 404")
         void notFound() throws Exception {
             doThrow(new RubricVersionNotFoundException("piqi.core", "9.9.9"))
-                    .when(registry).deleteDraft(any(), any(), any());
+                    .when(registry).deleteDraft(any(), any(), any(), any());
 
             mockMvc.perform(delete(BASE + "/piqi.core/versions/9.9.9")).andExpect(status().isNotFound());
         }

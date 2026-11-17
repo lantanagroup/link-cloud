@@ -449,18 +449,21 @@ public class RubricController {
     }
 
     @Operation(summary = "Delete a version that is still a DRAFT. A PUBLISHED or RETIRED version cannot be deleted. "
-            + "Deleting a rubric's only version removes the rubric")
+            + "Deleting a rubric's only version removes the rubric. Optional precondition: If-Match with the "
+            + "checksum of the draft last read refuses the delete (412) when the draft has been saved again since")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is PUBLISHED or RETIRED")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is PUBLISHED or RETIRED"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "412", description = "The If-Match precondition did not hold")
     })
     @DeleteMapping("/{rubricId}/versions/{semver}")
     public ResponseEntity<Void> deleteDraft(
             @PathVariable String rubricId,
             @PathVariable String semver,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
             Principal principal) {
-        registry.deleteDraft(rubricId, semver, actor(principal));
+        registry.deleteDraft(rubricId, semver, actor(principal), precondition(ifMatch, null).expectedChecksum());
         return ResponseEntity.noContent().build();
     }
 

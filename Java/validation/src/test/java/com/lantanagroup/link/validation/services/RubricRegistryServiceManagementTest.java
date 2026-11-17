@@ -443,6 +443,62 @@ class RubricRegistryServiceManagementTest {
         }
 
         @Test
+        @DisplayName("with the checksum the caller read: deleted, guarded on that checksum as well as the status")
+        void expectedChecksumMatches() {
+            stubExisting(version(RubricVersionStatus.DRAFT));
+            when(versionRepository.deleteIfStatusAndChecksum(1L, RubricVersionStatus.DRAFT, "abc123")).thenReturn(1);
+            when(versionRepository.countByRubricId("piqi.core")).thenReturn(1L);
+
+            service().deleteDraft("piqi.core", "1.0.0", "author", "ABC123");
+
+            verify(versionRepository, never()).deleteIfStatus(any(), any());
+            verify(eventRepository).save(any());
+            verify(cacheService).evictVersion("piqi.core", "1.0.0");
+        }
+
+        @Test
+        @DisplayName("saved again since the caller read it -> refused, and nothing is deleted")
+        void expectedChecksumStale() {
+            stubExisting(version(RubricVersionStatus.DRAFT));
+
+            assertThatThrownBy(() -> service().deleteDraft("piqi.core", "1.0.0", "author", "stale"))
+                    .isInstanceOf(RubricPreconditionFailedException.class)
+                    .hasMessageContaining("has been changed since it was read");
+
+            verify(checkRepository, never()).deleteByRubricVersionId(any());
+            verify(versionRepository, never()).deleteIfStatus(any(), any());
+            verify(versionRepository, never()).deleteIfStatusAndChecksum(any(), any(), any());
+            verifyNoInteractions(eventRepository, cacheService);
+        }
+
+        @Test
+        @DisplayName("saved again between the read and the delete -> refused as changed, nothing recorded")
+        void losesTheRaceToASave() {
+            stubExisting(version(RubricVersionStatus.DRAFT));
+            when(versionRepository.deleteIfStatusAndChecksum(anyLong(), any(), any())).thenReturn(0);
+
+            assertThatThrownBy(() -> service().deleteDraft("piqi.core", "1.0.0", "author", "abc123"))
+                    .isInstanceOf(RubricPreconditionFailedException.class)
+                    .hasMessageContaining("has been changed since it was read");
+
+            verify(rubricRepository, never()).deleteById(any());
+            verifyNoInteractions(eventRepository, cacheService);
+        }
+
+        @Test
+        @DisplayName("published between the read and a conditional delete -> refused with its real status")
+        void conditionalLosesTheRaceToPublish() {
+            when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
+                    .thenReturn(Optional.of(version(RubricVersionStatus.DRAFT)))
+                    .thenReturn(Optional.of(version(RubricVersionStatus.PUBLISHED)));
+            when(versionRepository.deleteIfStatusAndChecksum(anyLong(), any(), any())).thenReturn(0);
+
+            assertThatThrownBy(() -> service().deleteDraft("piqi.core", "1.0.0", "author", "abc123"))
+                    .isInstanceOf(RubricLifecycleException.class)
+                    .hasMessageContaining("status is PUBLISHED");
+        }
+
+        @Test
         @DisplayName("the semver is put in canonical form before the version is looked up")
         void normalizesSemver() {
             stubExisting(version(RubricVersionStatus.DRAFT));

@@ -195,10 +195,15 @@ export class RubricService {
     );
   }
 
-  /** Deletes a draft. A published or retired version cannot be deleted; that fails with `conflict`. */
-  deleteDraft(rubricId: string, semver: string): Observable<void> {
+  /**
+   * Deletes a draft. A published or retired version cannot be deleted; that fails with `conflict`. Given the
+   * checksum of the draft as it was read, a draft saved again since then is kept, and that fails with
+   * `preconditionFailed`.
+   */
+  deleteDraft(rubricId: string, semver: string, expectedChecksum?: string): Observable<void> {
+    const headers: Record<string, string> = expectedChecksum ? { 'If-Match': `"${expectedChecksum}"` } : {};
     return this.http.delete<void>(
-      `${this.baseUrl}/${encodeURIComponent(rubricId)}/versions/${encodeURIComponent(semver)}`).pipe(
+      `${this.baseUrl}/${encodeURIComponent(rubricId)}/versions/${encodeURIComponent(semver)}`, { headers }).pipe(
       map(() => undefined),
       catchError(RubricService.toApiError)
     );

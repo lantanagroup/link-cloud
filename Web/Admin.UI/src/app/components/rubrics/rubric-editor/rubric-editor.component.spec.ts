@@ -166,6 +166,19 @@ describe('RubricEditorComponent', () => {
       // read once: a reload does not bring it back
       expect(window.history.state[EDITOR_DEFINITION_STATE]).toBeUndefined();
     });
+
+    it('opens a handed-over definition that is missing its lists, and shows what is missing', () => {
+      // the import offers "Open in the editor" for exactly the definitions the service found invalid
+      window.history.replaceState({ [EDITOR_DEFINITION_STATE]: { id: 'brought.in', semver: '3.0.0', checks: null } }, '');
+
+      open();
+
+      expect(component.loading).toBeFalse();
+      expect(component.definition.checks).toEqual([]);
+      expect(component.dirty).toBeTrue();
+      expect(component.definitionJson).toContain('"brought.in"');
+      expect(component.formIssues.map(found => found.field)).toContain('checks');
+    });
   });
 
   // ------------------------------------------------------------------------------------------- editing
@@ -375,6 +388,74 @@ describe('RubricEditorComponent', () => {
       expect(component.errors('id').length).toBe(1);
     });
 
+    describe('a new rubric', () => {
+      function fillNewRubric(id = 'new.rubric'): void {
+        open();
+        component.definition = { ...stored, id, semver: '1.0.0', checks: stored.checks.map(check => ({ ...check })) };
+        component.onChanged();
+      }
+
+      it('is not saved under an id another rubric has, which would add to that rubric and rename it', () => {
+        fillNewRubric('piqi.core');
+
+        component.save();
+
+        expect(rubricService.getRubric).toHaveBeenCalledWith('piqi.core');
+        expect(rubricService.saveDraft).not.toHaveBeenCalled();
+        expect(component.errors('id').map(found => found.message))
+          .toEqual(['A rubric with the id "piqi.core" already exists. Choose another id, or open that rubric and create a new version there.']);
+        expect(component.busy).toBeNull();
+      });
+
+      it('is saved when no rubric has its id, and is not looked up again once saved', () => {
+        rubricService.getRubric.and.returnValue(throwError(() => new RubricApiError('not found', 404)));
+        fillNewRubric();
+
+        component.save();
+
+        expect(lastSave()[0].id).toBe('new.rubric');
+        expect(lastSave()[1]).toEqual({ mustNotExist: true });
+
+        rubricService.getRubric.calls.reset();
+        component.definition.title = 'Changed';
+        component.onChanged();
+        component.save();
+
+        expect(rubricService.getRubric).not.toHaveBeenCalled();
+        expect(rubricService.saveDraft).toHaveBeenCalledTimes(2);
+      });
+
+      it('is not saved when whether its id is taken cannot be told', () => {
+        rubricService.getRubric.and.returnValue(throwError(() => new RubricApiError('The service is unavailable.', 503)));
+        fillNewRubric();
+
+        component.save();
+
+        expect(rubricService.saveDraft).not.toHaveBeenCalled();
+        expect(component.failure).toBe('The service is unavailable.');
+      });
+
+      it('Validate says so when its id is taken, rather than that it is ready to save', () => {
+        rubricService.validate.and.returnValue(of({ ...valid, rubricExists: true }));
+        fillNewRubric('piqi.core');
+
+        component.validate();
+
+        expect(component.errors('id').length).toBe(1);
+        expect(component.notice).toBeNull();
+      });
+
+      it('a pasted definition whose id is taken says so', () => {
+        rubricService.validateText.and.returnValue(of({ valid: true, errors: [], rubricExists: true, definition: stored }));
+        open();
+        component.pasteText = 'id: piqi.core';
+
+        component.loadPasted();
+
+        expect(component.errors('id').length).toBe(1);
+      });
+    });
+
     it('a new version must not exist yet, and its address becomes the saved draft\'s', () => {
       open({ rubricId: 'piqi.core' });
 
@@ -388,6 +469,22 @@ describe('RubricEditorComponent', () => {
       expect(component.dirty).toBeFalse();
       expect(router.navigate).toHaveBeenCalledWith(
         ['/rubrics', 'piqi.core', 'versions', '1.1.1', 'edit'], jasmine.objectContaining({ replaceUrl: true }));
+    });
+
+    it('keeps the order checks run in when they were not stored in that order', () => {
+      // as an imported YAML might have it: written b then a, but a runs first
+      const outOfOrder = { ...stored, checks: [{ ...stored.checks[1], ordinal: 2 }, { ...stored.checks[0], ordinal: 1 }] };
+      rubricService.getVersion.and.returnValue(of(version('DRAFT', outOfOrder)));
+      open({ rubricId: 'piqi.core', semver: '1.1.0' });
+
+      expect(component.definition.checks.map(check => check.id)).toEqual(['first', 'second']);
+      expect(component.dirty).toBeFalse();
+
+      component.definition.title = 'Only the title changed';
+      component.onChanged();
+      component.save();
+
+      expect(lastSave()[0].checks.map(check => [check.id, check.ordinal])).toEqual([['first', 1], ['second', 2]]);
     });
 
     it('a draft is saved against the checksum it was opened with, then against the one the save returned', () => {
@@ -413,7 +510,33 @@ describe('RubricEditorComponent', () => {
       component.save();
 
       expect(lastSave()[1]).toEqual({ mustNotExist: true });
-      expect(rubricService.deleteDraft).toHaveBeenCalledOnceWith('piqi.core', '1.1.0');
+      // only as it was opened: a draft someone else has saved since is not deleted
+      expect(rubricService.deleteDraft).toHaveBeenCalledOnceWith('piqi.core', '1.1.0', 'sum-1');
+      expect(component.notice).toBe('Draft saved as version 2.0.0; the draft under 1.1.0 was deleted.');
+    });
+
+    it('keeps the old draft after a move when someone else saved it since it was opened, and says so', () => {
+      rubricService.deleteDraft.and.returnValue(throwError(() => new RubricApiError('changed', 412)));
+      open({ rubricId: 'piqi.core', semver: '1.1.0' });
+      component.definition.semver = '2.0.0';
+      component.onChanged();
+
+      component.save();
+
+      expect(component.dirty).toBeFalse();
+      expect(component.definition.semver).toBe('2.0.0');
+      expect(component.notice).toContain('The draft under 1.1.0 was kept: someone saved changes to it after you opened it.');
+      expect(component.staleDraft).toBeFalse();
+    });
+
+    it('a move whose old draft is already gone is simply done', () => {
+      rubricService.deleteDraft.and.returnValue(throwError(() => new RubricApiError('gone', 404)));
+      open({ rubricId: 'piqi.core', semver: '1.1.0' });
+      component.definition.semver = '2.0.0';
+      component.onChanged();
+
+      component.save();
+
       expect(component.notice).toBe('Draft saved as version 2.0.0; the draft under 1.1.0 was deleted.');
     });
 
@@ -551,6 +674,35 @@ describe('RubricEditorComponent', () => {
       component.loadPasted();
 
       expect(component.checkIssueCount(0)).toBe(1);
+    });
+
+    it('loads a definition that is missing its lists, and can still be changed and left', () => {
+      rubricService.validateText.and.returnValue(of({
+        valid: false, errors: ['checks: must not be empty'], definition: { id: 'piqi.core', semver: '1.2.0' } as unknown as IRubricDefinition
+      }));
+      component.pasteText = '{"id":"piqi.core","semver":"1.2.0"}';
+
+      component.loadPasted();
+      fixture.detectChanges();
+
+      expect(component.definition.dimensions).toEqual([]);
+      expect(component.definition.checks).toEqual([]);
+      expect(component.definition.scoringPolicy).toEqual({ type: '' });
+      expect(component.dirty).toBeTrue();
+      expect(() => component.needsRollup).not.toThrow();
+      expect(component.definitionJson).toContain('"1.2.0"');
+      expect(component.showIssues).toBeTrue();
+    });
+
+    it('puts the pasted checks in the order they run', () => {
+      rubricService.validateText.and.returnValue(of({
+        valid: true, errors: [], definition: { ...stored, checks: [{ ...stored.checks[1], ordinal: 2 }, { ...stored.checks[0], ordinal: 1 }] }
+      }));
+      component.pasteText = 'id: piqi.core';
+
+      component.loadPasted();
+
+      expect(component.definition.checks.map(check => check.id)).toEqual(['first', 'second']);
     });
 
     it('refuses a definition for another rubric, and leaves the draft as it was', () => {

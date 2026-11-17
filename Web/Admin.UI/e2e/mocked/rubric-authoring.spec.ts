@@ -62,6 +62,26 @@ test.beforeEach(async ({ api }) => {
 });
 
 test.describe('creating a rubric', () => {
+  test('an id another rubric has is refused before anything is saved', async ({ page, api }) => {
+    const saved = capture(api, `POST ${RUBRICS}/bare-minimum-requirements/versions`, savedDraft('bare-minimum-requirements', '9.0.0'));
+
+    await page.goto('/rubrics');
+    await page.getByRole('link', { name: 'New rubric' }).click();
+    await page.getByLabel('Rubric id').fill('bare-minimum-requirements');
+    await page.getByLabel('Version').fill('9.0.0'); // past the versions it has, so If-None-Match would not stop it
+    await page.getByRole('tab', { name: /Checks/ }).click();
+    await page.getByLabel('Add a check of type').selectOption('FHIRPATH');
+    await page.getByRole('button', { name: 'Add check' }).click();
+    await page.getByLabel('Check id').fill('name-present');
+    await page.getByLabel('FHIRPath expression').fill('Patient.name.exists()');
+    await page.getByRole('button', { name: 'Add check' }).click();
+
+    await page.getByRole('button', { name: 'Save draft' }).click();
+
+    await expect(page.getByText('A rubric with the id "bare-minimum-requirements" already exists.').first()).toBeVisible();
+    expect(saved).toHaveLength(0);
+  });
+
   test('from the list: fill in the details, add a check, validate, save', async ({ page, api }) => {
     const validated = capture(api, `POST ${RUBRICS}/$validate`, validationResult({ valid: true }));
     const saved = capture(api, `POST ${RUBRICS}/lab.results/versions`, savedDraft('lab.results', '1.0.0'));
@@ -69,7 +89,13 @@ test.describe('creating a rubric', () => {
       ...draftVersion, rubricId: 'lab.results', semver: '1.0.0',
       definition: { ...publishedDefinition, id: 'lab.results', semver: '1.0.0', checks: [] },
     }));
-    api.mock(`GET ${RUBRICS}/lab.results`, rubricOk({ rubricId: 'lab.results', versions: [] }));
+    // the id is free until the draft is saved, which is what the editor looks up before saving a new rubric
+    api.mock(`GET ${RUBRICS}/lab.results`, async (route: Route) => {
+      const { status, json } = saved.length
+        ? rubricOk({ rubricId: 'lab.results', versions: [] })
+        : rubricError(404, 'Rubric not found: lab.results');
+      await route.fulfill({ status, json });
+    });
 
     await page.goto('/rubrics');
     await page.getByRole('link', { name: 'New rubric' }).click();

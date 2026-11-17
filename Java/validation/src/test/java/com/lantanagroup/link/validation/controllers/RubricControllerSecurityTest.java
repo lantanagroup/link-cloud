@@ -100,7 +100,7 @@ class RubricControllerSecurityTest {
 
             verify(registry, never()).publish(any(), any(), any());
             verify(registry, never()).retire(any(), any(), any());
-            verify(registry, never()).deleteDraft(any(), any(), any());
+            verify(registry, never()).deleteDraft(any(), any(), any(), any());
         }
 
         @Test

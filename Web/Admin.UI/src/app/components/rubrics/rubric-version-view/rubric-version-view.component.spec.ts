@@ -337,6 +337,29 @@ describe('RubricVersionViewComponent', () => {
       expect(rubricService.publish).not.toHaveBeenCalled();
     });
 
+    it('cannot be cancelled once confirmed, so the page shows what the request did when it answers', () => {
+      const answer = new Subject<ReturnType<typeof summary>>();
+      rubricService.publish.and.returnValue(answer);
+      fixture.detectChanges();
+      component.open('publish');
+      component.confirm();
+      fixture.detectChanges();
+
+      const cancel = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+        .find(button => button.textContent?.trim() === 'Cancel');
+      expect(cancel?.disabled).toBeTrue();
+      component.cancelAction();
+      expect(component.plan).not.toBeNull();
+
+      rubricService.getVersion.and.returnValue(of({ ...draft, status: 'PUBLISHED' }));
+      answer.next(summary('1.2.0'));
+      answer.complete();
+      fixture.detectChanges();
+
+      expect(component.plan).toBeNull();
+      expect(component.version?.status).toBe('PUBLISHED');
+    });
+
     it('cannot be confirmed where a dry run is required and there is none, and offers one', () => {
       rubricService.getSettings.and.returnValue(of({ dryRunRequiredForPublish: true } as IRubricSettings));
       fixture.detectChanges();
