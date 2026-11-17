@@ -258,18 +258,24 @@ class InputTests(unittest.TestCase):
         m = {s["id"]: model.multiplier(s, a) for s in stores}
         expected = {"da.DataAcquisitionLogResourceId": 1000, "kafka.DataAcquisitionRequested": 1.9,
                     "kafka.ResourcesAcquired": 1.9, "kafka.ReadyForValidation": 0.9, "kafka.SubmitPayload.patient": 0.9,
-                    "validation.result": 100, "validation.result_category": 100,
-                    "validation.legacy_shadow_finding": 100, "validation.rubric_finding": 10,
+                    # 2026-11-17: about one validation result per acquired resource for reportable patients
+                    "validation.result": 900, "validation.result_category": 900,
+                    "validation.legacy_shadow_finding": 900, "validation.rubric_finding": 9,
                     "da.DataAcquisitionLog": 9.3, "da.FhirQuery": 9.3, "da.DataAcquisitionLogNote": 9.3,
-                    "kafka.ReadyToAcquire": 9.3, "report.ResourceCount": 10,
-                    "report.MeasureReportPopulation": 2, "da.PendingReferenceId": 20, "report.ReportEntry": 1}
+                    "da.FhirQueryResourceType": 9.3, "kafka.ReadyToAcquire": 9.3,
+                    "da.ResourceReferenceType": 18.6,  # 2 reference types per FhirQuery
+                    "report.ResourceCount": 9, "report.MeasureReportPopulation": 0.9,
+                    "validation.patient_category_count": 9, "validation.rubric_result": 0.9,
+                    "da.PendingReferenceId": 100, "report.ReportEntry": 1, "report.GroupPopulation": 1}
         for sid, value in expected.items():
             self.assertAlmostEqual(m[sid], value, places=9, msg=sid)
         by_id = {s["id"]: s for s in stores}
         # 2026-11-12: 3 INITIAL logs per entry + 7 SUPPLEMENTAL per reportable entry (10 per reportable patient)
-        self.assertEqual(by_id["da.DataAcquisitionLog"]["drivers"],
-                         [{"driver": "entry", "per": 3}, {"driver": "reportable", "per": 7}])
-        self.assertEqual(by_id["validation.result"]["drivers"][0]["driver"], "reportable_resources")
+        per_log = [{"driver": "entry", "per": 3}, {"driver": "reportable", "per": 7}]
+        for sid in ("da.DataAcquisitionLog", "da.FhirQuery", "da.FhirQueryResourceType",
+                    "da.DataAcquisitionLogNote", "kafka.ReadyToAcquire"):
+            self.assertEqual(by_id[sid]["drivers"], per_log, sid)
+        self.assertEqual(by_id["validation.result"]["drivers"], [{"driver": "reportable_resources", "per": 1.0}])
 
     def test_corrections_from_the_live_runs(self):
         """Code facts found by the 2026-11-11 runs; none of these is a measured prior."""
@@ -282,8 +288,12 @@ class InputTests(unittest.TestCase):
         pending = by_id["da.PendingReferenceId"]
         self.assertEqual(pending["anchor"], "report")  # a child of the log, not a work queue
         self.assertIn("attribution", pending["location"])
-        self.assertEqual({by_id[s]["grain"] for s in ("da.EncounterMapping", "da.EncounterLocation")},
-                         {"patient_report"})
+        # 2026-11-17: unique on (FacilityId, EncounterId) and re-inserted on each acquisition, so held rows
+        # follow distinct patients, not entries
+        for sid in ("da.EncounterMapping", "da.EncounterLocation"):
+            self.assertEqual(by_id[sid]["grain"], "census_patient", sid)
+            self.assertEqual(by_id[sid]["multiplier"], 10, sid)
+            self.assertNotIn("drivers", by_id[sid], sid)
         self.assertEqual(by_id["kafka.ReadyToAcquire"]["location"]["topics"], ["ReadyToAcquire"])
 
     def test_location_validation_rejects_bad_identifiers(self):

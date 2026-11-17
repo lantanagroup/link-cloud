@@ -57,7 +57,7 @@
       "kind": "sql",
       "store": "ReportEntry",
       "grain": "patient_report",
-      "multiplier_source": "schema: one row per (report, patient); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one row per (report, patient)",
       "multiplier_status": "schema",
       "bytes_per_row": 450,
       "anchor": "report",
@@ -87,7 +87,7 @@
       "kind": "sql",
       "store": "EntryMeasureReport",
       "grain": "patient_report",
-      "multiplier_source": "schema: one per entry per measure (one measure per ACH report); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one per entry per measure (one measure per ACH report)",
       "multiplier_status": "schema",
       "bytes_per_row": 350,
       "anchor": "report",
@@ -118,7 +118,7 @@
       "kind": "sql",
       "store": "ResourceCount",
       "grain": "patient_report",
-      "multiplier_source": "prior: ~10 resource types acquired (Performance Model query table); as drivers: 11.1111 per reportable (10 per entry at the decided drivers; was 10)",
+      "multiplier_source": "prior: ~10 resource types acquired (Performance Model query table)",
       "multiplier_status": "prior",
       "bytes_per_row": 60,
       "anchor": "report",
@@ -139,7 +139,7 @@
       "drivers": [
         {
           "driver": "reportable",
-          "per": 11.1111111111
+          "per": 10.0
         }
       ],
       "notes": "One row per resource type per measure report, written for reportable entries only, so it scales with the reportable share but not with record size."
@@ -201,9 +201,9 @@
       "kind": "sql",
       "store": "GroupPopulation",
       "grain": "report",
-      "multiplier": 5,
-      "multiplier_source": "placeholder: populations per measure group",
-      "multiplier_status": "placeholder",
+      "multiplier": 1,
+      "multiplier_source": "LEGPROG-516, 2026-11-17: the ACH measures have a single group with one population (initial population)",
+      "multiplier_status": "prior",
       "bytes_per_row": 300,
       "anchor": "report",
       "adr_action": "retain",
@@ -227,7 +227,7 @@
       "kind": "sql",
       "store": "MeasureReportPopulation",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: populations each patient is counted in; as drivers: 2.22222 per reportable (2 per entry at the decided drivers; was 2)",
+      "multiplier_source": "placeholder: populations each patient is counted in",
       "multiplier_status": "placeholder",
       "bytes_per_row": 80,
       "anchor": "report",
@@ -248,7 +248,7 @@
       "drivers": [
         {
           "driver": "reportable",
-          "per": 2.22222222222
+          "per": 1.0
         }
       ]
     },
@@ -258,7 +258,7 @@
       "kind": "sql",
       "store": "ReportEntryMappingOutcome",
       "grain": "patient_report",
-      "multiplier_source": "schema: one per (report, patient); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one per (report, patient)",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "report",
@@ -385,7 +385,7 @@
       "kind": "sql",
       "store": "DataAcquisitionLogs",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL)",
       "multiplier_status": "prior",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -417,7 +417,7 @@
       "kind": "sql",
       "store": "FhirQueries",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one query per log; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one query per log",
       "multiplier_status": "prior",
       "bytes_per_row": 500,
       "anchor": "report",
@@ -450,7 +450,7 @@
       "kind": "sql",
       "store": "FhirQueryResourceTypes",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one resource type per query; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one resource type per query",
       "multiplier_status": "prior",
       "bytes_per_row": 50,
       "anchor": "report",
@@ -483,8 +483,8 @@
       "kind": "sql",
       "store": "ResourceReferenceType",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: reference resource types per patient-report; as drivers: 0.001 per resources (1 per entry at the decided drivers; was 1)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); LEGPROG-516 production figures, 2026-11-17: about 2 reference resource types per FhirQuery (one row per query per reference-query resource type in the query plan)",
+      "multiplier_status": "prior",
       "bytes_per_row": 150,
       "anchor": "report",
       "adr_action": "delete (child of log)",
@@ -500,10 +500,15 @@
       },
       "drivers": [
         {
-          "driver": "resources",
-          "per": 0.001
+          "driver": "entry",
+          "per": 6
+        },
+        {
+          "driver": "reportable",
+          "per": 14
         }
-      ]
+      ],
+      "notes": "The count per query is set by the facility's query plan (its reference queries), not by the acquired data, so the store follows the DA log terms rather than resource count."
     },
     {
       "id": "da.DataAcquisitionLogNote",
@@ -511,7 +516,7 @@
       "kind": "sql",
       "store": "DataAcquisitionLogNotes",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one note per log; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one note per log",
       "multiplier_status": "prior",
       "bytes_per_row": 300,
       "anchor": "report",
@@ -544,7 +549,7 @@
       "kind": "sql",
       "store": "DataAcquisitionLogResourceIds",
       "grain": "patient_report",
-      "multiplier_source": "schema: one ID row per acquired resource; as drivers: 1 per resources (1000 per entry at the decided drivers; was 708)",
+      "multiplier_source": "schema: one ID row per acquired resource",
       "multiplier_status": "schema",
       "bytes_per_row": 120,
       "anchor": "report",
@@ -596,7 +601,7 @@
       "kind": "sql",
       "store": "PendingReferenceIds",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: reference IDs recorded per patient-report; as drivers: 0.02 per resources (20 per entry at the decided drivers; was 20)",
+      "multiplier_source": "placeholder: about 0.1 reference IDs recorded per acquired resource",
       "multiplier_status": "placeholder",
       "bytes_per_row": 200,
       "anchor": "report",
@@ -615,7 +620,7 @@
       "drivers": [
         {
           "driver": "resources",
-          "per": 0.02
+          "per": 0.1
         }
       ]
     },
@@ -646,9 +651,9 @@
       "service": "DataAcquisition",
       "kind": "sql",
       "store": "EncounterMappings",
-      "grain": "patient_report",
-      "multiplier_source": "placeholder: encounter mappings per patient-report (written by DataAcquisition during acquisition); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
-      "multiplier_status": "placeholder",
+      "grain": "census_patient",
+      "multiplier_source": "LEGPROG-516 production figures, 2026-11-17: about 10 encounter mappings per distinct patient",
+      "multiplier_status": "prior",
       "bytes_per_row": 250,
       "anchor": "record_age",
       "adr_action": "not covered by ADR 08",
@@ -661,22 +666,17 @@
         "service": "dataacquisition",
         "table": "dbo.EncounterMapping"
       },
-      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5).",
-      "drivers": [
-        {
-          "driver": "entry",
-          "per": 1.0
-        }
-      ]
+      "notes": "Written by DataAcquisition during acquisition, not by Census. EncounterMapping is unique on (FacilityId, EncounterId), and each acquisition deletes and re-inserts the encounter's mapping and its locations, so held rows follow distinct patients (census_patient grain), not entries. Write rates follow census arrivals and so understate that delete-and-reinsert churn, which happens once per acquisition. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5).",
+      "multiplier": 10
     },
     {
       "id": "da.EncounterLocation",
       "service": "DataAcquisition",
       "kind": "sql",
       "store": "EncounterLocations",
-      "grain": "patient_report",
-      "multiplier_source": "placeholder: encounter locations per patient-report (written by DataAcquisition during acquisition); as drivers: 2 per entry (2 per entry at the decided drivers; was 2)",
-      "multiplier_status": "placeholder",
+      "grain": "census_patient",
+      "multiplier_source": "LEGPROG-516 production figures, 2026-11-17: about 10 encounter locations per distinct patient",
+      "multiplier_status": "prior",
       "bytes_per_row": 60,
       "anchor": "record_age",
       "adr_action": "not covered by ADR 08",
@@ -689,13 +689,8 @@
         "service": "dataacquisition",
         "table": "dbo.EncounterLocation"
       },
-      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5).",
-      "drivers": [
-        {
-          "driver": "entry",
-          "per": 2.0
-        }
-      ]
+      "notes": "Written by DataAcquisition during acquisition, not by Census. EncounterMapping is unique on (FacilityId, EncounterId), and each acquisition deletes and re-inserts the encounter's mapping and its locations, so held rows follow distinct patients (census_patient grain), not entries. Write rates follow census arrivals and so understate that delete-and-reinsert churn, which happens once per acquisition. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5).",
+      "multiplier": 10
     },
     {
       "id": "da.SftpAcquisitionLog",
@@ -916,8 +911,8 @@
       "kind": "sql",
       "store": "result",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 decision, 2026-11-11: 100 validation results per patient-report entry; as drivers: 0.111111 per reportable x resources (100 per entry at the decided drivers; was 100)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 production analysis, 2026-11-17: about one validation result per acquired resource for reportable patients",
+      "multiplier_status": "prior",
       "bytes_per_row": 800,
       "anchor": "report",
       "adr_action": "delete",
@@ -933,7 +928,7 @@
       "drivers": [
         {
           "driver": "reportable_resources",
-          "per": 0.111111111111
+          "per": 1.0
         }
       ]
     },
@@ -943,8 +938,8 @@
       "kind": "sql",
       "store": "result_category",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 decision, 2026-11-11: 100 validation results per patient-report entry; one category row per result; as drivers: 0.111111 per reportable x resources (100 per entry at the decided drivers; was 100)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 production analysis, 2026-11-17: about one validation result per acquired resource for reportable patients; one category row per result",
+      "multiplier_status": "prior",
       "bytes_per_row": 30,
       "anchor": "report",
       "adr_action": "delete",
@@ -961,7 +956,7 @@
       "drivers": [
         {
           "driver": "reportable_resources",
-          "per": 0.111111111111
+          "per": 1.0
         }
       ]
     },
@@ -971,7 +966,7 @@
       "kind": "sql",
       "store": "patient_category_count",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: categories with issues per patient-report; as drivers: 5.55556 per reportable (5 per entry at the decided drivers; was 5)",
+      "multiplier_source": "placeholder: categories with issues per patient-report",
       "multiplier_status": "placeholder",
       "bytes_per_row": 150,
       "anchor": "report",
@@ -991,7 +986,7 @@
       "drivers": [
         {
           "driver": "reportable",
-          "per": 5.55555555556
+          "per": 10.0
         }
       ]
     },
@@ -1051,7 +1046,7 @@
       "kind": "sql",
       "store": "rubric_result",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: one rubric run per patient-report when the rubric engine is enabled; as drivers: 1.11111 per reportable (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "placeholder: one rubric run per patient-report when the rubric engine is enabled",
       "multiplier_status": "placeholder",
       "bytes_per_row": 1500,
       "anchor": "report",
@@ -1074,7 +1069,7 @@
       "drivers": [
         {
           "driver": "reportable",
-          "per": 1.11111111111
+          "per": 1.0
         }
       ]
     },
@@ -1084,7 +1079,7 @@
       "kind": "sql",
       "store": "rubric_finding",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: findings per rubric result; as drivers: 0.0111111 per reportable x resources (10 per entry at the decided drivers; was 10)",
+      "multiplier_source": "placeholder: about 10 findings per reportable patient-report entry",
       "multiplier_status": "placeholder",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -1107,11 +1102,11 @@
       },
       "drivers": [
         {
-          "driver": "reportable_resources",
-          "per": 0.0111111111111
+          "driver": "reportable",
+          "per": 10.0
         }
       ],
-      "notes": "Left at 10 per entry when validation.result went to 100 (2026-11-11): the rubric engine produces its own findings, independent of the legacy result count."
+      "notes": "Per reportable entry, independent of resource count: the rubric engine produces its own findings, unlike validation.result, which follows acquired resources."
     },
     {
       "id": "validation.legacy_shadow_result",
@@ -1119,7 +1114,7 @@
       "kind": "sql",
       "store": "legacy_shadow_result",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: one per patient-report while shadow validation runs; as drivers: 1.11111 per reportable (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "placeholder: one per patient-report while shadow validation runs",
       "multiplier_status": "placeholder",
       "bytes_per_row": 300,
       "anchor": "report",
@@ -1142,7 +1137,7 @@
       "drivers": [
         {
           "driver": "reportable",
-          "per": 1.11111111111
+          "per": 1.0
         }
       ]
     },
@@ -1152,7 +1147,7 @@
       "kind": "sql",
       "store": "legacy_shadow_finding",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 decision, 2026-11-11: 100 validation results per patient-report entry; shadow validation re-runs the legacy engine, so its findings mirror the legacy results; as drivers: 0.111111 per reportable x resources (100 per entry at the decided drivers; was 100)",
+      "multiplier_source": "LEGPROG-516 production analysis, 2026-11-17: about one validation result per acquired resource for reportable patients; shadow validation re-runs the legacy engine, so its findings mirror the legacy results",
       "multiplier_status": "placeholder",
       "bytes_per_row": 700,
       "anchor": "report",
@@ -1176,7 +1171,7 @@
       "drivers": [
         {
           "driver": "reportable_resources",
-          "per": 0.111111111111
+          "per": 1.0
         }
       ]
     },
@@ -1186,7 +1181,7 @@
       "kind": "sql",
       "store": "shadow_comparison_result",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: one comparison per patient-report while shadow validation runs; as drivers: 1.11111 per reportable (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "placeholder: one comparison per patient-report while shadow validation runs",
       "multiplier_status": "placeholder",
       "bytes_per_row": 1500,
       "anchor": "report",
@@ -1209,7 +1204,7 @@
       "drivers": [
         {
           "driver": "reportable",
-          "per": 1.11111111111
+          "per": 1.0
         }
       ]
     },
@@ -1219,7 +1214,7 @@
       "kind": "mongo",
       "store": "PatientReportingEvaluationStatus",
       "grain": "patient_report",
-      "multiplier_source": "architecture: one document per (facility, correlationId); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "architecture: one document per (facility, correlationId)",
       "multiplier_status": "schema",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -1269,7 +1264,7 @@
       "kind": "kafka",
       "store": "DataAcquisitionRequested",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries); as drivers: 1 per entry + 1 per reportable (1.9 per entry at the decided drivers; was 2)",
+      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries)",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1300,7 +1295,7 @@
       "kind": "kafka",
       "store": "ReadyToAcquire",
       "grain": "patient_report",
-      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); about one message per DataAcquisitionLog; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); about one message per DataAcquisitionLog",
       "multiplier_status": "prior",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1331,7 +1326,7 @@
       "kind": "kafka",
       "store": "ResourcesAcquired",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries); as drivers: 1 per entry + 1 per reportable (1.9 per entry at the decided drivers; was 2)",
+      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries)",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1362,7 +1357,7 @@
       "kind": "kafka",
       "store": "ResourcesNormalized",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries); as drivers: 1 per entry + 1 per reportable (1.9 per entry at the decided drivers; was 2)",
+      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries)",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1393,7 +1388,7 @@
       "kind": "kafka",
       "store": "MeasureReportGenerated",
       "grain": "patient_report",
-      "multiplier_source": "architecture: one terminal per patient-report per measure; as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
+      "multiplier_source": "architecture: one terminal per patient-report per measure",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1442,7 +1437,7 @@
       "kind": "kafka",
       "store": "ReadyForValidation",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one message per reportable patient-report entry",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1469,7 +1464,7 @@
       "kind": "kafka",
       "store": "ValidationComplete",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one message per reportable patient-report entry",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1496,7 +1491,7 @@
       "kind": "kafka",
       "store": "ShadowCompareEvent",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one message per reportable patient-report entry",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1526,7 +1521,7 @@
       "kind": "kafka",
       "store": "SubmitPayload (per patient)",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one message per reportable patient-report entry",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1553,7 +1548,7 @@
       "kind": "kafka",
       "store": "PayloadSubmitted (per patient)",
       "grain": "patient_report",
-      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_source": "schema: one message per reportable patient-report entry",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
