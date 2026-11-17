@@ -104,11 +104,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 MaxPollIntervalMs = 300000
             };
 
-            var assignmentTracker = new KafkaAssignmentTracker();
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
             try
             {
-                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.GenerateReportRequested), "Report"));
+                consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
                 _logger.LogInformation("{Name}: Started consumer for topic '{Topic}' at {Timestamp}", Name, nameof(KafkaTopic.GenerateReportRequested), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -118,24 +117,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            var accounted = false;
-                            try
-                            {
-                                await ProcessMessageAsync(result, consumeCancellationToken);
-                                accounted = true;
-                            }
-                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
-                            {
-                                throw;
-                            }
-                            finally
-                            {
-                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
-                                {
-                                    assignmentTracker.MarkProcessed(result);
-                                    consumer.SafeCommit(result, _logger);
-                                }
-                            }
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 
                     }
@@ -186,13 +169,15 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
                 var mappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
-                facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
+                var key = result.Message.Key;
                 var value = result.Message.Value;
                 var inboundMetricsMode = KafkaHeaderHelper.GetMetricsMode(result.Message.Headers);
                 var startDate = value.StartDate;
                 var endDate = value.EndDate;
                 var reportTypes = value.ReportTypes;
                 var reportId = value.ReportId;
+
+                facilityId = key;
 
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
@@ -365,10 +350,9 @@ namespace LantanaGroup.Link.Report.Listeners
                             _evaluationProducer.Produce(nameof(KafkaTopic.EvaluationRequested),
                                 new Message<string, EvaluationRequestedValue>
                                 {
-                                    Key = KafkaKeys.ForPatient(facilityId, entry.PatientId),
+                                    Key = facilityId,
                                     Value = new EvaluationRequestedValue
                                     {
-                                        FacilityId = facilityId,
                                         PreviousReportId = value.ReportId?.ToString(),
                                         PatientId = entry.PatientId,
                                         ReportTrackingId = reportSchedule.Id.ToString(),

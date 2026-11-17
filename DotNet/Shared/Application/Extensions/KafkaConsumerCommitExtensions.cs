@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions;
@@ -60,11 +59,9 @@ public static class KafkaConsumerCommitExtensions
         IEnumerable<TopicPartitionOffset> offsets,
         ILogger? logger = null)
     {
-        var batch = offsets as IReadOnlyList<TopicPartitionOffset> ?? offsets.ToList();
         try
         {
-            consumer.Commit(batch);
-            KafkaAssignmentRegistry.Remember(consumer, batch);
+            consumer.Commit(offsets);
         }
         catch (KafkaException ex)
         {

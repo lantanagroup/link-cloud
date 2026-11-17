@@ -4,12 +4,9 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using Confluent.Kafka.Extensions.Diagnostics;
@@ -56,36 +53,31 @@ namespace LantanaGroup.Link.Census.Listeners
                 EnableAutoCommit = false
             };
 
-            var assignmentTracker = new KafkaAssignmentTracker();
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
             try
             {
-                consumer.Subscribe(KafkaTopicNames.Subscription(
-                    nameof(KafkaTopic.CernerPatientsAcquired),
-                    CensusConstants.ServiceName));
+                consumer.Subscribe(nameof(KafkaTopic.CernerPatientsAcquired));
                 _logger.LogInformation("Started {name} consumer on {date} for topic '{TopicName}'", ClassName, DateTime.UtcNow, nameof(KafkaTopic.CernerPatientsAcquired));
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
+                    string facilityId = string.Empty;
+
                     try
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            var accounted = false;
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
-                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result?.Message));
-                                accounted = true;
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(result, ex, FacilityIdOf(result?.Message));
-                                accounted = true;
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -93,21 +85,16 @@ namespace LantanaGroup.Link.Census.Listeners
                             }
                             catch (OperationCanceledException ex)
                             {
-                                _transientExceptionHandler.HandleException(result, new TransientException("Operation canceled (non-shutdown): " + ex.Message, ex), FacilityIdOf(result?.Message));
-                                accounted = true;
+                                _transientExceptionHandler.HandleException(result, new TransientException("Operation canceled (non-shutdown): " + ex.Message, ex), facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), FacilityIdOf(result?.Message));
-                                accounted = true;
+                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), facilityId);
                             }
                             finally
                             {
-                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
-                                {
-                                    assignmentTracker.MarkProcessed(result);
-                                    consumer.SafeCommit(result, _logger);
-                                }
+                                if (!consumeCancellationToken.IsCancellationRequested)
+                                    consumer.Commit(result);
                             }
                         }, cancellationToken);
                     }
@@ -120,11 +107,10 @@ namespace LantanaGroup.Link.Census.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        var facilityId = FacilityIdFromConsumeException(ex);
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -133,6 +119,7 @@ namespace LantanaGroup.Link.Census.Listeners
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error encountered in CernerPatientsAcquiredListener");
+                        consumer.Commit();
                     }
                 }
             }
@@ -151,62 +138,24 @@ namespace LantanaGroup.Link.Census.Listeners
                 throw new DeadLetterException($"{ClassName}: CernerPatientsAcquired event value segment missing");
             }
 
-            var facilityId = KafkaIdentity.Facility(result.Message.Value.FacilityId, result.Message.Key);
-            if (string.IsNullOrWhiteSpace(facilityId))
-            {
-                throw new DeadLetterException($"{ClassName}: Facility id is missing from the message.");
-            }
-
-            _logger.LogDebug("Consuming Event (Facility = {FacilityId})", facilityId);
+            _logger.LogDebug("Consuming Event (Facility = {FacilityId})", result.Message.Key);
 
             using var scope = _scopeFactory.CreateScope();
             var cernerListService = scope.ServiceProvider.GetRequiredService<ICernerListService>();
 
-            var dischargeEvents = await cernerListService.ProcessDischarges(facilityId, result.Message.Value, cancellationToken);
+            var dischargeEvents = await cernerListService.ProcessDischarges(result.Message.Key, result.Message.Value, cancellationToken);
 
             if (dischargeEvents != null)
             {
-                await _eventProducerService.ProduceEventsAsync(facilityId, dischargeEvents, cancellationToken);
+                await _eventProducerService.ProduceEventsAsync(result.Message.Key, dischargeEvents, cancellationToken);
             }
 
-            var processedEvents = await cernerListService.ProcessAdmits(facilityId, result.Message.Value, cancellationToken);
+            var processedEvents = await cernerListService.ProcessAdmits(result.Message.Key, result.Message.Value, cancellationToken);
 
             if (processedEvents != null)
             {
-                await _eventProducerService.ProduceEventsAsync(facilityId, processedEvents, cancellationToken);
+                await _eventProducerService.ProduceEventsAsync(result.Message.Key, processedEvents, cancellationToken);
             }
-        }
-
-        private static string FacilityIdOf(Message<string, CernerPatientsAcquired>? message) =>
-            KafkaIdentity.Facility(message?.Value?.FacilityId, message?.Key) ?? string.Empty;
-
-        private static string FacilityIdFromConsumeException(ConsumeException exception)
-        {
-            string? keyText = null;
-            if (exception.ConsumerRecord?.Message?.Key is { Length: > 0 } keyBytes)
-            {
-                keyText = Encoding.UTF8.GetString(keyBytes);
-            }
-
-            string? valueFacilityId = null;
-            if (exception.ConsumerRecord?.Message?.Value is { Length: > 0 } valueBytes)
-            {
-                try
-                {
-                    var value = JsonSerializer.Deserialize<CernerPatientsAcquired>(valueBytes, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true,
-                        AllowTrailingCommas = true
-                    });
-                    valueFacilityId = value?.FacilityId;
-                }
-                catch (JsonException)
-                {
-                    // The value is not readable. The legacy key is the remaining source.
-                }
-            }
-
-            return KafkaIdentity.Facility(valueFacilityId, keyText) ?? string.Empty;
         }
     }
 }

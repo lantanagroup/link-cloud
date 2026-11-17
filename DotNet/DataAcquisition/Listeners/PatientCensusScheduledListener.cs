@@ -8,7 +8,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
@@ -38,8 +37,8 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         }
         catch (ArgumentNullException ex)
         {
-            Logger.LogError(ex, "FacilityId is missing from the message.");
-            throw new DeadLetterException("FacilityId is missing from the message.", ex);
+            Logger.LogError(ex, "FacilityId is missing from the message key.");
+            throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
         using var scope = _serviceScopeFactory.CreateScope();
@@ -70,10 +69,10 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
 
     protected override string ExtractFacilityId(ConsumeResult<string, PatientCensusScheduled> consumeResult)
     {
-        var facilityId = KafkaIdentity.Facility(consumeResult.Message.Value?.FacilityId, consumeResult.Message.Key);
+        var facilityId = consumeResult.Message.Key;
 
         if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentNullException("FacilityId is missing from the message.");
+            throw new ArgumentNullException("FacilityId is missing from the message key.");
 
         return facilityId;
     }

@@ -73,11 +73,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            var assignmentTracker = new KafkaAssignmentTracker();
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
             try
             {
-                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.ReportScheduled), "Report"));
+                consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
                 _logger.LogInformation("{Name}: Started consumer for topic '{Topic}' at {StartTime}", nameof(ReportScheduledListener), nameof(KafkaTopic.ReportScheduled), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -87,24 +86,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            var accounted = false;
-                            try
-                            {
-                                await ProcessMessageAsync(result, consumeCancellationToken);
-                                accounted = true;
-                            }
-                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
-                            {
-                                throw;
-                            }
-                            finally
-                            {
-                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
-                                {
-                                    assignmentTracker.MarkProcessed(result);
-                                    consumer.SafeCommit(result, _logger);
-                                }
-                            }
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 
                     }
@@ -148,8 +131,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
 
                 using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
+                var key = result.Message.Key;
                 var value = result.Message.Value;
-                facilityId = KafkaIdentity.Facility(value?.FacilityId, result.Message.Key) ?? string.Empty;
 
                 if (!value.IsValid())
                 {
@@ -161,6 +144,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
+                facilityId = key;
                 var startDate = value.StartDate;
                 var endDate = value.EndDate;
                 var frequency = value.Frequency;

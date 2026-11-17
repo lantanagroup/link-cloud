@@ -10,9 +10,8 @@ import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluation
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
-import com.lantanagroup.link.shared.kafka.KafkaIdentity;
-import com.lantanagroup.link.shared.kafka.KafkaKeys;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
@@ -40,7 +39,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AbstractAsyncConsumer<String, T> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AbstractAsyncConsumer<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger = LoggerFactory.getLogger("com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
 
@@ -87,7 +86,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     @Override
-    protected void process(ConsumerRecord<String, T> record) {
+    protected void process(ConsumerRecord<ResourceKey, T> record) {
         boolean perf = performanceLogger.isInfoEnabled();
         StopWatch totalStopWatch = perf ? new StopWatch() : null;
         StopWatch taskStopWatch = perf ? new StopWatch() : null;
@@ -103,12 +102,13 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
             if (perf) taskStopWatch.start("validateRecord");
-            T value = record.value();
-            String facilityId = KafkaIdentity.facility(value == null ? null : value.getFacilityId(), record.key());
-            String patientId = KafkaIdentity.patient(value == null ? null : value.getPatientId(), record.key());
-            if (facilityId == null || facilityId.isBlank()) {
+            ResourceKey key = record.key();
+            if (key == null || key.getFacilityId() == null || key.getFacilityId().isEmpty()) {
                 throw new ValidationException("Facility ID is null or empty.");
             }
+            String facilityId = key.getFacilityId();
+            String patientId = key.getPatientId();
+            T value = record.value();
             if (value.getQueryType() == null) {
                 throw new ValidationException("Query Type is null.");
             }
@@ -488,7 +488,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus, org.apache.kafka.common.header.Headers inboundHeaders) {
         logger.debug("Producing {}", Topics.DATA_ACQUISITION_REQUESTED);
         DataAcquisitionRequested valueDa = new DataAcquisitionRequested();
-        valueDa.setFacilityId(patientStatus.getFacilityId());
         valueDa.setPatientId(patientStatus.getPatientId());
         valueDa.setQueryType(QueryType.SUPPLEMENTAL);
         valueDa.setReportableEvent(value.getReportableEvent().toString());
@@ -506,7 +505,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         dataAcquisitionRequestedTemplate.send(new ProducerRecord<>(
                 Topics.DATA_ACQUISITION_REQUESTED,
                 null,
-                KafkaKeys.forPatient(patientStatus.getFacilityId(), patientStatus.getPatientId()),
+                patientStatus.getFacilityId(),
                 valueDa,
                 headers));
     }

@@ -4,7 +4,6 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {
     public class GenerateReportValue
     {
-        public string? FacilityId { get; set; }
         public Guid? ReportId { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }

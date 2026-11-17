@@ -47,13 +47,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_ProducesOutcomeIdentifyingNormalizationAsTheSource()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU", "PHARMACY"),
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -67,21 +67,20 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         // Location org resolution belongs to DataAcquisition; Normalization neither computes nor forwards it.
         Assert.Null(produced.Value.LocationOrgOutcome);
 
-        Assert.Equal(KafkaKeys.ForPatient(FacilityId, PatientId), produced.Key);
-        Assert.Equal(FacilityId, produced.Value.FacilityId);
-        Assert.Equal(PatientId, produced.Value.PatientId);
+        Assert.Equal(FacilityId, produced.Key.FacilityId);
+        Assert.Equal(PatientId, produced.Key.PatientId);
     }
 
     [Fact]
     public async Task ProcessMessageAsync_CarriesTheCodeMapCountsAndUnmappedCodes()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU", "PHARMACY", "LAB"),
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -98,13 +97,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_ForwardsTheScheduledReportsFromTheAcquiredMessage()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -118,13 +117,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_NoCodeMapsConfigured_StillProducesAnEmptyOutcome()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
             sequences: [],
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -138,8 +137,8 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_ProducesResourcesNormalizedAsWell()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
-        var normalizedProducer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var normalizedProducer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
             CodeMapSequence(("ICU", "1027-4")),
@@ -154,13 +153,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         normalizedProducer.Verify(
             item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         outcomeProducer.Verify(
             item => item.ProduceAsync(
                 KafkaTopic.MappingOutcomeEvaluated.ToString(),
-                It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(),
+                It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -168,7 +167,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_CountsSpanEveryResourceInTheCorrelation()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             [
                 LocationWithTypeCodes("ICU").Single(),
@@ -177,7 +176,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -191,13 +190,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_CarriesTheCorrelationIdHeader()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -209,11 +208,11 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_OutcomeProduceFails_DoesNotFailTheMessageOrSkipCacheCleanup()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         outcomeProducer
             .Setup(item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(),
+                It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(),
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KafkaException(ErrorCode.Local_MsgTimedOut));
 
@@ -239,17 +238,17 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_ProducesTheOutcomeAfterResourcesNormalized()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
-        var normalizedProducer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var normalizedProducer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var order = new List<string>();
 
         normalizedProducer
             .Setup(item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("normalized"))
-            .ReturnsAsync(new DeliveryResult<string, ResourcesNormalizedValue>());
+            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
 
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
@@ -269,15 +268,15 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     }
 
     private static void Capture(
-        Mock<IProducer<string, MappingOutcomeEvaluatedValue>> producer,
-        Action<Message<string, MappingOutcomeEvaluatedValue>> capture) =>
+        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> producer,
+        Action<Message<ResourceKey, MappingOutcomeEvaluatedValue>> capture) =>
         producer
             .Setup(item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(),
+                It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, Message<string, MappingOutcomeEvaluatedValue>, CancellationToken>((_, message, _) => capture(message))
-            .ReturnsAsync(new DeliveryResult<string, MappingOutcomeEvaluatedValue>());
+            .Callback<string, Message<ResourceKey, MappingOutcomeEvaluatedValue>, CancellationToken>((_, message, _) => capture(message))
+            .ReturnsAsync(new DeliveryResult<ResourceKey, MappingOutcomeEvaluatedValue>());
 
     private static List<DomainResource> LocationWithTypeCodes(params string[] codes)
     {
@@ -293,8 +292,8 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_CodeMapOperationFails_ReportsTheFailureWithoutStoppingNormalization()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
-        var normalizedProducer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        var normalizedProducer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var resourceCache = new Mock<IResourceCache>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU", "PHARMACY"),
@@ -303,7 +302,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             normalizedProducer,
             resourceCache);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -323,7 +322,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         normalizedProducer.Verify(
             item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         resourceCache.Verify(
@@ -377,13 +376,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_CodeMapConfiguredButNothingAcquired_ReportsItWithZeroCounts()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         // Data Acquisition lists a cache key only for a type it actually acquired, so a run that fetched
@@ -404,13 +403,13 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     [Fact]
     public async Task ProcessMessageAsync_ConfiguredMapThatRuns_ReportsTheRunRatherThanTheDeclaration()
     {
-        var outcomeProducer = new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
+        var outcomeProducer = new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var listener = BuildListener(
             LocationWithTypeCodes("ICU"),
             CodeMapSequence(("ICU", "1027-4")),
             outcomeProducer);
 
-        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
         Capture(outcomeProducer, message => produced = message);
 
         await listener.ProcessMessageAsync(BuildConsumeResult(), CancellationToken.None);
@@ -425,11 +424,11 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
     private static ResourcesAcquiredListener BuildListener(
         List<DomainResource> resources,
         List<OperationSequenceModel> sequences,
-        Mock<IProducer<string, MappingOutcomeEvaluatedValue>> mappingOutcomeProducer,
-        Mock<IProducer<string, ResourcesNormalizedValue>>? normalizedProducer = null,
+        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> mappingOutcomeProducer,
+        Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>? normalizedProducer = null,
         Mock<IResourceCache>? resourceCache = null)
     {
-        normalizedProducer ??= new Mock<IProducer<string, ResourcesNormalizedValue>>();
+        normalizedProducer ??= new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         resourceCache ??= new Mock<IResourceCache>();
 
         resourceCache
@@ -461,11 +460,11 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         var scopeFactory = new Mock<IServiceScopeFactory>();
         scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
 
-        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
+        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         deadLetterHandler.SetupProperty(item => item.Topic);
-        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
+        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         transientHandler.SetupProperty(item => item.Topic);
-        var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, string>>();
+        var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
         var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
@@ -475,7 +474,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),
             new ServiceInformation { ServiceConfigName = "Normalization" },
             scopeFactory.Object,
-            Mock.Of<IKafkaConsumerFactory<string, ResourcesAcquiredValue>>(),
+            Mock.Of<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>(),
             consumeExceptionHandler.Object,
             deadLetterHandler.Object,
             transientHandler.Object,
@@ -495,29 +494,27 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             mappingOutcomeProducer.Object);
     }
 
-    private static ConsumeResult<string, ResourcesAcquiredValue> BuildConsumeResult() =>
+    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult() =>
         BuildConsumeResult([LocationCacheKey]);
 
-    private static ConsumeResult<string, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
+    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
     {
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(CorrelationId))
         };
 
-        return new ConsumeResult<string, ResourcesAcquiredValue>
+        return new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
         {
             Topic = "ResourcesAcquired",
             Partition = new Partition(0),
             Offset = new Offset(0),
-            Message = new Message<string, ResourcesAcquiredValue>
+            Message = new Message<ResourceKey, ResourcesAcquiredValue>
             {
                 Headers = headers,
-                Key = KafkaKeys.ForPatient(FacilityId, PatientId),
+                Key = new ResourceKey { FacilityId = FacilityId, PatientId = PatientId },
                 Value = new ResourcesAcquiredValue
                 {
-                    FacilityId = FacilityId,
-                    PatientId = PatientId,
                     QueryType = "Initial",
                     ReportableEvent = "Adhoc",
                     ScheduledReports = [new ScheduledReport { ReportTrackingId = "tracking-1" }],

@@ -3,7 +3,6 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
 
 namespace LantanaGroup.Link.Census.Application.Services;
@@ -43,15 +42,10 @@ public class EventProducerService<MessageType> : IEventProducerService<MessageTy
                         new Header(CensusConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(patientEventResponse.CorrelationId))
                     };
 
-                var facilityId = string.IsNullOrEmpty(patientEventResponse.FacilityId)
-                    ? key
-                    : patientEventResponse.FacilityId;
-                patientEventResponse.PatientEvent.FacilityId = facilityId;
-
                 // Cast the PatientEvent to MessageType to match the generic type constraint
                 var message = new Message<string, MessageType>
                 {
-                    Key = KafkaKeys.ForPatient(facilityId, patientEventResponse.PatientEvent.PatientId),
+                    Key = patientEventResponse.FacilityId,
                     Headers = headers ?? null,
                     Value = (MessageType)(object)patientEventResponse.PatientEvent
                 };

@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
@@ -12,7 +12,6 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -34,11 +33,11 @@ namespace LantanaGroup.Link.Normalization.Listeners;
 public class ResourcesAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourcesAcquiredListener> _logger;
-    private readonly IKafkaConsumerFactory<string, ResourcesAcquiredValue> _consumerFactory;
-    private readonly IProducer<string, ResourcesNormalizedValue> _producer;
-    private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue> _transientExceptionHandler;
+    private readonly IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue> _consumerFactory;
+    private readonly IProducer<ResourceKey, ResourcesNormalizedValue> _producer;
+    private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -54,18 +53,18 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly IResourceCache _resourceCache;
     private readonly IResourceCachePurger _resourceCachePurger;
     private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
-    private readonly IProducer<string, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
+    private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
         ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
-        IKafkaConsumerFactory<string, ResourcesAcquiredValue> consumerFactory,
-        IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue> deadLetterExceptionHandler,
-        ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue> transientExceptionHandler,
+        IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue> consumerFactory,
+        IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> deadLetterExceptionHandler,
+        ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
-        IProducer<string, ResourcesNormalizedValue> producer,
+        IProducer<ResourceKey, ResourcesNormalizedValue> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         HSLOCMapOperationService hslocMapOperationService,
@@ -76,7 +75,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IResourceCache resourceCache,
         IResourceCachePurger resourceCachePurger,
         IOptionsMonitor<TelemetrySettings> telemetrySettings,
-        IProducer<string, MappingOutcomeEvaluatedValue> mappingOutcomeProducer)
+        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -116,16 +115,13 @@ public class ResourcesAcquiredListener : BackgroundService
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
-        var assignmentTracker = new KafkaAssignmentTracker();
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
             GroupId = _serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
-        }, assignmentTracker: assignmentTracker);
+        });
 
-        kafkaConsumer.Subscribe(KafkaTopicNames.Subscription(
-            KafkaTopic.ResourcesAcquired.ToString(),
-            NormalizationConstants.ServiceName));
+        kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourcesAcquired.ToString() });
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
@@ -133,23 +129,14 @@ public class ResourcesAcquiredListener : BackgroundService
             {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                 {
-                    var accounted = false;
                     try
                     {
                         await ConsumeMessageAsync(result, consumeCancellationToken);
-                        accounted = true;
-                    }
-                    catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
-                    {
-                        throw;
                     }
                     finally
                     {
-                        if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
-                        {
-                            assignmentTracker.MarkProcessed(result);
-                            kafkaConsumer.SafeCommit(result, _logger);
-                        }
+                        if (!consumeCancellationToken.IsCancellationRequested)
+                            kafkaConsumer.Commit(result);
                     }
                 }, cancellationToken);
             }
@@ -164,12 +151,32 @@ public class ResourcesAcquiredListener : BackgroundService
                     throw new OperationCanceledException(ex.Error.Reason, ex);
                 }
 
-                var facilityId = FacilityIdFromConsumeException(ex);
+                string facilityId = string.Empty;
+                if (ex.ConsumerRecord?.Message?.Key != null)
+                {
+                    try
+                    {
+                        var key = JsonSerializer.Deserialize<ResourceKey>(ex.ConsumerRecord.Message.Key);
+                        facilityId = key?.FacilityId ?? string.Empty;
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+
                 _consumeExceptionHandler.HandleConsumeException(ex, facilityId);
-                var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                kafkaConsumer.SafeCommit(
-                    offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset },
-                    _logger);
+                TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                if (offset == null)
+                {
+                    kafkaConsumer.Commit();
+                }
+                else
+                {
+                    kafkaConsumer.Commit(new List<TopicPartitionOffset> {
+                        offset
+                    });
+                }
                 continue;
             }
         }
@@ -182,7 +189,7 @@ public class ResourcesAcquiredListener : BackgroundService
     /// Separate from the consume loop (which owns only the offset commit) so that the failure routing —
     /// in particular which failures release the resource cache — is directly testable.
     /// </remarks>
-    public async Task ConsumeMessageAsync(ConsumeResult<string, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
+    public async Task ConsumeMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
     {
         try
         {
@@ -190,7 +197,7 @@ public class ResourcesAcquiredListener : BackgroundService
         }
         catch (DeadLetterException ex)
         {
-            _deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result.Message));
+            _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
 
             // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
             // so release its acquisition keys and the {correlationId} key normalization was writing.
@@ -202,7 +209,7 @@ public class ResourcesAcquiredListener : BackgroundService
         }
         catch (TransientException ex)
         {
-            _transientExceptionHandler.HandleException(result, ex, FacilityIdOf(result.Message));
+            _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
         }
         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
         {
@@ -210,26 +217,26 @@ public class ResourcesAcquiredListener : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", FacilityIdOf(result?.Message).SanitizeForLog());
+            _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
 
-            _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), FacilityIdOf(result?.Message));
+            _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
         }
     }
 
-    public async Task ProcessMessageAsync(ConsumeResult<string, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
+    public async Task ProcessMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
         using var duration = _metrics.MeasureNormalizationDuration(
         [
-            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, FacilityIdOf(result.Message)),
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
             new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(result.Message.Value.QueryType))
         ]);
         using var scope = _scopeFactory.CreateScope();
         var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
         if (abortRegistry != null)
         {
-            var facilityId = FacilityIdOf(result.Message);
+            var facilityId = result.Message.Key.FacilityId;
             if (await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
             {
                 _logger.LogDebug(
@@ -270,7 +277,7 @@ public class ResourcesAcquiredListener : BackgroundService
         var failedOperations = 0;
 
         await RegisterConfiguredCodeMapsAsync(
-            scope, FacilityIdOf(result.Message), mappingOutcomes, cancellationToken);
+            scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
 
         foreach (var cacheKey in cacheKeys)
         {
@@ -280,7 +287,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
                 var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
                 {
-                    FacilityId = FacilityIdOf(result.Message),
+                    FacilityId = result.Message.Key.FacilityId,
                     ResourceType = resourceType.ToString()
                 }, cancellationToken: cancellationToken);
 
@@ -292,14 +299,14 @@ public class ResourcesAcquiredListener : BackgroundService
                     // create data that was never cached (org-map filter, Encounter strip, etc.).
                     throw new DeadLetterException(
                         $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
-                        $"CacheType={result.Message.Value.CacheType}, FacilityId={FacilityIdOf(result.Message).SanitizeForLog()}.");
+                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
                 }
 
                 normalizedResources += resources.Count;
 
                 if (sequences == null || sequences.Count == 0)
                 {
-                    _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", FacilityIdOf(result.Message).SanitizeForLog(), resourceType.ToString().SanitizeForLog());
+                    _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", result.Message.Key.FacilityId.SanitizeForLog(), resourceType.ToString().SanitizeForLog());
                 }
                 else
                 {
@@ -319,7 +326,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
                             if(dbEntity != null && dbEntity.IsDisabled)
                             {
-                                _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), FacilityIdOf(result.Message).SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
                                 continue;
                             }
 
@@ -350,14 +357,14 @@ public class ResourcesAcquiredListener : BackgroundService
                                 if (operationResult.SuccessCode == OperationStatus.Success)
                                 {
                                     _metrics.IncrementResourceChangedCounter(
-                                        BuildResourceChangedTags(FacilityIdOf(result.Message), correlationId, PatientIdOf(result.Message), resource.TypeName, operation.OperationType.ToString()),
+                                        BuildResourceChangedTags(result.Message.Key.FacilityId, correlationId, result.Message.Key.PatientId, resource.TypeName, operation.OperationType.ToString()),
                                         operationResult.SuccessCode == OperationStatus.Success);
                                 }
                                 
                                 if(operation.OperationType == OperationType.HSLOCMap)
                                 {
-                                    _logger.LogDebug("HSLOCMap operation produced {CodeMappingCount} code mappings for {FacilityId}/{ResourceType}/{ResourceId}.", operationResult.CodeMapping?.Count ?? 0, FacilityIdOf(result.Message).SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
-                                    hslocMappingResults.AddRange(BuildHSLOCMappingResults(FacilityIdOf(result.Message), resource, operationResult));
+                                    _logger.LogDebug("HSLOCMap operation produced {CodeMappingCount} code mappings for {FacilityId}/{ResourceType}/{ResourceId}.", operationResult.CodeMapping?.Count ?? 0, result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                    hslocMappingResults.AddRange(BuildHSLOCMappingResults(result.Message.Key.FacilityId, resource, operationResult));
                                 }
                             }
                             else
@@ -369,7 +376,7 @@ public class ResourcesAcquiredListener : BackgroundService
                                     mappingOutcomes.AddFailure(codeMapOperation); 
                                 }
 
-                                _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", FacilityIdOf(result.Message).SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType.ToString().SanitizeForLog(), operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
+                                _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType.ToString().SanitizeForLog(), operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
                             }
                         }
 
@@ -383,8 +390,8 @@ public class ResourcesAcquiredListener : BackgroundService
                             // Automation validators query Loki for this marker and parse
                             // FacilityId/ResourceType/ResourceId/Steps from the rendered line.
                             "[NormalizationExecutionSummary] FacilityId={FacilityId}, PatientId={PatientId}, CorrelationId={CorrelationId}, ReportTrackingId={ReportTrackingId}, ResourceType={ResourceType}, ResourceId={ResourceId}, Steps=[{Steps}]",
-                            FacilityIdOf(result.Message).SanitizeForLog(),
-                            PatientIdOf(result.Message).SanitizeForLog(),
+                            result.Message.Key.FacilityId.SanitizeForLog(),
+                            result.Message.Key.PatientId.SanitizeForLog(),
                             correlationId.SanitizeForLog(),
                             reportTrackingId.SanitizeForLog(),
                             resource.TypeName.SanitizeForLog(),
@@ -394,7 +401,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
                     try{
                         var facilityLocationLocalCodeMappingManager = scope.ServiceProvider.GetRequiredService<IFacilityLocationLocalCodeMappingManager>();
-                        await facilityLocationLocalCodeMappingManager.UpdateFacilityLocationLocalCodeMappings(FacilityIdOf(result.Message), hslocMappingResults, cancellationToken);
+                        await facilityLocationLocalCodeMappingManager.UpdateFacilityLocationLocalCodeMappings(result.Message.Key.FacilityId, hslocMappingResults, cancellationToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -405,7 +412,7 @@ public class ResourcesAcquiredListener : BackgroundService
                         _logger.LogError(
                             exception,
                             "Failed to save HSLOC map results for FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
-                            FacilityIdOf(result.Message).SanitizeForLog(),
+                            result.Message.Key.FacilityId.SanitizeForLog(),
                             correlationId.SanitizeForLog());
 
                         throw new TransientException("Failed to save HSLOC map results.", exception);
@@ -420,12 +427,12 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             _logger.LogInformation(
                 "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
-                FacilityIdOf(result.Message).SanitizeForLog(),
+                result.Message.Key.FacilityId.SanitizeForLog(),
                 correlationId.SanitizeForLog());
         }
 
-        await ProduceResourcesNormalizedMessage(result, FacilityIdOf(result.Message), correlationId, cancellationToken);
-        await RecordReportActivityAsync(scope, result.Message.Value, FacilityIdOf(result.Message), correlationId, normalizedResources, failedOperations, cancellationToken);
+        await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+        await RecordReportActivityAsync(scope, result.Message.Value, result.Message.Key.FacilityId, correlationId, normalizedResources, failedOperations, cancellationToken);
 
         // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
         // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
@@ -438,8 +445,8 @@ public class ResourcesAcquiredListener : BackgroundService
         // this still reports them with zero counts, which is what separates "nothing reached the map"
         // from "no map is configured".
         await ProduceMappingOutcomeEvaluatedMessage(
-            FacilityIdOf(result.Message),
-            PatientIdOf(result.Message),
+            result.Message.Key.FacilityId,
+            result.Message.Key.PatientId,
             correlationId,
             result.Message.Value,
             mappingOutcomes,
@@ -509,16 +516,16 @@ public class ResourcesAcquiredListener : BackgroundService
         return hslocMappingResults;
     }
 
-    private void ValidateResourcesAcquiredEvent(ConsumeResult<string, ResourcesAcquiredValue>? message, out string correlationId)
+    private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId)
     {
         if (message == null || message.Message == null)
         {
             throw new DeadLetterException("Event is null");
         }
 
-        if (string.IsNullOrWhiteSpace(FacilityIdOf(message.Message)) || string.IsNullOrWhiteSpace(PatientIdOf(message.Message)))
+        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId) || string.IsNullOrWhiteSpace(message.Message.Key.PatientId))
         {
-            throw new DeadLetterException("Malformed message. Facility Id and Patient Id are required.");
+            throw new DeadLetterException("Malformed key in the event. Facility Id and Patient Id are required.");
         }
 
         if (string.IsNullOrWhiteSpace(message.Message.Value.QueryType))
@@ -569,7 +576,7 @@ public class ResourcesAcquiredListener : BackgroundService
         return tags;
     }
 
-    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<string, ResourcesAcquiredValue>? message, string facilityId, string correlationId, CancellationToken cancellationToken = default)
+    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
         var headers = new Headers
         {
@@ -579,17 +586,15 @@ public class ResourcesAcquiredListener : BackgroundService
 
         var resourceNormalizedMessage = new ResourcesNormalizedValue
         {
-            FacilityId = facilityId,
-            PatientId = PatientIdOf(message.Message),
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent,
             CacheType = message.Message.Value.CacheType,
             CacheKey = correlationId
         };
-        Message<string, ResourcesNormalizedValue> produceMessage = new Message<string, ResourcesNormalizedValue>
+        Message<ResourceKey, ResourcesNormalizedValue> produceMessage = new Message<ResourceKey, ResourcesNormalizedValue>
         {
-            Key = KafkaKeys.ForPatient(facilityId, PatientIdOf(message.Message)),
+            Key = message.Message.Key,
             Headers = headers,
             Value = resourceNormalizedMessage
         };
@@ -598,7 +603,7 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             await _producer.ProduceAsync(KafkaTopic.ResourcesNormalized.ToString(), produceMessage, cancellationToken);
         }
-        catch (ProduceException<string, ResourcesNormalizedValue> ex)
+        catch (ProduceException<ResourceKey, ResourcesNormalizedValue> ex)
         {
             _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId.SanitizeForLog(), correlationId.SanitizeForLog(), message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
@@ -680,8 +685,6 @@ public class ResourcesAcquiredListener : BackgroundService
         var outcomes = mappingOutcomes.BuildAll().ToList();
         var value = new MappingOutcomeEvaluatedValue
         {
-            FacilityId = facilityId,
-            PatientId = patientId,
             Source = MappingOutcomeSource.Normalization,
             ScheduledReports = acquiredValue.ScheduledReports,
             CodeMapOutcomes = outcomes,
@@ -708,9 +711,13 @@ public class ResourcesAcquiredListener : BackgroundService
         try
         {
             await _mappingOutcomeProducer.ProduceAsync(KafkaTopic.MappingOutcomeEvaluated.ToString(),
-                new Message<string, MappingOutcomeEvaluatedValue>
+                new Message<ResourceKey, MappingOutcomeEvaluatedValue>
                 {
-                    Key = KafkaKeys.ForPatient(facilityId, patientId),
+                    Key = new ResourceKey
+                    {
+                        FacilityId = facilityId ?? string.Empty,
+                        PatientId = patientId ?? string.Empty
+                    },
                     Headers = headers,
                     Value = value
                 }, cancellationToken);
@@ -730,7 +737,7 @@ public class ResourcesAcquiredListener : BackgroundService
         this._cancelled = true;
     }
 
-    private string ExtractCorrelationId(Message<string, ResourcesAcquiredValue> message)
+    private string ExtractCorrelationId(Message<ResourceKey, ResourcesAcquiredValue> message)
     {
         var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
 
@@ -740,40 +747,5 @@ public class ResourcesAcquiredListener : BackgroundService
         var correlationId = Encoding.UTF8.GetString(cIBytes);
 
         return correlationId;
-    }
-
-    private static string FacilityIdOf(Message<string, ResourcesAcquiredValue>? message) =>
-        KafkaIdentity.Facility(message?.Value?.FacilityId, message?.Key) ?? string.Empty;
-
-    private static string PatientIdOf(Message<string, ResourcesAcquiredValue>? message) =>
-        KafkaIdentity.Patient(message?.Value?.PatientId, message?.Key) ?? string.Empty;
-
-    private static string FacilityIdFromConsumeException(ConsumeException exception)
-    {
-        string? keyText = null;
-        if (exception.ConsumerRecord?.Message?.Key is { Length: > 0 } keyBytes)
-        {
-            keyText = Encoding.UTF8.GetString(keyBytes);
-        }
-
-        string? valueFacilityId = null;
-        if (exception.ConsumerRecord?.Message?.Value is { Length: > 0 } valueBytes)
-        {
-            try
-            {
-                var value = JsonSerializer.Deserialize<ResourcesAcquiredValue>(valueBytes, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    AllowTrailingCommas = true
-                });
-                valueFacilityId = value?.FacilityId;
-            }
-            catch (JsonException)
-            {
-                // The value is not readable. The legacy key is the remaining source.
-            }
-        }
-
-        return KafkaIdentity.Facility(valueFacilityId, keyText) ?? string.Empty;
     }
 }

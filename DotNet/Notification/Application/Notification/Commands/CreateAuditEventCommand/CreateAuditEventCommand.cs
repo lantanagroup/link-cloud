@@ -3,11 +3,8 @@ using LantanaGroup.Link.Notification.Application.Models;
 using System.Text;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Infrastructure;
-using ServiceActivitySource = LantanaGroup.Link.Notification.Infrastructure.ServiceActivitySource;
-using LantanaGroup.Link.Notification.Settings;
 using System.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Models;
-using KafkaKeys = LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaKeys;
 
 namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 {
@@ -39,14 +36,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                         headers.Add("X-Correlation-Id",Encoding.ASCII.GetBytes(auditEvent.CorrelationId));
                     }                    
 
-                    if (string.IsNullOrWhiteSpace(auditEvent.FacilityId))
-                    {
-                        auditEvent.FacilityId = facilityId;
-                    }
-
+                    //write to auditable event occurred topic
                     await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
                     {
-                        Key = KafkaKeys.ForAudit(auditEvent.FacilityId, null, NotificationConstants.ServiceName),
+                        Key = facilityId ?? string.Empty,
                         Value = auditEvent,
                         Headers = headers
                     });

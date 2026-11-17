@@ -7,7 +7,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,7 +24,7 @@ public class AcquisitionProcessingJob : IJob
 {
     private readonly ILogger<AcquisitionProcessingJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
+    private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
     private readonly ICacheService? _cache;
     private const int BatchSize = 100;
@@ -33,7 +32,7 @@ public class AcquisitionProcessingJob : IJob
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
-        IProducer<string, ReadyToAcquire> readyToAcquireProducer,
+        IProducer<long, ReadyToAcquire> readyToAcquireProducer,
         IOptions<AcquisitionWorkerProcessorSettings> settings,
         ICacheService? cache = null)
     {
@@ -320,14 +319,13 @@ public class AcquisitionProcessingJob : IJob
 
                         await _readyToAcquireProducer.ProduceAsync(
                             KafkaTopic.ReadyToAcquire.ToString(),
-                            new Message<string, ReadyToAcquire>
+                            new Message<long, ReadyToAcquire>
                             {
-                                Key = ReadyToAcquireKey(facilityId, request.PatientId),
+                                Key = request.Id,
                                 Value = new ReadyToAcquire
                                 {
                                     LogId = request.Id,
                                     FacilityId = facilityId,
-                                    PatientId = request.PatientId,
                                     ReportTrackingId = request.ReportTrackingId
                                 },
                                 Headers = headers
@@ -358,16 +356,24 @@ public class AcquisitionProcessingJob : IJob
         }
     }
 
-    private static bool IsWithinAcquisitionWindow(TimeSpan? minAcquisitionPullTime, TimeSpan? maxAcquisitionPullTime) =>
-        AcquisitionWindow.Contains(minAcquisitionPullTime, maxAcquisitionPullTime, DateTime.UtcNow.TimeOfDay);
-
-    private static string ReadyToAcquireKey(string? facilityId, string? patientId)
+    private static bool IsWithinAcquisitionWindow(TimeSpan? minAcquisitionPullTime, TimeSpan? maxAcquisitionPullTime)
     {
-        if (string.IsNullOrWhiteSpace(patientId))
+        // No time restrictions
+        if (minAcquisitionPullTime == default && maxAcquisitionPullTime == default)
         {
-            return KafkaKeys.ForFacility(facilityId);
+            return true;
         }
 
-        return KafkaKeys.ForPatient(facilityId, patientId);
+        var currentTime = DateTime.UtcNow.TimeOfDay;
+
+        // Same-day window (e.g., 9 AM to 5 PM)
+        if (minAcquisitionPullTime <= maxAcquisitionPullTime)
+        {
+            return currentTime >= minAcquisitionPullTime && currentTime <= maxAcquisitionPullTime;
+        }
+
+        // Midnight-spanning window (e.g., 8 PM to 4 AM)
+        return currentTime >= minAcquisitionPullTime || currentTime <= maxAcquisitionPullTime;
     }
+
 }

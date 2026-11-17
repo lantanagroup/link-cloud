@@ -23,6 +23,7 @@ spring:
 
     consumer:
       group-id: measureeval-events
+      client-id: measureeval-client
 
     producer:
       properties:

@@ -49,19 +49,6 @@ public class SectionHeaderGuardTests
         block.Should().NotContain("#545c64");
     }
 
-    [Fact]
-    public void Raw_message_sections_share_the_dark_code_style()
-    {
-        var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
-        css.Should().Contain(".lu-kafka .lu-msg-raw");
-        css.Should().Contain(".lu-kafka .lu-msg-raw pre.lu-json");
-        var start = css.IndexOf(".lu-kafka .lu-msg-raw {", StringComparison.Ordinal);
-        start.Should().BeGreaterThan(-1);
-        var body = css[start..css.IndexOf('}', start)];
-        body.Should().Contain("background: var(--au-dark)");
-        body.Should().Contain("color: #f4f4f4");
-    }
-
     private static string Rel(string path) => Path.GetRelativePath(Root(), path);
 
     private static string Root()

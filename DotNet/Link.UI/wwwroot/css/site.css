@@ -3069,10 +3069,6 @@ a.lu-clip {
   border-color: #adb5bd;
   color: #111;
 }
-.lu-kafka .lu-msg-raw .btn.lu-copy,
-.lu-kafka .lu-msg-raw .btn.btn-au-link.lu-icon-btn.lu-copy,
-.lu-kafka .lu-msg-raw .btn.lu-copy:hover,
-.lu-kafka .lu-msg-raw .btn.lu-copy:focus,
 .au-card .card-header .btn.lu-copy,
 .au-card .card-header .btn.btn-au-link.lu-icon-btn.lu-copy,
 .au-card .card-header .btn.lu-copy:hover,
@@ -3082,8 +3078,6 @@ a.lu-clip {
   border-color: rgba(255, 255, 255, .5);
   color: #fff;
 }
-.lu-kafka .lu-msg-raw .btn.lu-copy:hover,
-.lu-kafka .lu-msg-raw .btn.lu-copy:focus,
 .au-card .card-header .btn.lu-copy:hover,
 .au-card .card-header .btn.lu-copy:focus {
   background: rgba(255, 255, 255, .1);
@@ -3953,31 +3947,6 @@ kbd {
   margin-left: .4rem;
   color: inherit;
 }
-
-.lu-kafka-fold {
-  border: 1px solid #e6e6e6;
-  border-radius: .5rem;
-  background: #fff;
-  box-shadow: var(--au-card-shadow);
-  padding: .85rem 1rem;
-  margin-top: 1rem;
-}
-.lu-kafka-fold > summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.lu-kafka-fold[open] > summary {
-  margin-bottom: .25rem;
-}
-tr.lu-kafka-problem > td:first-child {
-  box-shadow: inset 3px 0 0 #b42318;
-}
-.is-dimmed {
-  opacity: .45;
-}
-.lu-kafka-attention {
-  box-shadow: inset 3px 0 0 #b42318;
-}
 #kafka-change-partitions [data-partition-pane],
 #kafka-change-partitions [data-partition-btn] {
   display: none;
@@ -4114,30 +4083,6 @@ tr.lu-kafka-problem > td:first-child {
   border-color: var(--au-link);
   color: #fff;
 }
-
-.lu-kafka .lu-section-nav a,
-.lu-kafka .lu-section-nav button {
-  transition: color .16s ease, background-color .16s ease, box-shadow .16s ease;
-}
-.lu-kafka h1,
-.lu-kafka h2,
-.lu-kafka .card-header {
-  letter-spacing: -.015em;
-}
-.lu-kafka .form-label {
-  font-weight: 600;
-  font-size: .8rem;
-}
-.lu-kafka fieldset {
-  background: #fff;
-  border-color: var(--au-border) !important;
-  box-shadow: var(--au-card-shadow);
-  min-width: 0;
-  max-width: 100%;
-}
-.lu-kafka fieldset,
-.lu-kafka .form-text,
-.lu-kafka legend,
 .lu-search,
 .lu-search .form-text,
 .lu-search legend {
@@ -4145,13 +4090,8 @@ tr.lu-kafka-problem > td:first-child {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
-.lu-kafka .row > [class*="col-"],
 .lu-search .row > [class*="col-"] {
   min-width: 0;
-}
-.lu-kafka-stat {
-  color: var(--au-muted);
-  font-size: .875rem;
 }
 .lu-pager {
   display: flex;
@@ -4173,89 +4113,6 @@ tr.lu-kafka-problem > td:first-child {
   cursor: pointer;
   color: var(--au-muted);
   font-size: .875rem;
-}
-.lu-kafka .alert {
-  border-radius: var(--au-radius);
-}
-.lu-kafka pre {
-  background: var(--au-bg);
-  border: 1px solid var(--au-border);
-  border-radius: var(--au-radius);
-  padding: .75rem 1rem;
-  font-size: .8125rem;
-  line-height: 1.45;
-}
-.lu-kafka .table {
-  font-variant-numeric: tabular-nums;
-}
-.lu-kafka .table thead th {
-  background: var(--au-dark);
-  color: #fff;
-  font-weight: 600;
-  border: none;
-  white-space: nowrap;
-  padding: .55rem .75rem;
-}
-.lu-kafka .table thead th a,
-.lu-kafka .table thead th a:visited,
-.lu-kafka .table thead th a:hover {
-  color: inherit;
-}
-.lu-kafka .table tbody td {
-  vertical-align: middle;
-}
-.lu-kafka .table tbody tr {
-  transition: background-color .16s ease;
-}
-.lu-kafka-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .75rem;
-  margin-top: 1rem;
-}
-.lu-kafka-summary > div {
-  flex: 1 1 9rem;
-  background: #fff;
-  border: 1px solid var(--au-border);
-  border-radius: var(--au-radius);
-  box-shadow: var(--au-card-shadow);
-  padding: .7rem .9rem;
-}
-.lu-kafka-summary-wide {
-  flex: 2 1 16rem;
-}
-.lu-kafka-summary-value {
-  font-size: 1.35rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.01em;
-  line-height: 1.2;
-}
-.lu-kafka-summary-text {
-  font-size: .95rem;
-  font-weight: 600;
-  line-height: 1.35;
-}
-.lu-kafka-summary-label {
-  margin-top: .2rem;
-  font-size: .72rem;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--au-muted);
-}
-.lu-kafka-pager {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: .5rem;
-  margin-top: .75rem;
-  font-variant-numeric: tabular-nums;
-}
-.lu-kafka tr.lu-msg-row > td {
-  background: var(--au-bg);
-  padding: .75rem;
 }
 .lu-msg {
   background: #fff;
@@ -4408,19 +4265,6 @@ tr.lu-kafka-problem > td:first-child {
 .lu-produce-summary {
   margin: 0 0 .75rem;
 }
-.lu-kafka pre.lu-json {
-  margin: 0;
-  max-height: 22rem;
-  overflow: auto;
-  background: var(--au-dark);
-  color: #f4f4f4;
-  border: none;
-  border-radius: 0;
-  padding: .75rem 1rem .9rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: .8125rem;
-  line-height: 1.5;
-}
 .lu-result {
   padding: .4rem .7rem;
 }
@@ -4506,9 +4350,6 @@ tr.lu-kafka-problem > td:first-child {
   padding-top: .6rem;
   border-top: 1px solid var(--au-border);
 }
-.lu-result .lu-kafka-summary {
-  margin-top: 0;
-}
 .lu-result a.btn.lu-nav-current,
 .lu-result a.btn.lu-nav-current:hover,
 .lu-result a.btn.lu-nav-current:focus {
@@ -4516,11 +4357,6 @@ tr.lu-kafka-problem > td:first-child {
   background: #fff;
   border-color: var(--au-warning);
   box-shadow: inset 0 -3px 0 var(--au-warning);
-}
-.lu-kafka-summary-of {
-  font-size: .72em;
-  font-weight: 650;
-  color: var(--au-muted);
 }
 .lu-rf-track {
   list-style: none;
@@ -4772,25 +4608,6 @@ button.btn-au-action.disabled,
   opacity: .82;
 }
 
-.lu-kafka .lu-msg-raw {
-  background: var(--au-dark);
-  color: #f4f4f4;
-  border-color: #1a1a1a;
-}
-.lu-kafka .lu-msg-raw h4,
-.lu-kafka .lu-msg-raw .h6 {
-  color: #f4f4f4;
-}
-.lu-kafka .lu-msg-raw pre,
-.lu-kafka .lu-msg-raw pre.lu-json {
-  background: transparent;
-  color: #f4f4f4;
-  border: none;
-}
-.lu-kafka .lu-msg-raw .text-muted {
-  color: #d0d0d0;
-}
-
 /* Short columns shrink to their text. max-width: 0 on a flexible column only
    drops the content minimum so the column can use the space that is left.
    The text is cut only when that space is smaller than the value. */
@@ -4937,56 +4754,11 @@ table .lu-facility-id {
 .lu-funnel-count {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-/* The provider state is a small badge beside the Kafka title, not a heading-sized block. */
-h1 .lu-provider-badge { font-size: .75rem; font-weight: 600; vertical-align: middle; padding: .3em .6em; }
-h1 .lu-provider-badge + .au-info-icon { font-size: .8rem; vertical-align: middle; }
-
-/* A variant that is not on the broker stays readable on the dark section nav. */
-.lu-section-nav .is-dimmed { color: #9aa0a6; padding: .35rem .75rem; cursor: not-allowed; }
-
-/* ---- Kafka overview widgets (shared by the Kafka Overview and the landing dashboard) ---- */
-.lu-pipeline { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: .5rem; counter-reset: lu-step; }
-.lu-pipeline > li { display: flex; min-width: 0; counter-increment: lu-step; }
-.lu-pipeline > li > .lu-pipeline-step { flex: 1 1 auto; min-width: 0; }
-.lu-pipeline-name::before { content: counter(lu-step) ". "; color: var(--au-muted); font-weight: 600; }
-.lu-pipeline-step { display: flex; flex-direction: column; padding: .4rem .65rem; border-radius: .4rem; border: 1px solid transparent; border-left-width: 4px; text-decoration: none; color: var(--au-text); background: #fff; }
-.lu-pipeline-step:hover, .lu-pipeline-step:focus-visible { text-decoration: none; outline: 2px solid var(--au-link); outline-offset: 1px; }
-.lu-pipeline-name { font-weight: 600; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lu-pipeline-lag { font-size: .72rem; color: var(--au-muted); white-space: nowrap; }
+}/* The provider state is a small badge beside the Kafka title { font-size: .75rem; font-weight: 600; vertical-align: middle; padding: .3em .6em; }
 .lu-tone-ok { background: #e9f7ee; border-color: #b9e3c6; border-left-color: var(--au-success); }
 .lu-tone-warn { background: #fff6db; border-color: #f1dc9c; border-left-color: #e0a045; }
 .lu-tone-bad { background: #fdecee; border-color: #f3c0c6; border-left-color: #dc3545; }
 .lu-tone-unknown { background: var(--au-accent-soft); border-color: var(--au-border); border-left-color: #9a9a9a; }
-.lu-pipeline-compact { gap: .35rem; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); }
-.lu-pipeline-compact .lu-pipeline-step { min-width: 0; padding: .25rem .5rem; }
-
-.lu-broker-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; }
-.lu-broker-card { display: flex; flex-direction: column; gap: .3rem; padding: .7rem .85rem; border: 1px solid var(--au-border); border-radius: .5rem; background: #fff; color: var(--au-text); text-decoration: none; min-width: 0; }
-.lu-broker-card:hover, .lu-broker-card:focus-visible { text-decoration: none; border-color: var(--au-link); }
-.lu-broker-card.lu-kafka-attention { border-left: 4px solid #dc3545; }
-.lu-broker-title { font-weight: 700; }
-.lu-broker-host { font-size: .8rem; color: var(--au-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lu-broker-state { display: flex; gap: .35rem; flex-wrap: wrap; }
-.lu-broker-stats { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .8rem; color: var(--au-muted); }
-.lu-broker-stats strong { color: var(--au-text); font-size: .95rem; }
-
-.lu-spark-row { display: flex; align-items: center; gap: 1.25rem; }
-.lu-spark-figure { display: flex; flex-direction: column; min-width: 5.5rem; }
-.lu-spark-value { font-size: 1.35rem; font-weight: 700; line-height: 1.1; white-space: nowrap; }
-.lu-spark-label { font-size: .75rem; color: var(--au-muted); display: flex; align-items: center; gap: .3rem; }
-.lu-spark-key { display: inline-block; width: .7rem; height: .2rem; border-radius: 1px; }
-.lu-spark { flex: 1 1 auto; min-width: 8rem; height: 3.25rem; overflow: visible; }
-.lu-spark polyline { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-.lu-spark .lu-spark-in, .lu-spark-key.lu-spark-in { stroke: var(--lu-spark-in); background: var(--lu-spark-in); }
-.lu-spark .lu-spark-out, .lu-spark-key.lu-spark-out { stroke: var(--lu-spark-out); background: var(--lu-spark-out); }
-.lu-spark .lu-spark-lag, .lu-spark-key.lu-spark-lag { stroke: var(--lu-spark-lag); background: var(--lu-spark-lag); }
-.lu-kind-badge { font-size: .68rem; font-weight: 600; vertical-align: middle; margin-left: .4rem; }
-#kafka-widget-leaders .lu-donut-layout { flex-wrap: nowrap; gap: 1.5rem; justify-content: center; }
-#kafka-widget-leaders .lu-donut-chart, #kafka-widget-leaders .lu-donut-ring { width: 160px; height: 160px; margin-inline: 0; flex: 0 0 auto; }
-#kafka-widget-leaders .lu-donut-legend { margin: 0; grid-template-columns: max-content; }
-.lu-kafka-widget-grid > [class*="col"] > .lu-kafka-widget > .card { margin-top: 0 !important; }
 
 /* Facility names are readable values, not GUIDs: show them in full in the reports tables. */
 .lu-reports-table > tbody > tr > td:nth-child(2) .lu-clip { max-width: none; }
@@ -5004,21 +4776,8 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon {
   padding: 0;
 }
 table > tbody > tr > td .btn.btn-sm.lu-row-icon > :not(i.bi) { display: none; }
-table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
-
-/* Kafka topic combo box: content-width input, caret toggle, overlay list. */
-.lu-combo { position: relative; width: 30rem; max-width: 100%; }
-.lu-combo > .form-control { padding-right: 2.25rem; }
-.lu-combo-toggle { position: absolute; top: 0; right: 0; height: 100%; width: 2.25rem; border: 0; background: transparent; color: #495057; }
-.lu-combo-list { position: absolute; top: calc(100% + .25rem); left: 0; right: 0; z-index: 1050; max-height: 20rem; overflow-y: auto; margin: 0; padding: .25rem 0; list-style: none; background: #fff; border: 1px solid #d0d5da; border-radius: .375rem; box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15); }
-.lu-combo-option { display: flex; justify-content: space-between; gap: .75rem; padding: .4rem .75rem; cursor: pointer; }
-.lu-combo-option:hover, .lu-combo-option.active { background: var(--au-link); color: #fff; }
-.lu-combo-option:hover .lu-combo-meta, .lu-combo-option.active .lu-combo-meta { color: #fff; }
-.lu-combo-meta { font-size: .8rem; color: #495057; white-space: nowrap; }
-.lu-combo-empty { padding: .4rem .75rem; color: #495057; }
-
-.lu-combo-option.is-current > span:first-child::before { content: '\2713'; display: inline-block; width: 1.1rem; font-weight: 700; }
-.lu-combo-option:not(.is-current) > span:first-child { padding-left: 1.1rem; }
+table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }/* Kafka topic combo box: content-width input,
+caret toggle { position: relative; width: 30rem; max-width: 100%; }
 
 /* Resource types: the legend doubles as a bar graph (slice colour, count, share), biggest first.
    Sits beside the donut and drops under it when the card is too narrow; names wrap, never truncate. */

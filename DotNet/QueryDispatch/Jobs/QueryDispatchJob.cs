@@ -57,7 +57,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 var dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                 {
-                    FacilityId = patientDispatchEntity.FacilityId,
                     PatientId = patientDispatchEntity.PatientId,
                     ScheduledReports = new List<ScheduledReport>(),
                     QueryType = QueryType.Initial.ToString(),
@@ -83,7 +82,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 _acquisitionProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), new Message<string, DataAcquisitionRequestedValue>
                 {
-                    Key = KafkaKeys.ForPatient(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId),
+                    Key = patientDispatchEntity.FacilityId,
                     Value = dataAcquisitionRequestedValue,
                     Headers = acqHeaders
                 });
@@ -121,7 +120,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             var auditMessage = new AuditEventMessage
             {
                 FacilityId = patientDispatchEntity.FacilityId,
-                PatientId = patientDispatchEntity.PatientId,
                 ServiceName = QueryDispatchConstants.ServiceName,
                 Action = AuditEventType.Create,
                 EventDate = DateTime.UtcNow,
@@ -131,7 +129,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
             _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
-                Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                 Value = auditMessage,
                 Headers = headers
             });

@@ -24,7 +24,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class PatientAcquiredMessage
     {
-        public string? FacilityId { get; set; }
         public List PatientIds { get; set; }
         public string ReportTrackingId { get; set; } = string.Empty;
     }

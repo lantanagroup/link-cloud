@@ -39,21 +39,6 @@ public static class StatusPills
         return "au-badge-muted";
     }
 
-    /// <summary>Kafka health words on the overview widgets: Online, In sync, Healthy, Offline, ISR short, Needs attention.</summary>
-    public static string ForKafkaHealth(string? state)
-    {
-        var name = Compact(state);
-        if (name is "online" or "insync" or "healthy")
-            return "au-badge-success";
-        if (name is "offline" or "down")
-            return "au-badge-danger";
-        if (name is "isrshort")
-            return "au-badge-warning";
-        if (name is "needsattention" or "needattention")
-            return "au-badge-attention";
-        return "au-badge-muted";
-    }
-
     public static string ForLevel(string? level)
     {
         var name = Compact(level);

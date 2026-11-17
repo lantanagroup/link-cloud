@@ -7,7 +7,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -27,12 +26,12 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
     private readonly ILogger<DataAcquisitionLogService> _logger;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
-    IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
+    IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly ICacheService? _cache;
 
     public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IProducer<string, ReadyToAcquire> readyToAcquireProducer,
+        IProducer<long, ReadyToAcquire> readyToAcquireProducer,
         ICacheService? cache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -75,14 +74,13 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             await _readyToAcquireProducer.ProduceAsync(
                 nameof(KafkaTopic.ReadyToAcquire),
-                new Message<string, ReadyToAcquire>
+                new Message<long, ReadyToAcquire>
                 {
-                    Key = ReadyToAcquireKey(log.FacilityId, log.PatientId),
+                    Key = log.Id,
                     Value = new ReadyToAcquire
                     {
                         LogId = log.Id,
                         FacilityId = log.FacilityId,
-                        PatientId = log.PatientId,
                         ReportTrackingId = log.ReportTrackingId ?? string.Empty
                     },
                     Headers = headers
@@ -144,15 +142,5 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         {
             _logger.LogInformation("Bulk retrieval process completed successfully for all {successCount} logs.", successCount);
         }
-    }
-
-    private static string ReadyToAcquireKey(string? facilityId, string? patientId)
-    {
-        if (string.IsNullOrWhiteSpace(patientId))
-        {
-            return KafkaKeys.ForFacility(facilityId);
-        }
-
-        return KafkaKeys.ForPatient(facilityId, patientId);
     }
 }

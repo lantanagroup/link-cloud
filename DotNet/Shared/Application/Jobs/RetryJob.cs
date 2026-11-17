@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -55,8 +54,7 @@ public class RetryJob : IJob
                 var darKey = retryModel.Key;
                 var darValue = retryModel.Value;
 
-                var destination = KafkaTopicNames.Redrive(retryModel.Topic, retryModel.ServiceName);
-                producer.Produce(destination,
+                producer.Produce(retryModel.Topic,
                     new Message<string, string>
                     {
                         Key = darKey,

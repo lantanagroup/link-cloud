@@ -1,9 +1,8 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
@@ -35,13 +34,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 var message = new Message<string, object>
                 {
-                    Key = KafkaKeys.ForPatient(model.Key, model.PatientId),
-                    Value = new PatientEventMessage
-                    {
-                        FacilityId = model.Key,
-                        PatientId = model.PatientId,
-                        EventType = model.EventType
-                    },
+                    Key = model.Key,
+                    Value = new PatientEventMessage { PatientId = model.PatientId, EventType = model.EventType },
                     Headers = headers
                 };
 

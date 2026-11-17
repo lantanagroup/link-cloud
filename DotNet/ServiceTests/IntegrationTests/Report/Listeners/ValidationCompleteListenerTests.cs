@@ -242,15 +242,12 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.ProduceAsync(
+            p => p.Produce(
                 It.IsAny<string>(),
-                It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
-                    m.Value.FacilityId == facilityId &&
-                    m.Value.ReportScheduleId == reportId &&
+                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Once);
     }
 
@@ -325,15 +322,12 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.ProduceAsync(
+            p => p.Produce(
                 It.IsAny<string>(),
-                It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
-                    m.Value.FacilityId == facilityId &&
-                    m.Value.ReportScheduleId == reportId &&
+                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Once);
     }
 
@@ -407,10 +401,10 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.NotSubmitted, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.ProduceAsync(
+            p => p.Produce(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Never);
     }
 
@@ -473,15 +467,12 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.ProduceAsync(
+            p => p.Produce(
                 It.IsAny<string>(),
-                It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
-                    m.Value.FacilityId == facilityId &&
-                    m.Value.ReportScheduleId == reportId &&
+                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Once);
     }
 
@@ -560,10 +551,10 @@ public class ValidationCompleteListenerTests
 
         // Still no submission of any kind.
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.ProduceAsync(
+            p => p.Produce(
                 It.IsAny<string>(),
-                It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Never);
     }
 

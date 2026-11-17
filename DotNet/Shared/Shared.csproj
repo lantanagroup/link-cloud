@@ -88,8 +88,4 @@
 		<ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<InternalsVisibleTo Include="KafkaKeyProof.Tests" />
-	</ItemGroup>
-
 </Project>

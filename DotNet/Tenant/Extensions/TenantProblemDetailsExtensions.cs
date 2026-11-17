@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Tenant.Extensions
                     if (statusCode == (int)HttpStatusCode.InternalServerError
                         || string.IsNullOrWhiteSpace(ctx.ProblemDetails.Detail))
                     {
-                        ctx.ProblemDetails.Detail = "An error occurred in our API. Please use the trace id when requesting assistance.";
+                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
                     }
 
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))

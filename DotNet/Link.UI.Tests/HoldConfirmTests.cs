@@ -65,8 +65,6 @@ public class HoldConfirmTests
         css.Should().Contain(".au-badge-test { background: #fff1f2");
         Read("Views", "Shared", "_AutomationBadge.cshtml").Should().Contain("au-badge-automation").And.NotContain("au-badge-warning");
         Read("Views", "Tenants", "Facility.cshtml").Should().Contain("au-badge-test\">Test facility");
-        StatusPills.ForKafkaHealth("Needs attention").Should().Be("au-badge-attention");
-        StatusPills.ForKafkaHealth("ISR short").Should().Be("au-badge-warning");
         Read("wwwroot", "js", "facility-save.js").Should().Contain("luHoldConfirm.ask").And.Contain("beforeunload");
     }
 

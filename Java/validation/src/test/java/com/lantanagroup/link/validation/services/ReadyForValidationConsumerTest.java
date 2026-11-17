@@ -5,9 +5,7 @@ import ca.uhn.fhir.parser.IParser;
 import com.azure.core.util.BinaryData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
-import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Headers;
-import com.lantanagroup.link.shared.kafka.KafkaKeys;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
@@ -215,20 +213,22 @@ public class ReadyForValidationConsumerTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private ConsumerRecord<String, ReadyForValidation> buildRecord(String payloadUri) {
+    private ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> buildRecord(String payloadUri) {
         return buildRecord(payloadUri, false);
     }
 
-    private ConsumerRecord<String, ReadyForValidation> buildRecord(
+    private ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> buildRecord(
             String payloadUri, boolean withCorrelationId) {
+        ReadyForValidation.Key key = new ReadyForValidation.Key();
+        key.setFacilityId(FACILITY_ID);
+
         ReadyForValidation value = new ReadyForValidation();
-        value.setFacilityId(FACILITY_ID);
         value.setPatientId(PATIENT_ID);
         value.setReportTrackingId(REPORT_ID);
         value.setPayloadUri(payloadUri);
 
-        ConsumerRecord<String, ReadyForValidation> record =
-                new ConsumerRecord<>(TOPIC, 0, 0L, "other-facility:other-patient", value);
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record =
+                new ConsumerRecord<>(TOPIC, 0, 0L, key, value);
 
         if (withCorrelationId) {
             record.headers().add(Headers.CORRELATION_ID, Headers.getBytes(CORRELATION_ID));
@@ -293,7 +293,7 @@ public class ReadyForValidationConsumerTest {
                 .thenReturn(BinaryData.fromBytes(new byte[0]));
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
-        ConsumerRecord<String, ReadyForValidation> record = buildRecord(PAYLOAD_URI);
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(PAYLOAD_URI);
         record.headers().add(Headers.METRICS_MODE, Headers.getBytes("performance"));
         consumer.process(record);
 
@@ -576,13 +576,12 @@ public class ReadyForValidationConsumerTest {
 
         ValidationComplete vc = captor.getValue().value();
         assertEquals(PATIENT_ID, vc.getPatientId());
-        assertEquals(FACILITY_ID, vc.getFacilityId());
         assertEquals(REPORT_ID, vc.getReportTrackingId());
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void process_validationCompleteKeyIsPatientKey() throws Exception {
+    void process_validationCompleteKeyIsSetToFacilityId() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
@@ -594,35 +593,7 @@ public class ReadyForValidationConsumerTest {
 
         consumer.process(buildRecord(null));
 
-        assertEquals(KafkaKeys.forPatient(FACILITY_ID, PATIENT_ID), captor.getValue().key());
-        assertEquals(FACILITY_ID, captor.getValue().value().getFacilityId());
-    }
-
-    @Test
-    void process_legacyJsonKeySuppliesFacilityWhenValueOmitsIt() throws Exception {
-        ReadyForValidation value = new ReadyForValidation();
-        value.setPatientId(PATIENT_ID);
-        value.setReportTrackingId(REPORT_ID);
-        String key = "{\"FacilityId\":\"" + FACILITY_ID + "\",\"patientId\":\"from-key\"}";
-        stubRestRetrieval();
-        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
-
-        consumer.process(new ConsumerRecord<>(TOPIC, 0, 0L, key, value));
-
-        verify(validationService).validate(bundle, FACILITY_ID, REPORT_ID);
-        verify(reportClient).getSubmissionModel(FACILITY_ID, PATIENT_ID, REPORT_ID);
-    }
-
-    @Test
-    void process_colonKeyIsNotParsedWhenValueOmitsFacility() {
-        ReadyForValidation value = new ReadyForValidation();
-        value.setPatientId(PATIENT_ID);
-        value.setReportTrackingId(REPORT_ID);
-
-        assertThrows(ValidationException.class,
-                () -> consumer.process(new ConsumerRecord<>(TOPIC, 0, 0L, FACILITY_ID + ":" + PATIENT_ID, value)));
-
-        verifyNoInteractions(validationService);
+        assertEquals(FACILITY_ID, captor.getValue().key());
     }
 
     @Test

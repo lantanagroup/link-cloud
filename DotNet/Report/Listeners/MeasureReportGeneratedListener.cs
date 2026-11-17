@@ -11,7 +11,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Diagnostics;
 using System.Text;
@@ -22,12 +21,12 @@ namespace LantanaGroup.Link.Report.Listeners
     public class MeasureReportGeneratedListener : BackgroundService
     {
         private readonly ILogger<MeasureReportGeneratedListener> _logger;
-        private readonly IKafkaConsumerFactory<string, MeasureReportGeneratedValue> _kafkaConsumerFactory;
+        private readonly IKafkaConsumerFactory<Null, MeasureReportGeneratedValue> _kafkaConsumerFactory;
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        private readonly ITransientExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> _deadLetterExceptionHandler;
 
         private readonly ReadyForValidationProducer _readyForValidationProducer;
         private readonly ServiceInformation _serviceInformation;
@@ -38,9 +37,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public MeasureReportGeneratedListener(
             ILogger<MeasureReportGeneratedListener> logger,
-            IKafkaConsumerFactory<string, MeasureReportGeneratedValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue> deadLetterExceptionHandler,
+            IKafkaConsumerFactory<Null, MeasureReportGeneratedValue> kafkaConsumerFactory,
+            ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,
             ReadyForValidationProducer readyForValidationProducer,
@@ -75,11 +74,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            var assignmentTracker = new KafkaAssignmentTracker();
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
             try
             {
-                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.MeasureReportGenerated), "Report"));
+                consumer.Subscribe(nameof(KafkaTopic.MeasureReportGenerated));
                 _logger.LogInformation("{Name}: Started MeasureReportGenerated consumer on {date} for topic '{MeasureReportGeneratedName}'", Name, DateTime.UtcNow, nameof(KafkaTopic.MeasureReportGenerated));
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -90,22 +88,18 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            var accounted = false;
                             try
                             {
-                                facilityId = KafkaIdentity.Facility(result?.Message?.Value?.FacilityId, result?.Message?.Key) ?? string.Empty;
+                                facilityId = result.Message.Value.FacilityId;
                                 await ProcessMessageAsync(result, facilityId, consumeCancellationToken);
-                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                accounted = true;
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                accounted = true;
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -114,15 +108,11 @@ namespace LantanaGroup.Link.Report.Listeners
                             catch (Exception ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
-                                accounted = true;
                             }
                             finally
                             {
-                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
-                                {
-                                    assignmentTracker.MarkProcessed(result);
+                                if (!consumeCancellationToken.IsCancellationRequested)
                                     consumer.SafeCommit(result, _logger);
-                                }
                             }
                         }, cancellationToken);
                     }
@@ -154,7 +144,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
+        public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
             using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
 
@@ -165,19 +155,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Value.ReportTrackingId}, FacilityId = {result.Message.Value.FacilityId}).");
 
             var messageValue = result.Message.Value;
-            var resolvedFacilityId = KafkaIdentity.Facility(messageValue.FacilityId, result.Message.Key);
-            var resolvedPatientId = KafkaIdentity.Patient(messageValue.PatientId, result.Message.Key);
-            if (!string.IsNullOrWhiteSpace(resolvedFacilityId))
-            {
-                messageValue.FacilityId = resolvedFacilityId;
-                facilityId = resolvedFacilityId;
-            }
-
-            if (!string.IsNullOrWhiteSpace(resolvedPatientId))
-            {
-                messageValue.PatientId = resolvedPatientId;
-            }
-
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
             _logger.LogDebug("Consuming MeasureReportGenerated (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);

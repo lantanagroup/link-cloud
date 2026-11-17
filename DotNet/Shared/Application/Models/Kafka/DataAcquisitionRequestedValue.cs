@@ -6,8 +6,6 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 public class DataAcquisitionRequestedValue
 {
     [DataMember]
-    public string? FacilityId { get; set; }
-    [DataMember]
     public string PatientId { get; set; } = string.Empty;
     [DataMember]
     public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();

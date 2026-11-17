@@ -6,7 +6,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 
 public class DataAcquisitionRequested
 {
-    public string? FacilityId { get; set; }
     public string PatientId { get; set; } = null!;
     /// <summary>
     /// Valid options: Initial, Supplemental

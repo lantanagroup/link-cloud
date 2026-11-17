@@ -63,14 +63,10 @@ public class ValidationCompleteListenerTests
             Times.Once);
 
         harness.Producer.Verify(
-            p => p.ProduceAsync(
+            p => p.Produce(
                 nameof(KafkaTopic.SubmitPayload),
-                It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForPatient(FacilityId, PatientId) &&
-                    m.Value.FacilityId == FacilityId &&
-                    m.Value.PatientId == PatientId &&
-                    m.Value.ReportScheduleId == harness.ReportId),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
             Times.Once);
     }
 
@@ -114,7 +110,7 @@ public class ValidationCompleteListenerTests
         public Guid ReportId { get; } = Guid.NewGuid();
         public Mock<PatientAggregator> PatientAggregator { get; }
         public Mock<IReportEntryManager> ReportEntryManager { get; } = new();
-        public Mock<IProducer<string, SubmitPayloadValue>> Producer { get; } = new();
+        public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> Producer { get; } = new();
         public ValidationCompleteListener Listener { get; }
 
         public Harness()

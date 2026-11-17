@@ -1,10 +1,8 @@
 ﻿using Census.Domain.Entities;
 using Confluent.Kafka;
-using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Jobs;
@@ -13,9 +11,9 @@ namespace LantanaGroup.Link.Census.Application.Jobs;
 public class SchedulePatientListRetrieval : IJob
 {
     private readonly ILogger<SchedulePatientListRetrieval> _logger;
-    private readonly IProducer<string, PatientCensusScheduled> _kafkaProducer;
+    private readonly IProducer<string, Null> _kafkaProducer;
 
-    public SchedulePatientListRetrieval(ILogger<SchedulePatientListRetrieval> logger, IProducer<string, PatientCensusScheduled> kafkaProducer)
+    public SchedulePatientListRetrieval(ILogger<SchedulePatientListRetrieval> logger, IProducer<string, Null> kafkaProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
@@ -37,16 +35,12 @@ public class SchedulePatientListRetrieval : IJob
 
         try
         {
-            await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, PatientCensusScheduled>
+            await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
             {
-                Key = KafkaKeys.ForFacility(facility.FacilityID),
-                Value = new PatientCensusScheduled
-                {
-                    FacilityId = facility.FacilityID
-                }
+                Key = facility.FacilityID
             });
         }
-        catch (ProduceException<string, PatientCensusScheduled> ex)
+        catch (ProduceException<string, Null> ex)
         {
             _logger.LogError(ex, "SchedulePatientListRetrieval: Error producing {Topic} message to Kafka for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
             throw;

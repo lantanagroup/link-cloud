@@ -7,7 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ValidationComplete {
-    private String facilityId;
     private String patientId;
     private String reportTrackingId;
 

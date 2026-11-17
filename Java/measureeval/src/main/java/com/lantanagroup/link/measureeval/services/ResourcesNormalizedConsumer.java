@@ -4,6 +4,7 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -48,7 +49,7 @@ public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<Resour
 
     @KafkaListener(topics = Topics.RESOURCES_NORMALIZED, containerFactory = "manualAckListenerContainerFactory")
     public void consume(
-            ConsumerRecord<String, ResourcesNormalized> record,
+            ConsumerRecord<ResourceKey, ResourcesNormalized> record,
             Acknowledgment acknowledgment) {
         doConsume(record, acknowledgment);
     }

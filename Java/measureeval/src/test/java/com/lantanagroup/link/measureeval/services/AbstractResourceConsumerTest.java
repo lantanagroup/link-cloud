@@ -4,9 +4,7 @@ import com.lantanagroup.link.measureeval.entities.*;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.shared.exceptions.ValidationException;
-import com.lantanagroup.link.shared.kafka.KafkaKeys;
-import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
@@ -16,7 +14,6 @@ import org.hl7.fhir.r4.model.ResourceType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.data.mongodb.core.BulkOperations;
@@ -198,14 +195,7 @@ class AbstractResourceConsumerTest {
 
         assertTrue(result);
         assertTrue(report.getReportable());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<ProducerRecord<String, DataAcquisitionRequested>> captor =
-                ArgumentCaptor.forClass(ProducerRecord.class);
-        verify(dataAcquisitionRequestedTemplate).send(captor.capture());
-        assertEquals(Topics.DATA_ACQUISITION_REQUESTED, captor.getValue().topic());
-        assertEquals(KafkaKeys.forPatient("facility-1", "patient-1"), captor.getValue().key());
-        assertEquals("facility-1", captor.getValue().value().getFacilityId());
-        assertEquals("patient-1", captor.getValue().value().getPatientId());
+        verify(dataAcquisitionRequestedTemplate).send((ProducerRecord<String, DataAcquisitionRequested>) any());
     }
 
     @Test
@@ -289,7 +279,7 @@ class AbstractResourceConsumerTest {
         when(bulkResult.getModifiedCount()).thenReturn(1);
         when(bulkOps.execute()).thenReturn(bulkResult);
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
         consumerWithAbs.process(record);
 
         verify(absResourceService).readResources(facilityId, cacheKey, patientId, cacheKey);
@@ -304,7 +294,7 @@ class AbstractResourceConsumerTest {
         String cacheKey = "cache-key-1";
 
         ResourcesNormalized value = buildAbsValue(cacheKey);
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> consumer.process(record));
         assertEquals("ABS cache type requested but cache-blob-storage is not configured", ex.getMessage());
@@ -361,7 +351,7 @@ class AbstractResourceConsumerTest {
         when(bulkResult.getModifiedCount()).thenReturn(1);
         when(bulkOps.execute()).thenReturn(bulkResult);
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
         consumerWithAbs.process(record);
 
         // The ABS branch of the cleanup switch must actually run, not merely leave Redis alone:
@@ -408,7 +398,7 @@ class AbstractResourceConsumerTest {
         when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any()))
                 .thenThrow(new RuntimeException("evaluation failed"));
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
 
@@ -430,7 +420,7 @@ class AbstractResourceConsumerTest {
         doThrow(new RuntimeException("metrics failed"))
                 .when(measureEvalMetrics).IncrementRecordsReceivedCounter(any());
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
 
@@ -486,7 +476,7 @@ class AbstractResourceConsumerTest {
         when(bulkResult.getModifiedCount()).thenReturn(1);
         when(bulkOps.execute()).thenReturn(bulkResult);
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
         consumer.process(record);
 
         verify(redisResourceService).cleanup(cacheKey);
@@ -544,7 +534,7 @@ class AbstractResourceConsumerTest {
 
         doThrow(new RuntimeException("cleanup failed")).when(redisResourceService).cleanup(cacheKey);
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
         assertDoesNotThrow(() -> consumer.process(record));
 
         verify(redisResourceService).cleanup(cacheKey);
@@ -591,37 +581,11 @@ class AbstractResourceConsumerTest {
         when(reportabilityPredicate.test(any())).thenReturn(true);
         when(patientStatusRepository.save(any())).thenReturn(patientStatus);
 
-        ConsumerRecord<String, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
         consumer.process(record);
 
         verify(redisResourceService, never()).cleanup(anyString());
         verifyNoInteractions(mongoOperations);
-    }
-
-    @Test
-    void process_legacyJsonKeySuppliesIdsWhenValueOmitsThem() {
-        ResourcesNormalized value = buildRedisValue("cache-legacy");
-        String key = "{\"FacilityId\":\"fac-legacy\",\"PatientId\":\"pat-legacy\"}";
-        when(redisResourceService.readResources("fac-legacy", "cache-legacy", "pat-legacy"))
-                .thenThrow(new RuntimeException("stop-after-ids"));
-
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> consumer.process(new ConsumerRecord<>("ResourcesNormalized", 0, 0L, key, value)));
-
-        assertEquals("stop-after-ids", ex.getMessage());
-        verify(redisResourceService).readResources("fac-legacy", "cache-legacy", "pat-legacy");
-    }
-
-    @Test
-    void process_colonKeyIsNotParsedWhenValueOmitsFacility() {
-        ResourcesNormalized value = buildRedisValue("cache-colon");
-        ConsumerRecord<String, ResourcesNormalized> record =
-                new ConsumerRecord<>("ResourcesNormalized", 0, 0L, "fac:pat", value);
-
-        ValidationException ex = assertThrows(ValidationException.class, () -> consumer.process(record));
-
-        assertEquals("Facility ID is null or empty.", ex.getMessage());
-        verifyNoInteractions(redisResourceService);
     }
 
     private static org.hl7.fhir.r4.model.Patient nonEmptyPatient() {
@@ -652,13 +616,10 @@ class AbstractResourceConsumerTest {
         return value;
     }
 
-    private ConsumerRecord<String, ResourcesNormalized> buildConsumerRecord(
+    private ConsumerRecord<ResourceKey, ResourcesNormalized> buildConsumerRecord(
             String facilityId, String patientId, ResourcesNormalized value) {
-        value.setFacilityId(facilityId);
-        value.setPatientId(patientId);
-        // The colon key must not be parsed; the ids above are what the consumer reads.
-        return new ConsumerRecord<>("ResourcesNormalized", 0, 0L,
-                "other-facility:other-patient", value);
+        ResourceKey key = ResourceKey.builder().facilityId(facilityId).patientId(patientId).build();
+        return new ConsumerRecord<>("ResourcesNormalized", 0, 0L, key, value);
     }
 
     private static class TestScheduledReport {

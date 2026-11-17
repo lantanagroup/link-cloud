@@ -2,6 +2,5 @@
 {
     public class PatientCensusScheduled
     {
-        public string? FacilityId { get; set; }
     }
 }

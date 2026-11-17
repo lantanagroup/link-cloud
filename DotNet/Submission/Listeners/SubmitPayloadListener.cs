@@ -1,11 +1,8 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -16,8 +13,6 @@ using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -26,14 +21,10 @@ namespace LantanaGroup.Link.Submission.Listeners
     {
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
 
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializationMode.Ostrich);
-
         private readonly ILogger<SubmitPayloadListener> _logger;
-        private readonly KafkaAssignmentTracker _assignmentTracker = new();
-        private readonly IConsumer<string, SubmitPayloadValue> _consumer;
-        private readonly ITransientExceptionHandler<SubmitPayloadListener, string, SubmitPayloadValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<SubmitPayloadListener, string, SubmitPayloadValue> _deadLetterExceptionHandler;
+        private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
+        private readonly ITransientExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> _deadLetterExceptionHandler;
         private readonly IStorageService _blobStorageService;
         private readonly ISubmissionServiceMetrics _metrics;
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
@@ -42,9 +33,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         public SubmitPayloadListener(
             ILogger<SubmitPayloadListener> logger,
-            IKafkaConsumerFactory<string, SubmitPayloadValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<SubmitPayloadListener, string, SubmitPayloadValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitPayloadListener, string, SubmitPayloadValue> deadLetterExceptionHandler,
+            IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue> kafkaConsumerFactory,
+            ITransientExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> deadLetterExceptionHandler,
             IStorageService blobStorageService,
             ISubmissionServiceMetrics metrics,
             PayloadSubmittedProducer payloadSubmittedProducer,
@@ -57,7 +48,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 GroupId = SubmissionConstants.ServiceName,
                 EnableAutoCommit = false
-            }, assignmentTracker: _assignmentTracker);
+            });
 
             _transientExceptionHandler = transientExceptionHandler;
             _transientExceptionHandler.Topic = TopicName + "-Retry";
@@ -83,7 +74,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private async Task ExecuteCoreAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Subscribing: {}", TopicName);
-            _consumer.Subscribe(KafkaTopicNames.Subscription(TopicName, SubmissionConstants.ServiceName));
+            _consumer.Subscribe(TopicName);
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
@@ -99,55 +90,58 @@ namespace LantanaGroup.Link.Submission.Listeners
                     ConsumeResult<byte[], byte[]>? result = ex.ConsumerRecord;
                     if (result != null)
                     {
-                        var rawKey = result.Message?.Key != null ? Encoding.UTF8.GetString(result.Message.Key) : null;
-                        var facilityId = KafkaIdentity.Facility(null, rawKey);
-                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId ?? string.Empty);
-                        _consumer.SafeCommit(new List<TopicPartitionOffset> { result.TopicPartitionOffset }, _logger);
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, null!);
+                    }
+                    TopicPartitionOffset? offset = result?.TopicPartitionOffset;
+                    if (offset == null)
+                    {
+                        _consumer.Commit();
+                    }
+                    else
+                    {
+                        _consumer.Commit([offset]);
                     }
                 }
             }
         }
 
         private async Task ConsumeAsync(
-            ConsumeResult<string, SubmitPayloadValue>? result,
+            ConsumeResult<SubmitPayloadKey, SubmitPayloadValue>? result,
             CancellationToken cancellationToken)
         {
             _logger.LogDebug("Consumed: {}@{}", TopicName, result?.Offset.Value);
             if (result == null)
             {
                 _logger.LogWarning("Consume result is null");
-                _consumer.SafeCommit(_logger);
+                _consumer.Commit();
                 return;
             }
-
-            var accounted = false;
-            string? facilityId = null;
+            Message<SubmitPayloadKey, SubmitPayloadValue>? message = result.Message;
+            Headers? headers = message?.Headers;
+            string? correlationId = headers == null ? null : KafkaHeaderHelper.GetCorrelationId(headers);
+            SubmitPayloadKey? key = message?.Key;
+            SubmitPayloadValue? value = message?.Value;
+            
+            if (key == null)
+            {
+                _logger.LogWarning("Message key is null");
+                _consumer.Commit(result);
+                return;
+            }
+            
+            if (value == null)
+            {
+                _logger.LogWarning("Message value is null");
+                _consumer.Commit(result);
+                return;
+            }
+            
+            string? facilityId = key?.FacilityId;
             try
             {
-                Message<string, SubmitPayloadValue>? message = result.Message;
-                Headers? headers = message?.Headers;
-                string? correlationId = headers == null ? null : KafkaHeaderHelper.GetCorrelationId(headers);
-                SubmitPayloadValue? value = message?.Value;
-
-                if (value == null)
-                {
-                    _logger.LogWarning("Message value is null");
-                    accounted = true;
-                    return;
-                }
-
-                facilityId = KafkaIdentity.Facility(value.FacilityId, message?.Key);
-                var patientId = KafkaIdentity.Patient(value.PatientId, message?.Key);
-                var reportScheduleId = KafkaIdentity.ReportSchedule(value.ReportScheduleId, message?.Key);
-
                 if (string.IsNullOrEmpty(facilityId))
                 {
                     throw new DeadLetterException("Facility ID not specified.");
-                }
-
-                if (reportScheduleId is null)
-                {
-                    throw new DeadLetterException("Report schedule id not specified.");
                 }
 
                 if (value.ReportTypes == null || value.ReportTypes.Count == 0)
@@ -155,26 +149,19 @@ namespace LantanaGroup.Link.Submission.Listeners
                     throw new DeadLetterException("Measure IDs not specified.");
                 }
 
-                var payloadKey = new SubmitPayloadKey
-                {
-                    FacilityId = facilityId,
-                    ReportScheduleId = reportScheduleId.Value
-                };
-
                 if (_externalBlobStorageSettings.SuppressManifest && value.PayloadType == PayloadType.ReportSchedule)
                 {
                     _logger.LogInformation(
                         "Skipping external manifest upload for ReportScheduleId={ReportScheduleId}, FacilityId={FacilityId} because ExternalBlobStorage:SuppressManifest=true.",
-                        reportScheduleId,
+                        key.ReportScheduleId,
                         facilityId);
 
                     _payloadSubmittedProducer.Produce(
                         correlationId,
                         facilityId,
-                        reportScheduleId.Value,
+                        key.ReportScheduleId,
                         value.PayloadType,
-                        patientId);
-                    accounted = true;
+                        value.PatientId);
                     return;
                 }
 
@@ -193,7 +180,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to download from internal blob storage.");
-                        await ProduceAuditEventAsync(facilityId, patientId, correlationId, $"Failed to download from internal blob storage: {ex}", cancellationToken);
+                        await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to download from internal blob storage: {ex}", cancellationToken);
 
                         throw new TransientException("Failed to download from internal blob storage.");
                     }
@@ -202,10 +189,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                 bool uploaded = false;
                 try
                 {
-                    List<KeyValuePair<string, object?>> metricTags = _metrics.BuildTags(correlationId, reportScheduleId.Value, patientId, facilityId, _blobStorageService.DestinationType);
+                    List<KeyValuePair<string, object?>> metricTags = _metrics.BuildTags(correlationId, key.ReportScheduleId, value.PatientId, facilityId, _blobStorageService.DestinationType);
                     Stopwatch uploadStopwatch = Stopwatch.StartNew();
 
-                    await _blobStorageService.UploadToExternalAsync(payloadKey, value, content, cancellationToken);
+                    await _blobStorageService.UploadToExternalAsync(key, value, content, cancellationToken);
 
                     uploadStopwatch.Stop();
                     _metrics.IncrementResourceCount(metricTags);
@@ -221,8 +208,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to upload to external blob storage.");
-                    await ProduceAuditEventAsync(facilityId, patientId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
-                    List<KeyValuePair<string, object?>> failureTags = _metrics.BuildTags(correlationId, reportScheduleId.Value, patientId, facilityId, _blobStorageService.DestinationType);
+                    await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
+                    List<KeyValuePair<string, object?>> failureTags = _metrics.BuildTags(correlationId, key.ReportScheduleId, value.PatientId, facilityId, _blobStorageService.DestinationType);
                     _metrics.IncrementUploadCount(failureTags, "failure");
 
                     throw new TransientException("Failed to upload to external blob storage.");
@@ -233,22 +220,18 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _payloadSubmittedProducer.Produce(
                         correlationId,
                         facilityId,
-                        reportScheduleId.Value,
+                        key.ReportScheduleId,
                         value.PayloadType,
-                        patientId);
+                        value.PatientId);
                 }
-
-                accounted = true;
             }
             catch (TransientException ex)
             {
-                _transientExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                accounted = true;
+                _transientExceptionHandler.HandleException(result, ex, facilityId!);
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                accounted = true;
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -256,25 +239,20 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (Exception ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                accounted = true;
+                _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             finally
             {
-                if (accounted && !cancellationToken.IsCancellationRequested)
-                {
-                    _assignmentTracker.MarkProcessed(result);
-                    _consumer.SafeCommit(result, _logger);
-                }
+                if (!cancellationToken.IsCancellationRequested)
+                    _consumer.Commit(result);
             }
         }
 
-        private async Task ProduceAuditEventAsync(string facilityId, string? patientId, string? correlationId, string notes, CancellationToken cancellationToken = default)
+        private async Task ProduceAuditEventAsync(string facilityId, string? correlationId, string notes, CancellationToken cancellationToken = default)
         {
             AuditEventMessage auditEvent = new()
             {
                 FacilityId = facilityId,
-                PatientId = patientId,
                 CorrelationId = correlationId,
                 EventDate = DateTime.UtcNow,
                 Notes = notes

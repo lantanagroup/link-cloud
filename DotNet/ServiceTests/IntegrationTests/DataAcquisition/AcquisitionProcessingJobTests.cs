@@ -78,7 +78,7 @@ public class AcquisitionProcessingJobTests
 
         var log = await logManager.CreateAsync(createLog);
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
@@ -90,11 +90,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg =>
-                msg.Key == KafkaKeys.ForPatient(facilityId, "Patient/123") &&
-                msg.Value.LogId == log.Id &&
-                msg.Value.FacilityId == facilityId &&
-                msg.Value.PatientId == "Patient/123"),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -147,7 +143,7 @@ public class AcquisitionProcessingJobTests
 
         await abort.AbortAsync(facilityId: null, reportTrackingId.ToString(), TimeSpan.FromDays(14));
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
@@ -159,7 +155,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ReadyToAcquire.ToString(),
-                It.IsAny<Message<string, ReadyToAcquire>>(),
+                It.IsAny<Message<long, ReadyToAcquire>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -200,7 +196,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -213,7 +209,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.FacilityId == missingConfigFacilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == missingConfigFacilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -261,7 +257,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(failedLog);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -322,7 +318,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -335,7 +331,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -403,7 +399,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log2);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -416,16 +412,14 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg =>
-                msg.Key == KafkaKeys.ForPatient(facilityId, "Patient/123") &&
-                msg.Value.LogId == log1.Id),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log1.Id),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ReadyToAcquire.ToString(),
-                It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.LogId == log2.Id),
+                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log2.Id),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -498,7 +492,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log2);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -511,16 +505,14 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg =>
-                msg.Key == KafkaKeys.ForPatient(facilityId, "Patient/123") &&
-                msg.Value.LogId == log1.Id),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log1.Id),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ReadyToAcquire.ToString(),
-                It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.LogId == log2.Id),
+                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log2.Id),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -587,7 +579,7 @@ public class AcquisitionProcessingJobTests
         }
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -600,7 +592,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.FacilityId.EndsWith($"_{testTag}")),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId.EndsWith($"_{testTag}")),
             It.IsAny<CancellationToken>()),
             Times.Exactly(numFacilities * logsPerFacility));
 
@@ -721,7 +713,7 @@ public class AcquisitionProcessingJobTests
         var processablePerFacility = pendingPerFacility + failedRetryablePerFacility;
         var totalProcessable = numFacilities * processablePerFacility;
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -734,7 +726,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.FacilityId.EndsWith($"_{testTag}")),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId.EndsWith($"_{testTag}")),
             It.IsAny<CancellationToken>()),
             Times.Exactly(totalProcessable));
 
@@ -812,7 +804,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -825,11 +817,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg =>
-                msg.Key == KafkaKeys.ForPatient(facilityId, "Patient/123") &&
-                msg.Value.LogId == log.Id &&
-                msg.Value.FacilityId == facilityId &&
-                msg.Value.PatientId == "Patient/123"),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -895,7 +883,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -908,7 +896,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -972,7 +960,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -985,11 +973,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg =>
-                msg.Key == KafkaKeys.ForPatient(facilityId, "Patient/123") &&
-                msg.Value.LogId == log.Id &&
-                msg.Value.FacilityId == facilityId &&
-                msg.Value.PatientId == "Patient/123"),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -1049,7 +1033,7 @@ public class AcquisitionProcessingJobTests
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ReadyToAcquire>>();
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -1062,7 +1046,7 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<string, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 

@@ -43,8 +43,7 @@ namespace LantanaGroup.Link.Audit.Application.Services
 
             //create audit event                                   
             var auditEventModel = AuditModel.FromMessage(messageValue);
-            var facilityId = KafkaIdentity.Facility(messageValue.FacilityId, result.Message.Key);
-            _logger.LogAuditableEventConsumption(facilityId ?? string.Empty, messageValue.ServiceName ?? string.Empty, auditEventModel);
+            _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, auditEventModel);
 
             try
             {

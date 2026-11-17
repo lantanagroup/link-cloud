@@ -661,11 +661,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 var message = new Message<string, GenerateReportValue>
                 {
-                    Key = KafkaKeys.ForFacility(facilityId),
+                    Key = facilityId,
                     Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue
                     {
-                        FacilityId = facilityId,
                         AdhocReportId = reportId,
                         StartDate = startDate,
                         EndDate = endDate,
@@ -749,11 +748,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 var message = new Message<string, GenerateReportValue>
                 {
-                    Key = KafkaKeys.ForFacility(facilityId),
+                    Key = facilityId,
                     Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue()
                     {
-                        FacilityId = facilityId,
                         ReportId = request.ReportId == null ? null : Guid.Parse(request.ReportId),
                         AdhocReportId = reportId,
                         Regenerate = true,

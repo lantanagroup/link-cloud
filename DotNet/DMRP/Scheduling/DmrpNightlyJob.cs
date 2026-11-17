@@ -323,11 +323,10 @@ namespace LantanaGroup.Link.DMRP.Scheduling
 
             var message = new Message<string, object>
             {
-                Key = KafkaKeys.ForFacility(facilityId),
+                Key = facilityId,
                 Headers = headers,
                 Value = new ReportScheduledMessage
                 {
-                    FacilityId = facilityId,
                     ReportTypes = dqms,
                     Frequency = period.Frequency,
                     StartDate = startUtc,

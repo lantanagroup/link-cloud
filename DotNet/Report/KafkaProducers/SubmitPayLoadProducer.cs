@@ -13,17 +13,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly ILogger<SubmitPayloadProducer> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IProducer<string, SubmitPayloadValue> _submitPayloadProducer;
+        private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayloadProducer;
 
 
-        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, SubmitPayloadValue> submitPayloadProducer, ILogger<SubmitPayloadProducer> logger)
+        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer, ILogger<SubmitPayloadProducer> logger)
         {
             _submitPayloadProducer = submitPayloadProducer;
             _serviceScopeFactory = serviceScopeFactory;
             _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null, string? metricsMode = null, CancellationToken cancellationToken = default)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null, string? metricsMode = null)
         {
             _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), patientId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
@@ -36,14 +36,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            var key = string.IsNullOrWhiteSpace(patientId)
-                ? KafkaKeys.ForFacility(schedule.FacilityId)
-                : KafkaKeys.ForPatient(schedule.FacilityId, patientId);
-
-            await _submitPayloadProducer.ProduceAsync(nameof(KafkaTopic.SubmitPayload),
-                new Message<string, SubmitPayloadValue>
+            _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
+                new Message<SubmitPayloadKey, SubmitPayloadValue>
                 {
-                    Key = key,
+                    Key = new SubmitPayloadKey()
+                    {
+                        FacilityId = schedule.FacilityId,
+                        ReportScheduleId = schedule.Id
+                    },
                     Value = new SubmitPayloadValue()
                     {
                         PayloadType = payloadType,
@@ -51,14 +51,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PayloadUri = payloadUri,
                         ReportTypes = schedule.ReportTypes,
                         StartDate = schedule.ReportStartDate.UtcDateTime,
-                        EndDate = schedule.ReportEndDate.UtcDateTime,
-                        FacilityId = schedule.FacilityId,
-                        ReportScheduleId = schedule.Id
+                        EndDate = schedule.ReportEndDate.UtcDateTime
                     },
 
                     Headers = CreateHeaders(corrId, metricsMode)
-                },
-                cancellationToken);
+                });
+
+            _submitPayloadProducer.Flush();
 
             return true;
         }

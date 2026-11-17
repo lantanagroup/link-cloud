@@ -4,7 +4,6 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -23,22 +22,14 @@ namespace LantanaGroup.Link.Notification.Application.Factory
             _brokerConnection = brokerConnection ?? throw new ArgumentNullException(nameof(brokerConnection));
         }
 
-        public IConsumer<string, NotificationMessage> CreateNotificationRequestedConsumer(bool enableAutoCommit = false, KafkaAssignmentTracker? assignmentTracker = null)
+        public IConsumer<string, NotificationMessage> CreateNotificationRequestedConsumer(bool enableAutoCommit = false)
         {
             try
             {
                 var config = _brokerConnection.Value.CreateConsumerConfig();
                 config.GroupId = ServiceName;
                 config.EnableAutoCommit = enableAutoCommit;
-                var builder = new ConsumerBuilder<string, NotificationMessage>(config)
-                    .SetValueDeserializer(new JsonWithFhirMessageDeserializer<NotificationMessage>());
-                if (assignmentTracker != null)
-                {
-                    builder.SetPartitionsRevokedHandler((consumer, revoked) => assignmentTracker.OnRevoked(consumer, revoked, _logger));
-                    builder.SetPartitionsLostHandler((consumer, lost) => assignmentTracker.OnRevoked(consumer, lost, _logger));
-                }
-
-                return builder.Build();
+                return new ConsumerBuilder<string, NotificationMessage>(config).SetValueDeserializer(new JsonWithFhirMessageDeserializer<NotificationMessage>()).Build();
             }
             catch (Exception ex)
             {

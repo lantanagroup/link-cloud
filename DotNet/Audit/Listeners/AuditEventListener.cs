@@ -4,7 +4,6 @@ using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -51,52 +50,43 @@ namespace LantanaGroup.Link.Audit.Listeners
                 EnableAutoCommit = false
             };
 
-            var assignmentTracker = new KafkaAssignmentTracker();
-            using (var _consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker))
+            using (var _consumer = _kafkaConsumerFactory.CreateConsumer(config))
             {
                 try
                 {
-                    _consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.AuditableEventOccurred), AuditConstants.ServiceName));
+                    _consumer.Subscribe(nameof(KafkaTopic.AuditableEventOccurred));
                     _logger.LogConsumerStarted(nameof(KafkaTopic.AuditableEventOccurred), DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        ConsumeResult<string, AuditEventMessage>? result = null;
                         try
                         {
-                            result = _consumer.Consume(cancellationToken);
-                            var accounted = false;
+                            var result = _consumer.Consume(cancellationToken);
 
                             try
                             {
+                                //process the audit event
                                 var _auditEventProcessor = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IAuditEventProcessor>();
                                 _ = await _auditEventProcessor.ProcessAuditEvent(result, cancellationToken);
-                                accounted = true;
+
+                                //consume the result and offset
+                                _consumer.Commit(result);
                             }
                             catch (DeadLetterException ex)
                             {
                                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                                 Activity.Current?.AddException(ex);
 
-                                var facilityId = KafkaIdentity.Facility(result?.Message?.Value?.FacilityId, result?.Message?.Key);
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                                accounted = true;
+                                //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
+                                _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);
+                                _consumer.Commit(result);
                             }
                             catch (TransientException ex)
                             {
                                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                                 Activity.Current?.AddException(ex);
-                                var facilityId = KafkaIdentity.Facility(result?.Message?.Value?.FacilityId, result?.Message?.Key);
-                                _transientExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                                accounted = true;
-                            }
-                            finally
-                            {
-                                if (accounted && result != null && !cancellationToken.IsCancellationRequested)
-                                {
-                                    assignmentTracker.MarkProcessed(result);
-                                    _consumer.SafeCommit(result, _logger);
-                                }
+                                _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
+                                _consumer.Commit(result);
                             }
                         }
                         catch (ConsumeException ex)
@@ -110,13 +100,12 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 throw new OperationCanceledException(ex.Error.Reason, ex);
                             }
 
-                            var rawKey = ex.ConsumerRecord?.Message?.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : null;
-                            var facilityId = KafkaIdentity.Facility(null, rawKey) ?? string.Empty;
+                            var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
 
                             _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                             var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                            _consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
+                            _consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                         }
                     }
 

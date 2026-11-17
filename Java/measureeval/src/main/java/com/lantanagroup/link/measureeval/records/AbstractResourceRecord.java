@@ -16,10 +16,6 @@ import java.util.List;
 @Setter
 public abstract class AbstractResourceRecord {
 
-    private String facilityId;
-
-    private String patientId;
-
     private QueryType queryType;
 
     private ReportableEvent reportableEvent;

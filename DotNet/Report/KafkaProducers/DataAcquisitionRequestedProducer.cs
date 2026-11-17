@@ -88,10 +88,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 activity?.SetTag("facilityId", schedule.FacilityId);
                 activity?.SetTag("reportScheduleId", schedule.Id);
 
-                var darKey = KafkaKeys.ForPatient(schedule.FacilityId, patientId);
+                var darKey = schedule.FacilityId;
                 var darValue = new DataAcquisitionRequestedValue()
                 {
-                    FacilityId = schedule.FacilityId,
                     PatientId = patientId,
                     ReportableEvent = reportableEvent,
                     ScheduledReports = new List<ScheduledReport>()

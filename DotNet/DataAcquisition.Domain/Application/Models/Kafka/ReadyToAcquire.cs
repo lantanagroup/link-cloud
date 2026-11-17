@@ -4,7 +4,6 @@ public class ReadyToAcquire
 {
     public long? LogId { get; set; }
     public string? FacilityId { get; set; }
-    public string? PatientId { get; set; }
 
     public string ReportTrackingId { get; set; } = string.Empty;
 }
