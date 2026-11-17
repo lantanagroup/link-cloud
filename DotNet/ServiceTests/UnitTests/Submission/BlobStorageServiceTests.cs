@@ -1,4 +1,8 @@
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace UnitTests.Submission
 {
@@ -36,6 +40,25 @@ namespace UnitTests.Submission
 
             Assert.Equal(2, result.Split('/').Length);
             Assert.EndsWith("_bundle.ndjson", result);
+        }
+
+        [Fact]
+        public void Constructor_ShippedAppSettingsWithoutConnectionString_ThrowsArgumentException()
+        {
+            // The shipped nulls bind as empty strings on .NET 8, so the null check that skips an unconfigured
+            // container is passed and the client rejects the empty container name. On .NET 10 they stay null
+            // and the service starts with no containers; see ConfigurationNullBindingTests.
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "Resources", "Submission", "appsettings.json"))
+                .Build();
+            var internalSettings = new InternalBlobStorageSettings();
+            var externalSettings = new ExternalBlobStorageSettings();
+            configuration.GetSection(InternalBlobStorageSettings.Key).Bind(internalSettings);
+            configuration.GetSection(ExternalBlobStorageSettings.Key).Bind(externalSettings);
+
+            Assert.Throws<ArgumentException>(() => new BlobStorageService(NullLogger<BlobStorageService>.Instance,
+                                                                          Options.Create(internalSettings),
+                                                                          Options.Create(externalSettings)));
         }
     }
 }
