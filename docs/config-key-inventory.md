@@ -42,7 +42,7 @@ value set in a store can never take effect.
 
 ### Account
 
-127 keys.
+129 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -134,6 +134,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
@@ -142,6 +143,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
@@ -176,7 +178,7 @@ value set in a store can never take effect.
 
 ### AdminBFF
 
-153 keys.
+155 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -296,6 +298,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
@@ -304,6 +307,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Admin.BFF/Program.cs:88` |
@@ -336,7 +340,7 @@ value set in a store can never take effect.
 
 ### Audit
 
-126 keys.
+128 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -429,6 +433,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
@@ -437,6 +442,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Audit/Program.cs:69` |
@@ -469,7 +475,7 @@ value set in a store can never take effect.
 
 ### AutomationUI
 
-169 keys.
+172 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -525,7 +531,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:PoolSize` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalBlobStorage:SuppressManifest` | dotnet | yes | test | `DotNet/Automation.UI/Services/RunExecutor.cs:112` |
+| `ExternalBlobStorage:SuppressManifest` | dotnet | yes | test | `DotNet/Automation.UI/Services/RunExecutor.cs:115` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
 | `FacilityIdSettings` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:50` |
 | `FacilityIdSettings:NumericOnlyFacilityId` | dotnet | yes | - | `DotNet/Automation.UI/Program.cs:50` |
@@ -587,8 +593,9 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ServiceHealth:CheckIntervalSeconds` | dotnet | - | - | `DotNet/Automation.UI/Services/RunExecutor.cs:90` |
-| `ServiceHealth:OutageThresholdSeconds` | dotnet | - | - | `DotNet/Automation.UI/Services/RunExecutor.cs:91` |
+| `Serilog:WriteTo` | dotnet | - | - | `DotNet/Automation.UI/Services/AutomationSerilog.cs:17` |
+| `ServiceHealth:CheckIntervalSeconds` | dotnet | - | - | `DotNet/Automation.UI/Services/RunExecutor.cs:93` |
+| `ServiceHealth:OutageThresholdSeconds` | dotnet | - | - | `DotNet/Automation.UI/Services/RunExecutor.cs:94` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -605,6 +612,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
@@ -613,6 +621,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:80` |
@@ -645,13 +654,13 @@ value set in a store can never take effect.
 
 ### Census
 
-123 keys.
+125 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:181` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:186` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:187` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:185` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:190` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:191` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
@@ -677,7 +686,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:74` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:188` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:192` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Census/Program.cs:79` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -735,6 +744,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
@@ -743,6 +753,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Census/Program.cs:70` |
@@ -775,15 +786,15 @@ value set in a store can never take effect.
 
 ### DataAcquisition
 
-158 keys.
+161 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
 | `AcquisitionJobSettings` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:62` |
 | `AcquisitionJobSettings:CronSchedule` | dotnet | yes | - | `DotNet/DataAcquisition/Program.cs:62` |
-| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
-| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
-| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
+| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
 | `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:102` |
 | `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:107` |
 | `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:108` |
@@ -816,8 +827,8 @@ value set in a store can never take effect.
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:49` |
 | `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:109` |
 | `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:53` |
-| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
-| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -828,8 +839,8 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
-| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
+| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:159` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition/Program.cs:159` |
@@ -880,6 +891,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
@@ -888,6 +900,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
@@ -904,22 +917,22 @@ value set in a store can never take effect.
 | `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
-| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
-| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
+| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `TailMessageRecoveryJobSettings` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:63` |
 | `TailMessageRecoveryJobSettings:CronSchedule` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:63` |
 | `TailMessageRecoveryJobSettings:MaxGroupsPerRun` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:63` |
@@ -941,7 +954,7 @@ value set in a store can never take effect.
 
 ### DataAcquisitionWorker
 
-159 keys.
+162 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -953,9 +966,9 @@ value set in a store can never take effect.
 | `AcquisitionWorkerProcessorSettings:StalledQueuedThresholdMinutes` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `AcquisitionWorkerProcessorSettings:TimeBudgetPerRunSeconds` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `AcquisitionWorkerProcessorSettings:WorkChannelCapacity` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
-| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
-| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
-| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
+| `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
+| `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:141` |
 | `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:42` |
 | `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:47` |
 | `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:48` |
@@ -988,8 +1001,8 @@ value set in a store can never take effect.
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `DataProtection:KeyRing` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:97` |
-| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
-| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1000,8 +1013,8 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `EnableSwagger` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
-| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
-| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:145` |
+| `FhirSearch` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
+| `FhirSearch:PageSize` | dotnet | yes | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:146` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:61` |
@@ -1052,6 +1065,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
@@ -1060,6 +1074,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Account/Program.cs:79` |
@@ -1076,22 +1091,22 @@ value set in a store can never take effect.
 | `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
-| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
-| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
-| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
-| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:142` |
+| `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxConcurrency` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryAttempts` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:MaxRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpAcquisition:ParallelProcessingThreshold` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:144` |
+| `SftpValidation` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxHostLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxRemoteDirectoryLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:Connection:MaxTimeoutMinutes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:AllowedExtensions:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpValidation:FileName:MaxLength` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:32` |
@@ -1137,7 +1152,7 @@ value set in a store can never take effect.
 
 ### Normalization
 
-124 keys.
+126 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1228,6 +1243,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
@@ -1236,6 +1252,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:75` |
@@ -1268,7 +1285,7 @@ value set in a store can never take effect.
 
 ### Notification
 
-136 keys.
+138 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1360,6 +1377,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
@@ -1368,6 +1386,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Notification/Program.cs:114` |
@@ -1411,7 +1430,7 @@ value set in a store can never take effect.
 
 ### QueryDispatch
 
-120 keys.
+122 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1498,6 +1517,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
@@ -1506,6 +1526,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/QueryDispatch/Program.cs:56` |
@@ -1538,7 +1559,7 @@ value set in a store can never take effect.
 
 ### Report
 
-138 keys.
+140 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1622,7 +1643,7 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `Retention:MaxReportsPerCleanup` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionCheckSettings.cs:90` |
-| `Retention:Participants` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionParticipants.cs:72` |
+| `Retention:Participants` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionParticipants.cs:73` |
 | `Retention:Schedule` | dotnet | - | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
 | `Retention:Schedule:Cron` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
 | `Retention:Schedule:Enabled` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
@@ -1643,6 +1664,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
@@ -1651,6 +1673,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Report/Program.cs:96` |
@@ -1683,7 +1706,7 @@ value set in a store can never take effect.
 
 ### Submission
 
-143 keys.
+145 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1787,6 +1810,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
@@ -1795,6 +1819,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Submission/Program.cs:73` |
@@ -1833,7 +1858,7 @@ value set in a store can never take effect.
 
 ### Tenant
 
-130 keys.
+132 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1859,7 +1884,7 @@ value set in a store can never take effect.
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Tenant/Program.cs:98` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:63` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:63` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:119` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:122` |
 | `ConnectionStrings:Redis` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:113` |
 | `DMRP` | dotnet | - | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DMRP:Api` | dotnet | - | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
@@ -1869,7 +1894,7 @@ value set in a store can never take effect.
 | `DMRP:Scheduling:NightlyCron` | dotnet | yes | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DMRP:Scheduling:ScheduledFireTimeOverride` | dotnet | yes | - | `DotNet/DMRP/DependencyInjection/DmrpModuleExtensions.cs:110` |
 | `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:79` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:114` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:117` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1930,6 +1955,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:MockDmrpApiUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:NhsnAppBffServiceUrl` | dotnet | yes | - | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
@@ -1938,6 +1964,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
+| `ServiceRegistry:PublicNhsnAppBffServiceUrl` | dotnet | - | - | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |
 | `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:95` |

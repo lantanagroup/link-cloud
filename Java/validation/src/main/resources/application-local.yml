@@ -1,5 +1,6 @@
 logging:
   level:
+    com.lantanagroup.link: debug
     org.hibernate.SQL: debug
 
 spring:

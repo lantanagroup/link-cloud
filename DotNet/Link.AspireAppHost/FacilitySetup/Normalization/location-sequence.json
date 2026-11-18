@@ -1,0 +1,10 @@
+[
+  {
+    "OperationId": "{{copyPropertyLocOpId}}",
+    "Sequence": 1
+  },
+  {
+    "OperationId": "{{codeMapLocOpId}}",
+    "Sequence": 2
+  }
+]

@@ -1,0 +1,200 @@
+@use '../../../../styles/validation-theme.scss' as vt;
+@use '../rubrics' as rubrics;
+
+@mixin fact-list() {
+  margin: 0;
+  font-family: vt.$vd-font-family-sans-serif;
+
+  dt {
+    font-weight: vt.$vd-font-weight-semibold;
+    color: vt.$vd-neutral-700;
+    font-size: .8125rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  dd {
+    margin: .125rem 0 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+.rubric-version {
+  @include rubrics.rubric-page();
+
+  &-banner {
+    @include rubrics.rubric-banner();
+
+    .rubric-banner-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .75rem;
+    }
+
+    // Up to five actions; they wrap under each other before they squeeze the heading.
+    .rubric-banner-actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      flex-shrink: 1;
+    }
+  }
+
+  &-notice {
+    margin-bottom: 1.25rem;
+    border-left: solid 6px vt.$vd-success-800;
+  }
+
+  // Publish, retire and delete sit at the end of the facts, beside the dry run they depend on.
+  &-lifecycle {
+    margin-left: auto;
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+  }
+
+  &-body {
+    @include rubrics.rubric-body();
+  }
+
+  .rubric-message {
+    @include rubrics.rubric-message();
+  }
+
+  &-export-error {
+    margin-bottom: 1.25rem;
+  }
+
+  &-facts {
+    @include fact-list();
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 3rem;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    background-color: vt.$vd-neutral-0;
+    box-shadow: vt.$vd-box-shadow-sm;
+  }
+
+  &-tab {
+    margin-top: 1.25rem;
+    background-color: vt.$vd-neutral-0;
+  }
+
+  &-tab-note {
+    margin: 1.25rem 0 0 0;
+    font-family: vt.$vd-font-family-sans-serif;
+    color: vt.$vd-neutral-700;
+
+    + .rubric-version-tab {
+      margin-top: .75rem;
+    }
+  }
+
+  &-check-toggle {
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    color: vt.$vd-link-color;
+
+    &:hover,
+    &:focus-visible {
+      text-decoration: underline;
+    }
+  }
+
+  &-check--disabled {
+    color: vt.$vd-neutral-700;
+    font-style: italic;
+  }
+
+  // A check id is read whole, so its column keeps room for one before the others take theirs.
+  .mat-column-id {
+    min-width: 16rem;
+  }
+
+  .mat-column-severity,
+  .mat-column-type,
+  .mat-column-dimension {
+    white-space: nowrap;
+  }
+
+  // One line in the row; the expanded row shows the whole of it.
+  &-summary {
+    display: block;
+    max-width: 30rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &-detail-row {
+    background-color: vt.$vd-neutral-50;
+
+    &--collapsed {
+      display: none;
+    }
+  }
+
+  &-check-detail {
+    padding: 1rem vt.$vd-mat-table-edge-cell-padding 1.25rem vt.$vd-mat-table-edge-cell-padding-nested;
+
+    dl {
+      @include fact-list();
+      display: grid;
+      gap: .75rem;
+    }
+  }
+
+  &-children {
+    margin-top: 1rem;
+    border-collapse: collapse;
+    font-family: vt.$vd-font-family-sans-serif;
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: .375rem 1.5rem .375rem 0;
+      border-bottom: solid 1px vt.$vd-neutral-400;
+    }
+
+    th {
+      font-size: .8125rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: vt.$vd-neutral-700;
+    }
+  }
+
+  &-settings {
+    @include fact-list();
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1.25rem 2rem;
+    padding: 1.5rem;
+    box-shadow: vt.$vd-box-shadow-sm;
+  }
+
+  &-definition {
+    box-shadow: vt.$vd-box-shadow-sm;
+    padding: 1rem 1.5rem 1.5rem;
+
+    &-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: .5rem;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 720px;
+      overflow: auto;
+      white-space: pre;
+      overflow-wrap: normal;
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "facilityID": "{{facilityId}}",
+  "scheduledTrigger": "0 0 */4 * * ?",
+  "enabled": false
+}
