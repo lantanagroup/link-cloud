@@ -1,4 +1,3 @@
-using DataAcquisition.Domain.Migrations;
 using IntegrationTests.DataAcquisition;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -742,7 +741,6 @@ public class DataAcquisitionLogQueriesTests
         };
         dbContext.DataAcquisitionLogs.Add(log1);
         await dbContext.SaveChangesAsync();
-        await dbContext.Database.ExecuteSqlRawAsync(StoreResourceTypeCountsPerLog.BackfillSql);
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
@@ -1603,7 +1601,6 @@ public class DataAcquisitionLogQueriesTests
                              RequestStatus.Completed,
                              resourceIds: ["Observation/other-report"]));
         await dbContext.SaveChangesAsync();
-        await dbContext.Database.ExecuteSqlRawAsync(StoreResourceTypeCountsPerLog.BackfillSql);
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
@@ -1800,15 +1797,53 @@ public class DataAcquisitionLogQueriesTests
     }
 
     [Fact]
-    public async Task GetResourceTypeCountsCreatedAtAsync_AfterMigrations_ReturnsWhenTheTableWasCreated()
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_CountedAndUncountedLogs_SumsStoredAndCountsTheRest()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var reportTrackingId = Guid.NewGuid();
+        var facilityId = $"StatFallback_{Guid.NewGuid():N}";
+        var schedule = NewSchedule(reportTrackingId);
+
+        var counted = NewStatisticsLog(schedule,
+                                       facilityId,
+                                       "patient-1",
+                                       RequestStatus.Completed,
+                                       resourceIds: ["Observation/1"]);
+        var uncounted = NewStatisticsLog(schedule,
+                                         facilityId,
+                                         "patient-2",
+                                         RequestStatus.Completed,
+                                         resourceIds: ["Observation/2", "Condition/c1"]);
+        var notCompleted = NewStatisticsLog(schedule,
+                                            facilityId,
+                                            "patient-3",
+                                            RequestStatus.Pending,
+                                            resourceIds: ["Observation/3"]);
+        dbContext.DataAcquisitionLogs.AddRange(counted, uncounted, notCompleted);
+        await dbContext.SaveChangesAsync();
+
+        // Differs from the counted log's one resource id on purpose: stored counts are used where they exist.
+        dbContext.DataAcquisitionLogResourceTypeCounts.Add(new DataAcquisitionLogResourceTypeCount
+        {
+            DataAcquisitionLogId = counted.Id,
+            ResourceType = "Observation",
+            Count = 5
+        });
+        await dbContext.SaveChangesAsync();
+
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
-        var createdAt = await queries.GetResourceTypeCountsCreatedAtAsync();
+        var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId.ToString());
 
-        Assert.NotNull(createdAt);
-        Assert.InRange(createdAt.Value, DateTime.Now.AddDays(-2), DateTime.Now.AddDays(1));
+        var expected = new Dictionary<string, int>
+        {
+            ["Observation"] = 6,
+            ["Condition"] = 1
+        };
+        Assert.Equal(expected, statistics.ResourceTypeCounts);
+        Assert.Equal(7, statistics.TotalResourcesAcquired);
     }
 
     private static ScheduledReportEntity NewSchedule(Guid reportTrackingId)

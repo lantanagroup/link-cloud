@@ -83,7 +83,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add Hosted Services
     builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
-    builder.Services.AddHostedService<ResourceTypeCountFillService>();
 
     if (!(consumerSettings?.DisableConsumer ?? false))
     {
