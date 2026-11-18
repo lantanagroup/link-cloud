@@ -11,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -1246,6 +1247,32 @@ public class DataAcquisitionLogManagerTests
         return logs;
     }
 
+    [Fact]
+    public async Task FillMissingResourceTypeCountsAsync_AnotherInstanceFillsFirst_KeepsItsCountsWithoutThrowing()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var setupContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddLogWithResourceIdsAsync(setupContext, DateTime.UtcNow.AddMinutes(-5), "Observation/1");
+        var connectionString = setupContext.Database.GetConnectionString()!;
+        var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
+            .UseSqlServer(connectionString)
+            .AddInterceptors(new CompetingCountInserter(connectionString, log.Id))
+            .Options;
+        await using var racingContext = new DataAcquisitionDbContext(options);
+        var manager = new DataAcquisitionLogManager(
+            new Mock<ILogger<DataAcquisitionLogManager>>().Object,
+            scope.ServiceProvider.GetRequiredService<IDatabase>(),
+            racingContext,
+            scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
+            CreateSemaphoreProviderMock(),
+            scope.ServiceProvider.GetRequiredService<IResourceCache>());
+
+        await manager.FillMissingResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
+
+        Assert.Equal(new Dictionary<string, int> { ["Observation"] = 99 },
+                     await GetResourceTypeCountsAsync(setupContext, log.Id));
+    }
+
     private static async Task<DataAcquisitionLog> AddPendingLogAsync(DataAcquisitionDbContext dbContext)
     {
         var log = new DataAcquisitionLog
@@ -1372,6 +1399,41 @@ public class DataAcquisitionLogManagerTests
         {
             lock (Commands) Commands.Add(command.CommandText);
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+
+    // Stands in for another service instance: commits counts for the log just before this context saves its own.
+    private sealed class CompetingCountInserter : SaveChangesInterceptor
+    {
+        private readonly string _connectionString;
+        private readonly long _logId;
+        private bool _inserted;
+
+        public CompetingCountInserter(string connectionString, long logId)
+        {
+            _connectionString = connectionString;
+            _logId = logId;
+        }
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_inserted)
+            {
+                _inserted = true;
+                await using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                await using var command = connection.CreateCommand();
+                command.CommandText = "INSERT INTO [DataAcquisitionLogResourceTypeCounts] " +
+                                      "([DataAcquisitionLogId], [ResourceType], [Count]) " +
+                                      "VALUES (@logId, N'Observation', 99)";
+                command.Parameters.AddWithValue("@logId", _logId);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            return await base.SavingChangesAsync(eventData, result, cancellationToken);
         }
     }
 }

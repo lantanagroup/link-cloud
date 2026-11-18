@@ -1,5 +1,5 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Jobs;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -40,6 +40,25 @@ public class ResourceTypeCountFillServiceTests
 
         await service.StartAsync(CancellationToken.None);
         await service.ExecuteTask!;
+
+        Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task StopAsync_WhileFilling_StopsWithoutThrowing()
+    {
+        var manager = new Mock<IDataAcquisitionLogManager>();
+        manager
+            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Returns(async (DateTime _, CancellationToken token) =>
+            {
+                await Task.Delay(Timeout.Infinite, token);
+                return 0;
+            });
+        var service = CreateService(manager.Object);
+
+        await service.StartAsync(CancellationToken.None);
+        await service.StopAsync(CancellationToken.None);
 
         Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
     }

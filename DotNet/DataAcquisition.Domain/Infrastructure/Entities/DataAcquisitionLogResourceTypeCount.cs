@@ -16,7 +16,7 @@ public class DataAcquisitionLogResourceTypeCount
     public long Id { get; set; }
 
     /// <summary>
-    /// The log whose acquired resource ids were counted.
+    /// The id of the log whose acquired resource ids were counted.
     /// </summary>
     public long DataAcquisitionLogId { get; set; }
 

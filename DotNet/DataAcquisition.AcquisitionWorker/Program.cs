@@ -73,6 +73,8 @@ if (!consumerSettings?.DisableConsumer ?? true)
 //Add SFTP Acquisition Service
 builder.Services.AddHostedService<SftpAcquisitionService>();
 
+builder.Services.AddHostedService<ResourceTypeCountFillService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

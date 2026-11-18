@@ -1,12 +1,17 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
-namespace LantanaGroup.Link.DataAcquisition.Jobs;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 /// <summary>
 /// Once at startup, stores per-type resource counts for recently modified logs that have none, such as logs the
 /// previous version completed between the database update and this version starting.
 /// </summary>
 /// <remarks>
+/// Registered in both the Data Acquisition service and the acquisition worker, because during a rolling deployment
+/// old worker pods keep completing logs until each is replaced; every new pod fills what was completed before it.
 /// Needed only until every environment has started a version that writes the counts; remove it after that.
 /// The migration that created the counts table filled them for all earlier logs.
 /// </remarks>

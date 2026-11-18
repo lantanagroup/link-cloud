@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Medallion.Threading;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -380,14 +381,28 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .ToList();
 
             _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(counts);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            lastId = logIds[^1];
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                // Another service instance filled some of this batch first; its counts stand.
+                _dbContext.ChangeTracker.Clear();
+                _logger.LogDebug("Another instance stored resource-type counts for logs up to {LastLogId}; " +
+                                 "skipped them.",
+                                 lastId);
+                continue;
+            }
+
             _dbContext.ChangeTracker.Clear();
 
             filled += counts
                 .Select(c => c.DataAcquisitionLogId)
                 .Distinct()
                 .Count();
-            lastId = logIds[^1];
         }
     }
 
@@ -451,7 +466,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (resourceAcquiredIds is { Count: > 0 })
         {
             // Delete old rows first (idempotent on re-process)
-            await _dbContext.DataAcquisitionLogResourceIds
+            var replacedResourceIds = await _dbContext.DataAcquisitionLogResourceIds
                 .Where(r => r.DataAcquisitionLogId == logId)
                 .ExecuteDeleteAsync(cancellationToken);
 
@@ -464,9 +479,13 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
             _dbContext.DataAcquisitionLogResourceIds.AddRange(resourceRows);
 
-            await _dbContext.DataAcquisitionLogResourceTypeCounts
-                .Where(c => c.DataAcquisitionLogId == logId)
-                .ExecuteDeleteAsync(cancellationToken);
+            // Counts only ever exist alongside resource ids, so a first save has none to replace.
+            if (replacedResourceIds > 0)
+            {
+                await _dbContext.DataAcquisitionLogResourceTypeCounts
+                    .Where(c => c.DataAcquisitionLogId == logId)
+                    .ExecuteDeleteAsync(cancellationToken);
+            }
 
             _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(resourceAcquiredIds.ToResourceTypeCounts(logId));
         }
@@ -1113,5 +1132,20 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .SetProperty(l => l.TailClaimedAt, (DateTime?)null)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
+    }
+
+    // SQL Server: 2627 = unique constraint, 2601 = unique index.
+    // Providers can wrap the SqlException, so walk the chain.
+    private static bool IsUniqueConstraintViolation(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException { Number: 2601 or 2627 })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
