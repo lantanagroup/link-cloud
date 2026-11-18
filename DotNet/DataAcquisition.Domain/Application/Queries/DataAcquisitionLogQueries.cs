@@ -786,19 +786,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total.
-        var resourceTypeCounts = await _dbContext.DataAcquisitionLogResourceIds
+        // Resource type counts + total, summed from the per-log counts stored with each log's resource ids.
+        // Counting the resource-id rows here instead reads every report's rows and times out on large tables.
+        var resourceTypeCounts = await _dbContext.DataAcquisitionLogResourceTypeCounts
             .AsNoTracking()
-            .Where(r =>
-                r.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
-                && !r.DataAcquisitionLog.IsDeleted
-                && r.DataAcquisitionLog.Status == RequestStatus.Completed
-                && r.ResourceId != null
-                && r.ResourceId != "")
-            .GroupBy(r => r.ResourceId.IndexOf("/") > 0
-                ? r.ResourceId.Substring(0, r.ResourceId.IndexOf("/"))
-                : r.ResourceId)
-            .Select(g => new { ResourceType = g.Key, Count = g.Count() })
+            .Where(c =>
+                c.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
+                && !c.DataAcquisitionLog.IsDeleted
+                && c.DataAcquisitionLog.Status == RequestStatus.Completed)
+            .GroupBy(c => c.ResourceType)
+            .Select(g => new { ResourceType = g.Key, Count = g.Sum(c => c.Count) })
             .ToListAsync(cancellationToken);
 
         foreach (var rt in resourceTypeCounts)

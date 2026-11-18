@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -33,6 +34,14 @@ public interface IDataAcquisitionLogManager
     Task<(int requested, int cancelled)> CancelByFilterAsync(SearchDataAcquisitionLogRequest filter, int minAgeHours, CancellationToken cancellationToken = default);
     Task<List<DataAcquisitionLog>> GetLogsByIdsAsync(List<long> ids, CancellationToken cancellationToken = default);
     Task UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores per-type resource counts for logs modified since <paramref name="modifiedSince"/> that have resource
+    /// ids but no counts, such as logs a previous version completed during a deployment.
+    /// Returns how many logs got counts.
+    /// </summary>
+    Task<int> FillMissingResourceTypeCountsAsync(DateTime modifiedSince, CancellationToken cancellationToken = default);
+
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, bool incrementRetry = false, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -198,6 +207,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     }
 
     private const int SoftDeleteBatchSize = 1000;
+    private const int ResourceTypeCountFillBatchSize = 500;
 
     // Soft deletes all logs for a facility in batches to avoid large update locks
     public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
@@ -330,6 +340,57 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return totalUpdated;
     }
 
+    public async Task<int> FillMissingResourceTypeCountsAsync(DateTime modifiedSince,
+                                                              CancellationToken cancellationToken = default)
+    {
+        var filled = 0;
+        long lastId = 0;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var logIds = await _dbContext.DataAcquisitionLogs
+                .AsNoTracking()
+                .Where(l => l.Id > lastId &&
+                            l.ModifyDate >= modifiedSince &&
+                            _dbContext.DataAcquisitionLogResourceIds.Any(r => r.DataAcquisitionLogId == l.Id) &&
+                            !_dbContext.DataAcquisitionLogResourceTypeCounts.Any(c => c.DataAcquisitionLogId == l.Id))
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .Take(ResourceTypeCountFillBatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (logIds.Count == 0)
+            {
+                return filled;
+            }
+
+            var resourceIds = await _dbContext.DataAcquisitionLogResourceIds
+                .AsNoTracking()
+                .Where(r => r.DataAcquisitionLogId != null && logIds.Contains(r.DataAcquisitionLogId.Value))
+                .Select(r => new { LogId = r.DataAcquisitionLogId!.Value, r.ResourceId })
+                .ToListAsync(cancellationToken);
+
+            var counts = resourceIds
+                .GroupBy(r => r.LogId)
+                .SelectMany(g => g
+                    .Select(r => r.ResourceId)
+                    .ToResourceTypeCounts(g.Key))
+                .ToList();
+
+            _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(counts);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
+
+            filled += counts
+                .Select(c => c.DataAcquisitionLogId)
+                .Distinct()
+                .Count();
+            lastId = logIds[^1];
+        }
+    }
+
     public async Task UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateAsync");
@@ -402,6 +463,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             }).ToList();
 
             _dbContext.DataAcquisitionLogResourceIds.AddRange(resourceRows);
+
+            await _dbContext.DataAcquisitionLogResourceTypeCounts
+                .Where(c => c.DataAcquisitionLogId == logId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(resourceAcquiredIds.ToResourceTypeCounts(logId));
         }
 
         // 4. Single SaveChangesAsync for all pending note/resource inserts

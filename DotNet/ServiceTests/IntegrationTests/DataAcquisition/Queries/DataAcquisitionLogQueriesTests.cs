@@ -1,5 +1,7 @@
+using DataAcquisition.Domain.Migrations;
 using IntegrationTests.DataAcquisition;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -740,6 +742,7 @@ public class DataAcquisitionLogQueriesTests
         };
         dbContext.DataAcquisitionLogs.Add(log1);
         await dbContext.SaveChangesAsync();
+        await dbContext.Database.ExecuteSqlRawAsync(StoreResourceTypeCountsPerLog.BackfillSql);
 
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
@@ -1555,6 +1558,300 @@ public class DataAcquisitionLogQueriesTests
         Assert.Equal(3, forReport.Single(row => row.PatientId == "patient-1" && row.ResourceType == "Observation").Count);
         Assert.Contains(forReport, row =>
             row.PatientId == "patient-1" && row.ResourceType == "MedicationRequest" && row.Count == 1);
+    }
+
+    [Fact]
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_ResourceIdsOfMixedShapes_CountsByTextBeforeSlash()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var reportTrackingId = Guid.NewGuid();
+        var otherReportTrackingId = Guid.NewGuid();
+        var facilityId = $"StatTypes_{Guid.NewGuid():N}";
+        var schedule = NewSchedule(reportTrackingId);
+        var otherSchedule = NewSchedule(otherReportTrackingId);
+
+        dbContext.DataAcquisitionLogs.AddRange(
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.Completed,
+                             resourceIds:
+                             [
+                                 "Observation/1",
+                                 "Observation/2",
+                                 "Condition/c1",
+                                 "bare-id",
+                                 "/leading-slash"
+                             ]),
+            NewStatisticsLog(schedule, facilityId, "patient-1", RequestStatus.Completed, resourceIds: [""]),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.Pending,
+                             resourceIds: ["Observation/pending"]),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.Completed,
+                             isDeleted: true,
+                             resourceIds: ["Observation/deleted"]),
+            NewStatisticsLog(otherSchedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.Completed,
+                             resourceIds: ["Observation/other-report"]));
+        await dbContext.SaveChangesAsync();
+        await dbContext.Database.ExecuteSqlRawAsync(StoreResourceTypeCountsPerLog.BackfillSql);
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId.ToString());
+
+        var expected = new Dictionary<string, int>
+        {
+            ["Observation"] = 2,
+            ["Condition"] = 1,
+            ["bare-id"] = 1,
+            ["/leading-slash"] = 1
+        };
+        Assert.Equal(expected, statistics.ResourceTypeCounts);
+        Assert.Equal(5, statistics.TotalResourcesAcquired);
+    }
+
+    [Fact]
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_MixedLogs_TotalsExcludeDeletedAndOtherReports()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var reportTrackingId = Guid.NewGuid();
+        var otherReportTrackingId = Guid.NewGuid();
+        var facilityId = $"StatTotals_{Guid.NewGuid():N}";
+        var schedule = NewSchedule(reportTrackingId);
+        var otherSchedule = NewSchedule(otherReportTrackingId);
+
+        dbContext.DataAcquisitionLogs.AddRange(
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.Completed,
+                             QueryPhase.Initial,
+                             FhirQueryType.Read,
+                             retryAttempts: 1,
+                             completionTimeMilliseconds: 100),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.MaxRetriesReached,
+                             QueryPhase.Supplemental,
+                             FhirQueryType.Search,
+                             completionTimeMilliseconds: 200),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-2",
+                             RequestStatus.Pending,
+                             QueryPhase.Supplemental,
+                             FhirQueryType.Search,
+                             retryAttempts: 2),
+            NewStatisticsLog(schedule, facilityId, "patient-3", status: null),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             patientId: null,
+                             RequestStatus.Completed,
+                             completionTimeMilliseconds: 50),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-4",
+                             RequestStatus.Completed,
+                             QueryPhase.Initial,
+                             FhirQueryType.Read,
+                             retryAttempts: 5,
+                             completionTimeMilliseconds: 1000,
+                             isDeleted: true),
+            NewStatisticsLog(otherSchedule,
+                             facilityId,
+                             "patient-5",
+                             RequestStatus.Completed,
+                             QueryPhase.Initial,
+                             FhirQueryType.Read,
+                             retryAttempts: 7,
+                             completionTimeMilliseconds: 2000));
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId.ToString());
+
+        Assert.Equal(5, statistics.TotalLogs);
+        Assert.Equal(3, statistics.TotalPatients);
+        Assert.Equal(3, statistics.TotalRetryAttempts);
+        Assert.Equal(350, statistics.TotalCompletionTimeMilliseconds);
+        Assert.Equal(1, statistics.TotalCompletedPatients);
+        Assert.Equal(new Dictionary<RequestStatus, int>
+                     {
+                         [RequestStatus.Completed] = 2,
+                         [RequestStatus.MaxRetriesReached] = 1,
+                         [RequestStatus.Pending] = 1
+                     },
+                     statistics.RequestStatusCounts);
+        Assert.Equal(new Dictionary<FhirQueryType, int>
+                     {
+                         [FhirQueryType.Read] = 1,
+                         [FhirQueryType.Search] = 2
+                     },
+                     statistics.QueryTypeCounts);
+        Assert.Equal(new Dictionary<QueryPhase, int>
+                     {
+                         [QueryPhase.Initial] = 1,
+                         [QueryPhase.Supplemental] = 2
+                     },
+                     statistics.QueryPhaseCounts);
+    }
+
+    [Fact]
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_RepeatedTypes_KeysByDistinctSortedTypes()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var reportTrackingId = Guid.NewGuid();
+        var facilityId = $"StatTimes_{Guid.NewGuid():N}";
+        var schedule = NewSchedule(reportTrackingId);
+
+        dbContext.DataAcquisitionLogs.AddRange(
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-1",
+                             RequestStatus.Completed,
+                             completionTimeMilliseconds: 100,
+                             queryResourceTypes:
+                             [
+                                 [Hl7.Fhir.Model.ResourceType.Observation, Hl7.Fhir.Model.ResourceType.Condition],
+                                 [Hl7.Fhir.Model.ResourceType.Observation]
+                             ]),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-2",
+                             RequestStatus.Completed,
+                             completionTimeMilliseconds: 300,
+                             queryResourceTypes:
+                             [
+                                 [Hl7.Fhir.Model.ResourceType.Condition, Hl7.Fhir.Model.ResourceType.Observation]
+                             ]),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-3",
+                             RequestStatus.Completed,
+                             completionTimeMilliseconds: 50,
+                             queryResourceTypes: [[Hl7.Fhir.Model.ResourceType.Patient]]),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-4",
+                             RequestStatus.Pending,
+                             queryResourceTypes: [[Hl7.Fhir.Model.ResourceType.Encounter]]),
+            NewStatisticsLog(schedule,
+                             facilityId,
+                             "patient-5",
+                             RequestStatus.Completed,
+                             completionTimeMilliseconds: 10,
+                             isDeleted: true,
+                             queryResourceTypes: [[Hl7.Fhir.Model.ResourceType.Coverage]]));
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId.ToString());
+
+        var expected = new Dictionary<string, long>
+        {
+            ["Condition,Observation"] = 400,
+            ["Patient"] = 50
+        };
+        Assert.Equal(expected, statistics.ResourceTypeCompletionTimeMilliseconds);
+        Assert.Equal(new ResourceCompletionTime("Patient", 50), statistics.FastestCompletionTimeMilliseconds);
+        Assert.Equal(new ResourceCompletionTime("Condition,Observation", 300),
+                     statistics.SlowestCompletionTimeMilliseconds);
+    }
+
+    // Without these included columns the report statistics read every report's rows, not just the one asked for.
+    [Theory]
+    [InlineData("IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted", "QueryType")]
+    [InlineData("IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted", "QueryPhase")]
+    public async Task Migrate_ReportStatisticsIndexes_IncludeTheColumnsTheQueriesRead(string indexName,
+                                                                                    string columnName)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var includedColumns = await dbContext.Database
+            .SqlQuery<string>(
+                $"""
+                 SELECT c.name AS [Value]
+                 FROM sys.indexes i
+                 JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                 JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                 WHERE i.name = {indexName} AND ic.is_included_column = 1
+                 """)
+            .ToListAsync();
+
+        Assert.Contains(columnName, includedColumns);
+    }
+
+    private static ScheduledReportEntity NewSchedule(Guid reportTrackingId)
+    {
+        return new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+    }
+
+    private static DataAcquisitionLog NewStatisticsLog(ScheduledReportEntity schedule,
+                                                       string facilityId,
+                                                       string? patientId,
+                                                       RequestStatus? status,
+                                                       QueryPhase? queryPhase = null,
+                                                       FhirQueryType? queryType = null,
+                                                       int? retryAttempts = null,
+                                                       long? completionTimeMilliseconds = null,
+                                                       bool isDeleted = false,
+                                                       string[]? resourceIds = null,
+                                                       Hl7.Fhir.Model.ResourceType[][]? queryResourceTypes = null)
+    {
+        var fhirQueries = (queryResourceTypes ?? [])
+            .Select(types => new FhirQuery
+            {
+                FacilityId = facilityId,
+                FhirQueryResourceTypes = types
+                    .Select(type => new FhirQueryResourceType { ResourceType = type })
+                    .ToList()
+            })
+            .ToList();
+
+        return new DataAcquisitionLog
+        {
+            FacilityId = facilityId,
+            PatientId = patientId,
+            Status = status,
+            QueryPhase = queryPhase,
+            QueryType = queryType,
+            RetryAttempts = retryAttempts,
+            CompletionTimeMilliseconds = completionTimeMilliseconds,
+            IsDeleted = isDeleted,
+            ReportTrackingId = schedule.ReportTrackingId,
+            CorrelationId = Guid.NewGuid().ToString(),
+            TraceId = Guid.NewGuid().ToString(),
+            FhirVersion = "test",
+            TailSent = true,
+            ScheduledReportEntity = schedule,
+            ResourceIds = (resourceIds ?? [])
+                .Select(id => new DataAcquisitionLogResourceId { ResourceId = id })
+                .ToList(),
+            FhirQueries = fhirQueries
+        };
     }
 }
 
