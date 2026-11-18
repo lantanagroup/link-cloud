@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -53,7 +54,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
         var settings = CreateConsumerConfig();
-        using var consumer = KafkaConsumerFactory.CreateConsumer(settings);
+        var assignmentTracker = new KafkaAssignmentTracker();
+        using var consumer = KafkaConsumerFactory.CreateConsumer(settings, assignmentTracker: assignmentTracker);
 
         try
         {
@@ -100,8 +102,11 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         finally
                         {
-                            if (!consumeCancellationToken.IsCancellationRequested)
+                            if (consumeResult != null && !consumeCancellationToken.IsCancellationRequested)
+                            {
+                                assignmentTracker.MarkProcessed(consumeResult);
                                 consumer.SafeCommit(consumeResult, Logger);
+                            }
                         }
                     }, cancellationToken);
                 }
@@ -134,6 +139,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         ServiceInformation.ServiceConfigName, this.TopicName);
                 }
             }
+
+            consumer.Close();
         }
         catch (OperationCanceledException oce)
         {

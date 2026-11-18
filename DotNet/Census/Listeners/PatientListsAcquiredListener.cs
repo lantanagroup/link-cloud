@@ -6,6 +6,7 @@ using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -63,7 +64,8 @@ public class PatientListsAcquiredListener : BackgroundService
             GroupId = CensusConstants.ServiceName,
             EnableAutoCommit = false
         };
-        using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+        var assignmentTracker = new KafkaAssignmentTracker();
+        using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
 
         IEnumerable<IBaseResponse>? responseMessages = null;
         kafkaConsumer.Subscribe(KafkaTopic.PatientListsAcquired.ToString());
@@ -170,7 +172,14 @@ public class PatientListsAcquiredListener : BackgroundService
                         finally
                         {
                             if (!consumeCancellationToken.IsCancellationRequested)
-                                kafkaConsumer.Commit(rawmessage);
+                            {
+                                if (rawmessage != null)
+                                {
+                                    assignmentTracker.MarkProcessed(rawmessage);
+                                }
+
+                                kafkaConsumer.SafeCommit(rawmessage, _logger);
+                            }
                         }
 
                     }), cancellationToken);
@@ -189,7 +198,7 @@ public class PatientListsAcquiredListener : BackgroundService
                     _nonTransientExceptionHandler.HandleConsumeException(ex, facilityId);
 
                     var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                    kafkaConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    kafkaConsumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -198,7 +207,7 @@ public class PatientListsAcquiredListener : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error consuming message for topics: [{subs}] at {dateTime}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
-                    kafkaConsumer.Commit();
+                    kafkaConsumer.SafeCommit(_logger);
                 }
             }
         }

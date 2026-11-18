@@ -104,7 +104,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 MaxPollIntervalMs = 300000
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
@@ -118,6 +119,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             await ProcessMessageAsync(result, consumeCancellationToken);
+                            if (result != null)
+                            {
+                                assignmentTracker.MarkProcessed(result);
+                            }
+
                             consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 

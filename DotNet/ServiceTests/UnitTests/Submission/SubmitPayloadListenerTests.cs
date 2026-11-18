@@ -35,7 +35,8 @@ public class SubmitPayloadListenerTests
             .Setup(f => f.CreateConsumer(
                 It.IsAny<ConsumerConfig>(),
                 It.IsAny<IDeserializer<SubmitPayloadKey>?>(),
-                It.IsAny<IDeserializer<SubmitPayloadValue>?>()))
+                It.IsAny<IDeserializer<SubmitPayloadValue>?>(),
+                It.IsAny<KafkaAssignmentTracker?>()))
             .Returns(_consumerMock.Object);
 
         _metricsMock
@@ -68,6 +69,9 @@ public class SubmitPayloadListenerTests
         string facilityId, PayloadType payloadType) =>
         new()
         {
+            Topic = nameof(KafkaTopic.SubmitPayload),
+            Partition = 0,
+            Offset = 0,
             Message = new Message<SubmitPayloadKey, SubmitPayloadValue>
             {
                 Key = new SubmitPayloadKey { FacilityId = facilityId, ReportScheduleId = Guid.NewGuid() },

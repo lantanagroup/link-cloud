@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
@@ -70,7 +71,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
@@ -92,16 +94,31 @@ namespace LantanaGroup.Link.Report.Listeners
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
+                                if (result != null)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                }
+
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                                if (result != null)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                }
+
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                                if (result != null)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                }
+
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (TimeoutException ex)
@@ -109,6 +126,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                                if (result != null)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                }
+
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
@@ -118,6 +140,11 @@ namespace LantanaGroup.Link.Report.Listeners
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                                if (result != null)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                }
+
                                 consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);

@@ -12,6 +12,7 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -115,11 +116,12 @@ public class ResourcesAcquiredListener : BackgroundService
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
+        var assignmentTracker = new KafkaAssignmentTracker();
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
             GroupId = _serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
-        });
+        }, assignmentTracker: assignmentTracker);
 
         kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourcesAcquired.ToString() });
 
@@ -135,8 +137,11 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                     finally
                     {
-                        if (!consumeCancellationToken.IsCancellationRequested)
-                            kafkaConsumer.Commit(result);
+                        if (result != null && !consumeCancellationToken.IsCancellationRequested)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                            kafkaConsumer.SafeCommit(result, _logger);
+                        }
                     }
                 }, cancellationToken);
             }
@@ -169,13 +174,13 @@ public class ResourcesAcquiredListener : BackgroundService
                 TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
                 if (offset == null)
                 {
-                    kafkaConsumer.Commit();
+                    kafkaConsumer.SafeCommit(_logger);
                 }
                 else
                 {
-                    kafkaConsumer.Commit(new List<TopicPartitionOffset> {
+                    kafkaConsumer.SafeCommit(new List<TopicPartitionOffset> {
                         offset
-                    });
+                    }, _logger);
                 }
                 continue;
             }

@@ -68,11 +68,12 @@ public class MappingOutcomeListener : BackgroundService
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
+        var assignmentTracker = new KafkaAssignmentTracker();
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
             GroupId = _serviceInformation.ServiceConfigName,
             EnableAutoCommit = false
-        });
+        }, assignmentTracker: assignmentTracker);
 
         kafkaConsumer.Subscribe(new string[] { KafkaTopic.MappingOutcomeEvaluated.ToString() });
 
@@ -97,16 +98,31 @@ public class MappingOutcomeListener : BackgroundService
                     try
                     {
                         await ConsumeMessageAsync(result, consumeCancellationToken);
+                        if (result != null)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                        }
+
                         kafkaConsumer.SafeCommit(result, _logger);
                     }
                     catch (DeadLetterException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                        if (result != null)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                        }
+
                         kafkaConsumer.SafeCommit(result, _logger);
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(result, ex, facilityId);
+                        if (result != null)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                        }
+
                         kafkaConsumer.SafeCommit(result, _logger);
                     }
                     catch (TimeoutException ex)
@@ -115,6 +131,11 @@ public class MappingOutcomeListener : BackgroundService
                             $"Timeout encountered at offset {result.TopicPartitionOffset}.", ex);
 
                         _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                        if (result != null)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                        }
+
                         kafkaConsumer.SafeCommit(result, _logger);
                     }
                     catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
@@ -129,6 +150,11 @@ public class MappingOutcomeListener : BackgroundService
                         // from the outcome upsert, or a transient SQL fault, should be retried rather than
                         // discarded or allowed to stop the service.
                         _transientExceptionHandler.HandleException(result, ex, facilityId);
+                        if (result != null)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                        }
+
                         kafkaConsumer.SafeCommit(result, _logger);
                     }
                 }, cancellationToken);

@@ -48,7 +48,8 @@ public class PayloadSubmittedListener(
             EnableAutoCommit = false
         };
 
-        using var consumer = kafkaConsumerFactory.CreateConsumer(config);
+        var assignmentTracker = new KafkaAssignmentTracker();
+        using var consumer = kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
         try
         {
             consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
@@ -61,6 +62,11 @@ public class PayloadSubmittedListener(
                     await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         await ProcessMessageAsync(result, consumeCancellationToken);
+                        if (result != null)
+                        {
+                            assignmentTracker.MarkProcessed(result);
+                        }
+
                         consumer.SafeCommit(result, logger);
                     }, cancellationToken);
                 }

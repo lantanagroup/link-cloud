@@ -6,6 +6,7 @@ using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -69,7 +70,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 EnableAutoCommit = false
             };
 
-            using (var _patientEventConsumer = _kafkaConsumerFactory.CreateConsumer(config))
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using (var _patientEventConsumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker))
             {
                 try
                 {
@@ -102,7 +104,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     if (value.EventType != PatientEvents.Discharge.ToString())
                                     {
                                         _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
-                                        _patientEventConsumer.Commit(consumeResult);
+                                        if (consumeResult != null)
+                                        {
+                                            assignmentTracker.MarkProcessed(consumeResult);
+                                        }
+
+                                        _patientEventConsumer.SafeCommit(consumeResult, _logger);
                                         return;
                                     }
 
@@ -154,17 +161,32 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     await patientDispatchMgr.createPatientDispatch(patientDispatch, consumeCancellationToken);
 
-                                    _patientEventConsumer.Commit(consumeResult);
+                                    if (consumeResult != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(consumeResult);
+                                    }
+
+                                    _patientEventConsumer.SafeCommit(consumeResult, _logger);
                                 }
                                 catch (DeadLetterException ex)
                                 {
                                     _deadLetterExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
-                                    _patientEventConsumer.Commit(consumeResult);
+                                    if (consumeResult != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(consumeResult);
+                                    }
+
+                                    _patientEventConsumer.SafeCommit(consumeResult, _logger);
                                 }
                                 catch (TransientException ex)
                                 {
                                     _transientExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
-                                    _patientEventConsumer.Commit(consumeResult);
+                                    if (consumeResult != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(consumeResult);
+                                    }
+
+                                    _patientEventConsumer.SafeCommit(consumeResult, _logger);
                                 }
                                 catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                                 {
@@ -186,7 +208,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
                                     _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), consumeResult.Message.Key);
-                                    _patientEventConsumer.Commit();
+                                    _patientEventConsumer.SafeCommit(_logger);
 
                                     //continue;
                                 }
@@ -204,7 +226,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                             _consumeResultDeadLetterExceptionHandler.HandleConsumeException(e, facilityId);
 
-                            _patientEventConsumer.Commit();
+                            _patientEventConsumer.SafeCommit(_logger);
                         }
                     }
                     _patientEventConsumer.Close();

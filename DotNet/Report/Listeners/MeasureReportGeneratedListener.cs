@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Diagnostics;
 using System.Text;
@@ -74,7 +75,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.MeasureReportGenerated));
@@ -112,7 +114,14 @@ namespace LantanaGroup.Link.Report.Listeners
                             finally
                             {
                                 if (!consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    if (result != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(result);
+                                    }
+
                                     consumer.SafeCommit(result, _logger);
+                                }
                             }
                         }, cancellationToken);
                     }

@@ -2,8 +2,10 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
@@ -64,7 +66,8 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
 
             try
             {
@@ -131,8 +134,11 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             }
                             finally
                             {
-                                if (!consumeCancellationToken.IsCancellationRequested)
-                                    consumer.Commit(consumeResult);
+                                if (consumeResult != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(consumeResult);
+                                    consumer.SafeCommit(consumeResult, _logger);
+                                }
                             }
 
                         }, cancellationToken);

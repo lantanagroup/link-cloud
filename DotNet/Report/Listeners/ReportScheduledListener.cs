@@ -73,7 +73,8 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
@@ -87,6 +88,11 @@ namespace LantanaGroup.Link.Report.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             await ProcessMessageAsync(result, consumeCancellationToken);
+                            if (result != null)
+                            {
+                                assignmentTracker.MarkProcessed(result);
+                            }
+
                             consumer.SafeCommit(result, _logger);
                         }, cancellationToken);
 

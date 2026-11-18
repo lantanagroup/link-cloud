@@ -3,6 +3,7 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -22,6 +23,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
 
         private readonly ILogger<SubmitPayloadListener> _logger;
+        private readonly KafkaAssignmentTracker _assignmentTracker = new();
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
         private readonly ITransientExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue> _deadLetterExceptionHandler;
@@ -48,7 +50,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 GroupId = SubmissionConstants.ServiceName,
                 EnableAutoCommit = false
-            });
+            }, assignmentTracker: _assignmentTracker);
 
             _transientExceptionHandler = transientExceptionHandler;
             _transientExceptionHandler.Topic = TopicName + "-Retry";
@@ -95,11 +97,11 @@ namespace LantanaGroup.Link.Submission.Listeners
                     TopicPartitionOffset? offset = result?.TopicPartitionOffset;
                     if (offset == null)
                     {
-                        _consumer.Commit();
+                        _consumer.SafeCommit(_logger);
                     }
                     else
                     {
-                        _consumer.Commit([offset]);
+                        _consumer.SafeCommit([offset], _logger);
                     }
                 }
             }
@@ -113,7 +115,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             if (result == null)
             {
                 _logger.LogWarning("Consume result is null");
-                _consumer.Commit();
+                _consumer.SafeCommit(_logger);
                 return;
             }
             Message<SubmitPayloadKey, SubmitPayloadValue>? message = result.Message;
@@ -125,14 +127,16 @@ namespace LantanaGroup.Link.Submission.Listeners
             if (key == null)
             {
                 _logger.LogWarning("Message key is null");
-                _consumer.Commit(result);
+                _assignmentTracker.MarkProcessed(result);
+                _consumer.SafeCommit(result, _logger);
                 return;
             }
             
             if (value == null)
             {
                 _logger.LogWarning("Message value is null");
-                _consumer.Commit(result);
+                _assignmentTracker.MarkProcessed(result);
+                _consumer.SafeCommit(result, _logger);
                 return;
             }
             
@@ -244,7 +248,10 @@ namespace LantanaGroup.Link.Submission.Listeners
             finally
             {
                 if (!cancellationToken.IsCancellationRequested)
-                    _consumer.Commit(result);
+                {
+                    _assignmentTracker.MarkProcessed(result);
+                    _consumer.SafeCommit(result, _logger);
+                }
             }
         }
 

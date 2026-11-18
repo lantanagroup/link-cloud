@@ -4,6 +4,7 @@ using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -61,7 +62,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 EnableAutoCommit = false
             };
 
-            using (var _reportScheduledConsumer = _kafkaConsumerFactory.CreateConsumer(config))
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using (var _reportScheduledConsumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker))
             {
                 try
                 {
@@ -120,13 +122,23 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         await scheduledReportMgr.createScheduledReport(scheduledReport, consumeCancellationToken);
                                     }
 
-                                    _reportScheduledConsumer.Commit(consumeResult);
+                                    if (consumeResult != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(consumeResult);
+                                    }
+
+                                    _reportScheduledConsumer.SafeCommit(consumeResult, _logger);
 
                                 }
                                 catch (DeadLetterException ex)
                                 {
                                     _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
-                                    _reportScheduledConsumer.Commit(consumeResult);
+                                    if (consumeResult != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(consumeResult);
+                                    }
+
+                                    _reportScheduledConsumer.SafeCommit(consumeResult, _logger);
                                 }
                                 catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                                 {
@@ -149,7 +161,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), consumeResult.Message.Key);
 
-                                    _reportScheduledConsumer.Commit(consumeResult);
+                                    if (consumeResult != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(consumeResult);
+                                    }
+
+                                    _reportScheduledConsumer.SafeCommit(consumeResult, _logger);
                                 }
 
                             }, cancellationToken);
@@ -168,7 +185,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                             var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                            _reportScheduledConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                            _reportScheduledConsumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                         }
                     }
 

@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using System.Threading;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using Confluent.Kafka.Extensions.Diagnostics;
@@ -53,7 +54,8 @@ namespace LantanaGroup.Link.Census.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.CernerPatientsAcquired));
@@ -94,7 +96,14 @@ namespace LantanaGroup.Link.Census.Listeners
                             finally
                             {
                                 if (!consumeCancellationToken.IsCancellationRequested)
-                                    consumer.Commit(result);
+                                {
+                                    if (result != null)
+                                    {
+                                        assignmentTracker.MarkProcessed(result);
+                                    }
+
+                                    consumer.SafeCommit(result, _logger);
+                                }
                             }
                         }, cancellationToken);
                     }
@@ -110,7 +119,7 @@ namespace LantanaGroup.Link.Census.Listeners
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        consumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -119,7 +128,7 @@ namespace LantanaGroup.Link.Census.Listeners
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error encountered in CernerPatientsAcquiredListener");
-                        consumer.Commit();
+                        consumer.SafeCommit(_logger);
                     }
                 }
             }
