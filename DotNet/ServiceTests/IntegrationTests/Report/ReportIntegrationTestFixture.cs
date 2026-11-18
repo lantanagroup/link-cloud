@@ -48,7 +48,7 @@ namespace IntegrationTests.Report
         public Mock<ISchedulerFactory> SchedulerFactoryMock { get; } = new();
 
         public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducerMock { get; private set; } = new();
-        public Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<string, ReadyForValidationValue>> ReadyForValidationKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, AuditEventMessage>> AuditableEventKafkaProducerMock { get; private set; } = new();
 
@@ -64,9 +64,9 @@ namespace IntegrationTests.Report
         public Mock<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventDeadLetterHandlerMock { get; } = new();
 
-        public Mock<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, MeasureReportGeneratedValue>> MeasureReportGeneratedConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedConsumerFactoryMock { get; } = new();
         public Mock<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
@@ -176,9 +176,9 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventDeadLetterHandlerMock.Object);
 
-            builder.Services.AddSingleton<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, MeasureReportGeneratedValue>>(MeasureReportGeneratedConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue>>(MeasureReportGeneratedDeadLetterHandlerMock.Object);
             builder.Services.AddSingleton<ICreateSystemToken>(CreateSystemTokenMock.Object);
             builder.Services.AddSingleton<IProducer<string, EvaluationRequestedValue>>(EvaluationRequestedProducerMock.Object);
 

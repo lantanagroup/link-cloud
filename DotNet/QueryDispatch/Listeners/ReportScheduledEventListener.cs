@@ -90,16 +90,16 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ReportScheduledValue value = consumeResult.Message.Value;
 
+                                    string key = KafkaIdentity.Facility(value?.FacilityId, consumeResult?.Message?.Key) ?? string.Empty;
+
                                     if (consumeResult == null
-                                    || string.IsNullOrWhiteSpace(consumeResult.Message.Key)
+                                    || string.IsNullOrWhiteSpace(key)
                                     || !value.IsValid())
                                     {
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
                                     var reportTrackingId = value.ReportTrackingId?.ToString();
-
-                                    string key = consumeResult.Message.Key;
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;

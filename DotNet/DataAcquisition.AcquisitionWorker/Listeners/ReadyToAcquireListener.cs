@@ -122,7 +122,6 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
 
     protected override string ExtractFacilityId(ConsumeResult<long, ReadyToAcquire> consumeResult)
     {
-        if (string.IsNullOrWhiteSpace(consumeResult.Message.Value.FacilityId)) return null;
-        return consumeResult.Message.Value.FacilityId;
+        return consumeResult.Message.Value?.FacilityId ?? string.Empty;
     }
 }

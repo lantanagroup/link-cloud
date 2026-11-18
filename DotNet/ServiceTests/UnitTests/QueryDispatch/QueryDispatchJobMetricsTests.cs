@@ -3,6 +3,7 @@ using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LanatanGroup.Link.QueryDispatch.Jobs;
+using QueryDispatch.Application.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -22,6 +23,20 @@ public class QueryDispatchJobMetricsTests
         var metrics = new Mock<IQueryDispatchServiceMetrics>();
         var acquisitionProducer = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
         var auditProducer = new Mock<IProducer<string, AuditEventMessage>>();
+        Message<string, AuditEventMessage>? producedAudit = null;
+        Message<string, DataAcquisitionRequestedValue>? producedAcquisition = null;
+        auditProducer
+            .Setup(p => p.Produce(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, AuditEventMessage>>(),
+                It.IsAny<Action<DeliveryReport<string, AuditEventMessage>>>()))
+            .Callback<string, Message<string, AuditEventMessage>, Action<DeliveryReport<string, AuditEventMessage>>>((_, message, _) => producedAudit = message);
+        acquisitionProducer
+            .Setup(p => p.Produce(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, DataAcquisitionRequestedValue>>(),
+                It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()))
+            .Callback<string, Message<string, DataAcquisitionRequestedValue>, Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>((_, message, _) => producedAcquisition = message);
         var patientDispatchMgr = new Mock<IPatientDispatchManager>();
         patientDispatchMgr
             .Setup(m => m.deletePatientDispatch(It.IsAny<string>(), It.IsAny<string>()))
@@ -58,5 +73,14 @@ public class QueryDispatchJobMetricsTests
 
         metrics.Verify(m => m.IncrementPatientsDispatched("facility-1", "success"), Times.Once);
         metrics.Verify(m => m.RecordDispatchDuration("facility-1", It.Is<double>(d => d >= 0)), Times.Once);
+
+        Assert.NotNull(producedAudit);
+        Assert.Null(producedAudit!.Key);
+        Assert.Equal("facility-1", producedAudit.Value.FacilityId);
+        Assert.Equal("patient-1", producedAudit.Value.PatientId);
+        Assert.NotNull(producedAcquisition);
+        Assert.Equal(KafkaKeys.ForPatient("facility-1", "patient-1"), producedAcquisition!.Key);
+        Assert.Equal("facility-1", producedAcquisition.Value.FacilityId);
+        Assert.Equal("patient-1", producedAcquisition.Value.PatientId);
     }
 }

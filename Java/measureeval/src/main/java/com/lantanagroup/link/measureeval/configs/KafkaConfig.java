@@ -73,11 +73,13 @@ public class KafkaConfig {
     }
 
     @Bean
-    public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
+    public Deserializer<?> keyDeserializer() {
+        // The key is a partition string. Identity comes from the value, with KafkaKeyLegacy for a
+        // legacy JSON or plain key. A colon key must not be deserialized into an id object.
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCES_NORMALIZED, new JsonDeserializer<>(ResourceKey.class, objectMapper),
-                Topics.RESOURCES_NORMALIZED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
-                Topics.RESOURCES_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCES_NORMALIZED, new StringDeserializer(),
+                Topics.RESOURCES_NORMALIZED_ERROR, new StringDeserializer(),
+                Topics.RESOURCES_NORMALIZED_RETRY, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_ERROR, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_RETRY, new StringDeserializer());

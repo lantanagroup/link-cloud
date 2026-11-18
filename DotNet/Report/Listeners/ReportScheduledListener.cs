@@ -137,7 +137,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
 
                 using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
-                var key = result.Message.Key;
                 var value = result.Message.Value;
 
                 if (!value.IsValid())
@@ -150,7 +149,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-                facilityId = key;
+                facilityId = KafkaIdentity.Facility(value?.FacilityId, result.Message.Key) ?? string.Empty;
                 var startDate = value.StartDate;
                 var endDate = value.EndDate;
                 var frequency = value.Frequency;

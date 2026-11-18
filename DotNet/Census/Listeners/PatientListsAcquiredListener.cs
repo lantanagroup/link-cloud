@@ -98,11 +98,15 @@ public class PatientListsAcquiredListener : BackgroundService
                                     }
                                 }
 
-                                var facilityId = rawmessage.Key ?? throw new DeadLetterException("FacilityId is null.", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
-
                                 if (rawmessage.Message.Value == null)
                                 {
                                     throw new DeadLetterException("Message value is null", new Exception("No message value provided. Unable to process message."));
+                                }
+
+                                var facilityId = KafkaIdentity.Facility(rawmessage.Message.Value.FacilityId, rawmessage.Key);
+                                if (string.IsNullOrWhiteSpace(facilityId))
+                                {
+                                    throw new DeadLetterException("FacilityId is null.", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                 }
 
                                 var msgValue = rawmessage.Message.Value;

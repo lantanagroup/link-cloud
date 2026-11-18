@@ -86,6 +86,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             await _patientEventConsumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                             {
                                 consumeResult = result;
+                                string facilityId = string.Empty;
 
                                 try
                                 {
@@ -94,12 +95,23 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     var scheduledReportRepository = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<ScheduledReportEntity>>();
                                     var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<QueryDispatchConfigurationEntity>>();
 
-                                    if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
+                                    if (consumeResult == null || consumeResult.Value == null || !consumeResult.Value.IsValid())
                                     {
                                         throw new DeadLetterException("Invalid Patient Event");
                                     }
 
                                     PatientEventValue value = consumeResult.Message.Value;
+                                    facilityId = KafkaIdentity.Facility(value.FacilityId, consumeResult.Message.Key) ?? string.Empty;
+                                    if (string.IsNullOrWhiteSpace(facilityId))
+                                    {
+                                        throw new DeadLetterException("Invalid Patient Event");
+                                    }
+
+                                    var resolvedPatientId = KafkaIdentity.Patient(value.PatientId, consumeResult.Message.Key);
+                                    if (!string.IsNullOrWhiteSpace(resolvedPatientId))
+                                    {
+                                        value.PatientId = resolvedPatientId;
+                                    }
 
                                     if (value.EventType != PatientEvents.Discharge.ToString())
                                     {
@@ -124,10 +136,10 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Correlation Id missing");
                                     }
 
-                                    _logger.LogInformation("Consumed Patient Event for: Facility '{FacilityId}'. PatientId '{PatientId}' with a event type of {EventType}", HtmlInputSanitizer.Sanitize(consumeResult.Message.Key), HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
+                                    _logger.LogInformation("Consumed Patient Event for: Facility '{FacilityId}'. PatientId '{PatientId}' with a event type of {EventType}", HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
 
-                                    //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
-                                    var scheduledReport = await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key, consumeCancellationToken);
+                                    //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(facilityId);
+                                    var scheduledReport = await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId, consumeCancellationToken);
 
                                     if (scheduledReport == null)
                                     {
@@ -137,26 +149,26 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     var now = DateTime.UtcNow;
                                     scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
 
-                                    // QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
-                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key, consumeCancellationToken);
+                                    // QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(facilityId);
+                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == facilityId, consumeCancellationToken);
 
                                     if (dispatchSchedule == null)
                                     {
-                                        throw new TransientException($"Query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
+                                        throw new TransientException($"Query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(facilityId)}");
                                     }
 
                                     DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
 
                                     if (dischargeDispatchSchedule == null)
                                     {
-                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
+                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(facilityId)}");
                                     }
 
-                                    PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
+                                    PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(facilityId, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
 
                                     if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
                                     {
-                                        throw new TransientException($"No active scheduled report periods found for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
+                                        throw new TransientException($"No active scheduled report periods found for facility {HtmlInputSanitizer.Sanitize(facilityId)}");
                                     }
 
                                     await patientDispatchMgr.createPatientDispatch(patientDispatch, consumeCancellationToken);
@@ -198,7 +210,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var auditValue = new AuditEventMessage
                                     {
-                                        FacilityId = consumeResult.Message.Key,
+                                        FacilityId = facilityId,
                                         Action = AuditEventType.Query,
                                         ServiceName = "QueryDispatch",
                                         EventDate = DateTime.UtcNow,
@@ -207,7 +219,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), consumeResult.Message.Key);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), facilityId);
                                     _patientEventConsumer.SafeCommit(_logger);
 
                                     //continue;
@@ -222,7 +234,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 throw new OperationCanceledException(e.Error.Reason, e);
                             }
 
-                            var facilityId = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "";
+                            var rawKey = e.ConsumerRecord?.Message?.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : null;
+                            var facilityId = KafkaIdentity.Facility(null, rawKey) ?? string.Empty;
 
                             _consumeResultDeadLetterExceptionHandler.HandleConsumeException(e, facilityId);
 

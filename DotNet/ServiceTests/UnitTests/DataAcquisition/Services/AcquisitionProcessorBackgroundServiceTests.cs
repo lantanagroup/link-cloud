@@ -28,8 +28,8 @@ public class AcquisitionProcessorBackgroundServiceTests
     private const string CorrelationId = "corr-1";
     private const long LogId = 42;
 
-    private readonly Mock<IProducer<ResourceKey, ResourcesAcquired>> _mockResourceAcquiredProducer = new();
-    private readonly Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> _mockMappingOutcomeProducer = new();
+    private readonly Mock<IProducer<string, ResourcesAcquired>> _mockResourceAcquiredProducer = new();
+    private readonly Mock<IProducer<string, MappingOutcomeEvaluatedValue>> _mockMappingOutcomeProducer = new();
     private readonly Mock<IResourcesAcquiredTailFinalizer> _mockTailFinalizer = new();
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager = new();
     private readonly AcquisitionProcessorBackgroundService _service;
@@ -54,7 +54,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         SetupTail();
         SetupStrip(NotApplicable());
 
-        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
         CaptureMappingOutcome(message => produced = message);
 
         await InvokeTryProduceTailMessageAsync();
@@ -84,7 +84,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         SetupTail(scheduledReports);
         SetupStrip(outcome);
 
-        Message<ResourceKey, MappingOutcomeEvaluatedValue>? produced = null;
+        Message<string, MappingOutcomeEvaluatedValue>? produced = null;
         CaptureMappingOutcome(message => produced = message);
 
         // Act
@@ -99,7 +99,9 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         // The schedules come from the tail, so one acquisition fans out to every report it served.
         Assert.Equal(scheduledReports, produced.Value.ScheduledReports);
-        Assert.Equal(FacilityId, produced.Key.FacilityId);
+        Assert.Equal(KafkaKeys.ForPatient(FacilityId, "patient-1"), produced.Key);
+        Assert.Equal(FacilityId, produced.Value.FacilityId);
+        Assert.Equal("patient-1", produced.Value.PatientId);
     }
 
     [Fact]
@@ -112,7 +114,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         _mockMappingOutcomeProducer
             .Setup(p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(),
+                It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(),
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KafkaException(ErrorCode.Local_MsgTimedOut));
 
@@ -124,7 +126,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         _mockResourceAcquiredProducer.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ResourcesAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -138,13 +140,13 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         var order = new List<string>();
         _mockMappingOutcomeProducer
-            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add(nameof(MappingOutcomeEvaluatedValue)))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, MappingOutcomeEvaluatedValue>());
+            .ReturnsAsync(new DeliveryResult<string, MappingOutcomeEvaluatedValue>());
         _mockResourceAcquiredProducer
-            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, ResourcesAcquired>>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add(nameof(ResourcesAcquired)))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesAcquired>());
+            .ReturnsAsync(new DeliveryResult<string, ResourcesAcquired>());
 
         // Act
         await InvokeTryProduceTailMessageAsync();
@@ -167,10 +169,10 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         // Assert — a partial group must not report an org-location outcome for encounters still arriving.
         _mockMappingOutcomeProducer.Verify(
-            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
+            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
             Times.Never);
         _mockResourceAcquiredProducer.Verify(
-            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()),
+            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, ResourcesAcquired>>(), It.IsAny<CancellationToken>()),
             Times.Never);
         _mockTailFinalizer.Verify(
             s => s.FinalizeAsync(It.IsAny<TailCompletionResult>(), It.IsAny<CancellationToken>()),
@@ -192,12 +194,12 @@ public class AcquisitionProcessorBackgroundServiceTests
         // and it arrives last, so it would overwrite the real result with a count of survivors over
         // survivors. The pipeline message is unaffected.
         _mockMappingOutcomeProducer.Verify(
-            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
+            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
             Times.Never);
         _mockResourceAcquiredProducer.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ResourcesAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -238,7 +240,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         // Assert — the gate is a whitelist, not a Supplemental blacklist, so an unrecognized phase reports
         // nothing rather than attributing whatever the cache happened to hold to the patient's mapping.
         _mockMappingOutcomeProducer.Verify(
-            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
+            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -256,7 +258,7 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         // Assert
         _mockMappingOutcomeProducer.Verify(
-            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
+            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -304,8 +306,8 @@ public class AcquisitionProcessorBackgroundServiceTests
             });
 
         _mockResourceAcquiredProducer
-            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesAcquired>());
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, ResourcesAcquired>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<string, ResourcesAcquired>());
     }
 
     private void SetupStrip(LocationOrgOutcome outcome) =>
@@ -313,14 +315,14 @@ public class AcquisitionProcessorBackgroundServiceTests
             .Setup(s => s.FinalizeAsync(It.IsAny<TailCompletionResult>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(outcome);
 
-    private void CaptureMappingOutcome(Action<Message<ResourceKey, MappingOutcomeEvaluatedValue>> capture) =>
+    private void CaptureMappingOutcome(Action<Message<string, MappingOutcomeEvaluatedValue>> capture) =>
         _mockMappingOutcomeProducer
             .Setup(p => p.ProduceAsync(
                 KafkaTopic.MappingOutcomeEvaluated.ToString(),
-                It.IsAny<Message<ResourceKey, MappingOutcomeEvaluatedValue>>(),
+                It.IsAny<Message<string, MappingOutcomeEvaluatedValue>>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, Message<ResourceKey, MappingOutcomeEvaluatedValue>, CancellationToken>((_, message, _) => capture(message))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, MappingOutcomeEvaluatedValue>());
+            .Callback<string, Message<string, MappingOutcomeEvaluatedValue>, CancellationToken>((_, message, _) => capture(message))
+            .ReturnsAsync(new DeliveryResult<string, MappingOutcomeEvaluatedValue>());
 
     private Task InvokeTryProduceTailMessageAsync()
     {

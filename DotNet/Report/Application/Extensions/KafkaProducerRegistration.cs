@@ -28,7 +28,7 @@ public static class KafkaProducerRegistration
         {
             ClientId = "Report_ReadyForValidation"
         };
-        var readyForValidationProducer = new KafkaProducerFactory<ReadyForValidationKey, ReadyForValidationValue>(kafkaConnection).CreateProducer(readyForValidationConfig);
+        var readyForValidationProducer = new KafkaProducerFactory<string, ReadyForValidationValue>(kafkaConnection).CreateProducer(readyForValidationConfig);
         services.AddSingleton(readyForValidationProducer);
 
         var evaluationRequestedConfig = new ProducerConfig()

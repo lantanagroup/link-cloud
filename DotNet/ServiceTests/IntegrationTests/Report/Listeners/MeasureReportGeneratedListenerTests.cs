@@ -1,4 +1,4 @@
-﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -119,9 +119,9 @@ public class MeasureReportGeneratedListenerTests
             ReportType = "DE-111"
         };
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-abort") } };
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = value, Headers = headers }
         };
 
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
@@ -147,9 +147,9 @@ public class MeasureReportGeneratedListenerTests
 
         var facilityId = "test-facility-011";
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = null! }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = null! }
         };
 
         await Assert.ThrowsAsync<DeadLetterException>(async () =>
@@ -169,9 +169,9 @@ public class MeasureReportGeneratedListenerTests
 
         var value = new MeasureReportGeneratedValue { FacilityId = facilityId, ReportTrackingId = reportId, PatientId = "pat-123" };
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = new Headers() }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = value, Headers = new Headers() }
         };
 
         await Assert.ThrowsAsync<DeadLetterException>(async () =>
@@ -194,16 +194,16 @@ public class MeasureReportGeneratedListenerTests
 
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = value, Headers = headers }
         };
 
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
 
         _fixture.MeasureReportGeneratedDeadLetterHandlerMock.Verify(
             h => h.HandleException(
-                It.IsAny<ConsumeResult<Null, MeasureReportGeneratedValue>>(),
+                It.IsAny<ConsumeResult<string, MeasureReportGeneratedValue>>(),
                 It.IsAny<DeadLetterException>(),
                 It.IsAny<string>()),
             Times.Never);
@@ -253,9 +253,9 @@ public class MeasureReportGeneratedListenerTests
 
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = value, Headers = headers }
         };
 
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
@@ -346,9 +346,9 @@ public class MeasureReportGeneratedListenerTests
 
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = value, Headers = headers }
         };
 
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
@@ -400,9 +400,9 @@ public class MeasureReportGeneratedListenerTests
 
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = value, Headers = headers, }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = value, Headers = headers, }
         };
 
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
@@ -410,8 +410,11 @@ public class MeasureReportGeneratedListenerTests
         _fixture.ReadyForValidationKafkaProducerMock.Verify(
             p => p.Produce(
                 It.IsAny<string>(),
-                It.Is<Message<ReadyForValidationKey, ReadyForValidationValue>>(m => m.Value.PatientId == "pat-123"),
-                It.IsAny<Action<DeliveryReport<ReadyForValidationKey, ReadyForValidationValue>>>()),
+                It.Is<Message<string, ReadyForValidationValue>>(m =>
+                    m.Key == KafkaKeys.ForPatient(facilityId, "pat-123") &&
+                    m.Value.FacilityId == facilityId &&
+                    m.Value.PatientId == "pat-123"),
+                It.IsAny<Action<DeliveryReport<string, ReadyForValidationValue>>>()),
             Times.Once);
     }
 
@@ -421,9 +424,9 @@ public class MeasureReportGeneratedListenerTests
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<MeasureReportGeneratedListener>();
 
-        var consumeResult = new ConsumeResult<Null, MeasureReportGeneratedValue>
+        var consumeResult = new ConsumeResult<string, MeasureReportGeneratedValue>
         {
-            Message = new Message<Null, MeasureReportGeneratedValue> { Value = null! }
+            Message = new Message<string, MeasureReportGeneratedValue> { Value = null! }
         };
 
         await Assert.ThrowsAsync<DeadLetterException>(async () =>

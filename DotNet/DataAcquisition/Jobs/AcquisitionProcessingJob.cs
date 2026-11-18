@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
@@ -326,6 +327,7 @@ public class AcquisitionProcessingJob : IJob
                                 {
                                     LogId = request.Id,
                                     FacilityId = facilityId,
+                                    PatientId = request.PatientId,
                                     ReportTrackingId = request.ReportTrackingId
                                 },
                                 Headers = headers

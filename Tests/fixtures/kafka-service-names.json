@@ -1,0 +1,20 @@
+[
+  "Account",
+  "Audit",
+  "Census",
+  "DataAcquisition",
+  "DataAcquisitionWorker",
+  "LinkAdminBFF",
+  "MockDmrpApi",
+  "NHSN App BFF",
+  "Normalization",
+  "Notification",
+  "Operations",
+  "QueryDispatch",
+  "Report",
+  "Submission",
+  "Tenant",
+  "Terminology",
+  "ValidationService",
+  "measureeval"
+]

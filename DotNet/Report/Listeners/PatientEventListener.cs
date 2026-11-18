@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
-            string facilityId = result.Message.Key;
+            string facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
 
             try
             {
@@ -150,6 +150,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 if (string.IsNullOrWhiteSpace(facilityId) || value == null)
                 {
                     throw new DeadLetterException("Invalid Patient Event");
+                }
+
+                var resolvedPatientId = KafkaIdentity.Patient(value.PatientId, result.Message.Key);
+                if (!string.IsNullOrWhiteSpace(resolvedPatientId))
+                {
+                    value.PatientId = resolvedPatientId;
                 }
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(

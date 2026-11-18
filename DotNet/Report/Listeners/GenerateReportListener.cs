@@ -175,7 +175,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
                 var mappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
-                var key = result.Message.Key;
                 var value = result.Message.Value;
                 var inboundMetricsMode = KafkaHeaderHelper.GetMetricsMode(result.Message.Headers);
                 var startDate = value.StartDate;
@@ -183,7 +182,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportTypes = value.ReportTypes;
                 var reportId = value.ReportId;
 
-                facilityId = key;
+                facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
 
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
@@ -356,9 +355,10 @@ namespace LantanaGroup.Link.Report.Listeners
                             _evaluationProducer.Produce(nameof(KafkaTopic.EvaluationRequested),
                                 new Message<string, EvaluationRequestedValue>
                                 {
-                                    Key = facilityId,
+                                    Key = KafkaKeys.ForPatient(facilityId, entry.PatientId),
                                     Value = new EvaluationRequestedValue
                                     {
+                                        FacilityId = facilityId,
                                         PreviousReportId = value.ReportId?.ToString(),
                                         PatientId = entry.PatientId,
                                         ReportTrackingId = reportSchedule.Id.ToString(),

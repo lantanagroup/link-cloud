@@ -4,6 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using KafkaKeys = LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaKeys;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
@@ -81,6 +82,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers,
                     Value = new ReportScheduledMessage()
                     {
+                        FacilityId = model.FacilityId,
                         ReportTypes = model.ReportTypes,
                         Frequency = model.Frequency.ToString(),
                         StartDate = model.StartDate,

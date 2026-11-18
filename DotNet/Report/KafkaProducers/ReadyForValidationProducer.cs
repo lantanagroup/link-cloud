@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using System.Text;
@@ -14,9 +15,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly ILogger<ReadyForValidationProducer> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
+        private readonly IProducer<string, ReadyForValidationValue> _readyForValidationProducer;
 
-        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, ILogger<ReadyForValidationProducer> logger)
+        public ReadyForValidationProducer(IProducer<string, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory, ILogger<ReadyForValidationProducer> logger)
         {
             _readyForValidationProducer = readyForValidationProducer;
             _serviceScopeFactory = serviceScopeFactory;
@@ -65,15 +66,12 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId.SanitizeForLog(), patientId.SanitizeForLog(), scheduleId.SanitizeForLog());
 
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
-                new Message<ReadyForValidationKey, ReadyForValidationValue>
+                new Message<string, ReadyForValidationValue>
                 {
-                    Key = new ReadyForValidationKey()
-                    {
-                        FacilityId = facilityId,
-                        CorrelationId = correlationId
-                    },
+                    Key = KafkaKeys.ForPatient(facilityId, patientId),
                     Value = new ReadyForValidationValue
                     {
+                        FacilityId = facilityId,
                         PatientId = patientId,
                         ReportTypes = reportTypes,
                         ReportTrackingId = scheduleId.ToString(),

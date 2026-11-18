@@ -147,23 +147,29 @@ namespace LantanaGroup.Link.Census.Listeners
                 throw new DeadLetterException($"{ClassName}: CernerPatientsAcquired event value segment missing");
             }
 
-            _logger.LogDebug("Consuming Event (Facility = {FacilityId})", result.Message.Key);
+            var facilityId = KafkaIdentity.Facility(result.Message.Value.FacilityId, result.Message.Key);
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new DeadLetterException($"{ClassName}: CernerPatientsAcquired event is missing a facility id.");
+            }
+
+            _logger.LogDebug("Consuming Event (Facility = {FacilityId})", facilityId);
 
             using var scope = _scopeFactory.CreateScope();
             var cernerListService = scope.ServiceProvider.GetRequiredService<ICernerListService>();
 
-            var dischargeEvents = await cernerListService.ProcessDischarges(result.Message.Key, result.Message.Value, cancellationToken);
+            var dischargeEvents = await cernerListService.ProcessDischarges(facilityId, result.Message.Value, cancellationToken);
 
             if (dischargeEvents != null)
             {
-                await _eventProducerService.ProduceEventsAsync(result.Message.Key, dischargeEvents, cancellationToken);
+                await _eventProducerService.ProduceEventsAsync(facilityId, dischargeEvents, cancellationToken);
             }
 
-            var processedEvents = await cernerListService.ProcessAdmits(result.Message.Key, result.Message.Value, cancellationToken);
+            var processedEvents = await cernerListService.ProcessAdmits(facilityId, result.Message.Value, cancellationToken);
 
             if (processedEvents != null)
             {
-                await _eventProducerService.ProduceEventsAsync(result.Message.Key, processedEvents, cancellationToken);
+                await _eventProducerService.ProduceEventsAsync(facilityId, processedEvents, cancellationToken);
             }
         }
     }
