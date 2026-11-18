@@ -1,5 +1,11 @@
+import { of, throwError } from 'rxjs';
 import { ViewReportComponent } from './view-report.component';
 import { SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
+import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
+import { LoadingService } from '../../../../services/loading.service';
+import {
+  IDataAcquisitionLogStatistics
+} from '../../../../interfaces/data-acquisition/data-acquisition-log-statistics.interface';
 
 /**
  * Covers the submission-status presentation mapping only.
@@ -80,5 +86,57 @@ describe('ViewReportComponent submission status presentation', () => {
           .toBeDefined();
       });
     });
+  });
+});
+
+describe('ViewReportComponent query analysis loading', () => {
+  const statistics = { totalLogs: 3 } as IDataAcquisitionLogStatistics;
+
+  let acquisitionLogService: jasmine.SpyObj<AcquisitionLogService>;
+  let loadingService: jasmine.SpyObj<LoadingService>;
+  let component: ViewReportComponent;
+
+  beforeEach(() => {
+    acquisitionLogService = jasmine.createSpyObj<AcquisitionLogService>(
+      'AcquisitionLogService', ['getAcquisitionLogStatistics']);
+    loadingService = jasmine.createSpyObj<LoadingService>('LoadingService', ['show', 'hide']);
+    component = new ViewReportComponent(
+      null!, null!, null!, null!, null!, acquisitionLogService, loadingService, null!, null!);
+  });
+
+  it('shows the statistics and no error when the request succeeds', () => {
+    acquisitionLogService.getAcquisitionLogStatistics.and.returnValue(of(statistics));
+
+    component.onViewQueryAnalysis();
+
+    expect(component.dataAcquisitionLogStatistics).toBe(statistics);
+    expect(component.queryAnalysisLoadFailed).toBeFalse();
+    expect(loadingService.hide).toHaveBeenCalled();
+  });
+
+  it('flags the failure and drops earlier statistics when the request fails', () => {
+    component.dataAcquisitionLogStatistics = statistics;
+    acquisitionLogService.getAcquisitionLogStatistics.and.returnValue(
+      throwError(() => new Error('timeout')));
+    spyOn(console, 'error');
+
+    component.onViewQueryAnalysis();
+
+    expect(component.queryAnalysisLoadFailed).toBeTrue();
+    expect(component.dataAcquisitionLogStatistics).toBeUndefined();
+    expect(loadingService.hide).toHaveBeenCalled();
+  });
+
+  it('clears the failure when a retry succeeds', () => {
+    acquisitionLogService.getAcquisitionLogStatistics.and.returnValues(
+      throwError(() => new Error('timeout')),
+      of(statistics));
+    spyOn(console, 'error');
+
+    component.onViewQueryAnalysis();
+    component.onViewQueryAnalysis();
+
+    expect(component.queryAnalysisLoadFailed).toBeFalse();
+    expect(component.dataAcquisitionLogStatistics).toBe(statistics);
   });
 });

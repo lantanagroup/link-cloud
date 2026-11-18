@@ -97,6 +97,7 @@ export class ViewReportComponent implements OnInit {
 
   reportSummary: IReportSchedule | undefined;
   dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
+  queryAnalysisLoadFailed = false;
 
   // Add summary data for donut charts
   reportEntrySummary: IReportEntrySummary | undefined;
@@ -383,15 +384,19 @@ export class ViewReportComponent implements OnInit {
     this.loadReportEntries();
   }
 
-  onViewQueryAnalysis() {
+  onViewQueryAnalysis(): void {
+    this.queryAnalysisLoadFailed = false;
     this.loadingService.show();
     this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId).subscribe({
       next: (response: IDataAcquisitionLogStatistics) => {
         this.dataAcquisitionLogStatistics = response;
         this.loadingService.hide();
       },
-      error: (error) => {
+      error: (error: unknown) => {
         console.error('Error loading acquisition log statistics:', error);
+        // Drop any earlier result so the tab never shows numbers the server did not just return.
+        this.dataAcquisitionLogStatistics = undefined;
+        this.queryAnalysisLoadFailed = true;
         this.loadingService.hide();
       }
     });
