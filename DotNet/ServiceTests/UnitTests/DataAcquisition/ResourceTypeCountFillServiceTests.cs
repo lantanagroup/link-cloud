@@ -14,50 +14,80 @@ public class ResourceTypeCountFillServiceTests
     private static readonly DateTime CountsTableCreatedAt = new(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public async Task StartAsync_CountsTableExists_FillsTwiceFromADayBeforeItWasCreated()
+    public async Task ExecuteAsync_LaterPass_FillsFromAnHourBeforeThePreviousPassStarted()
     {
-        var modifiedSince = new List<DateTime>();
+        var calls = new List<DateTime>();
+        var twoPasses = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var manager = new Mock<IDataAcquisitionLogManager>();
         manager
             .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .Callback<DateTime, CancellationToken>((since, _) => modifiedSince.Add(since))
+            .Callback<DateTime, CancellationToken>((since, _) => RecordCall(calls, since, twoPasses))
             .ReturnsAsync(3);
         var service = CreateService(manager.Object, CountsTableCreatedAt, TimeSpan.Zero);
 
+        var started = DateTime.UtcNow;
         await service.StartAsync(CancellationToken.None);
-        await service.ExecuteTask!;
+        await twoPasses.Task;
+        await service.StopAsync(CancellationToken.None);
 
-        var expected = CountsTableCreatedAt.AddDays(-1);
-        Assert.Equal([expected, expected], modifiedSince);
+        Assert.Equal(CountsTableCreatedAt.AddDays(-1), calls[0]);
+        Assert.InRange(calls[1], started.AddHours(-1).AddSeconds(-5), DateTime.UtcNow.AddHours(-1));
+        Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
     }
 
     [Fact]
-    public async Task StartAsync_CountsTableMissing_FillsNothing()
+    public async Task ExecuteAsync_FirstPassFails_RetriesTheSameWindowOnTheNextPass()
     {
+        var calls = new List<DateTime>();
+        var twoPasses = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
         var manager = new Mock<IDataAcquisitionLogManager>();
-        var service = CreateService(manager.Object, createdAt: null, TimeSpan.Zero);
+        manager
+            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Returns((DateTime since, CancellationToken _) =>
+            {
+                RecordCall(calls, since, twoPasses);
+                return Interlocked.Increment(ref attempts) == 1
+                    ? Task.FromException<int>(new InvalidOperationException("database unavailable"))
+                    : Task.FromResult(0);
+            });
+        var service = CreateService(manager.Object, CountsTableCreatedAt, TimeSpan.Zero);
 
         await service.StartAsync(CancellationToken.None);
-        await service.ExecuteTask!;
+        await twoPasses.Task;
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(CountsTableCreatedAt.AddDays(-1), calls[0]);
+        Assert.Equal(CountsTableCreatedAt.AddDays(-1), calls[1]);
+        Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CountsTableMissing_FillsNothingAndKeepsChecking()
+    {
+        var twoChecks = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var checks = 0;
+        var manager = new Mock<IDataAcquisitionLogManager>();
+        var queries = new Mock<IDataAcquisitionLogQueries>();
+        queries
+            .Setup(q => q.GetResourceTypeCountsCreatedAtAsync(It.IsAny<CancellationToken>()))
+            .Callback(() =>
+            {
+                if (Interlocked.Increment(ref checks) == 2)
+                {
+                    twoChecks.TrySetResult();
+                }
+            })
+            .ReturnsAsync((DateTime?)null);
+        var service = CreateService(manager.Object, queries.Object, TimeSpan.Zero);
+
+        await service.StartAsync(CancellationToken.None);
+        await twoChecks.Task;
+        await service.StopAsync(CancellationToken.None);
 
         Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
         manager.Verify(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
                        Times.Never);
-    }
-
-    [Fact]
-    public async Task StartAsync_FillFails_DoesNotThrow()
-    {
-        var manager = new Mock<IDataAcquisitionLogManager>();
-        manager
-            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("database unavailable"));
-        var service = CreateService(manager.Object, CountsTableCreatedAt, TimeSpan.Zero);
-
-        await service.StartAsync(CancellationToken.None);
-        await service.ExecuteTask!;
-
-        Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -103,22 +133,41 @@ public class ResourceTypeCountFillServiceTests
                        Times.Once);
     }
 
+    private static void RecordCall(List<DateTime> calls, DateTime since, TaskCompletionSource twoPasses)
+    {
+        lock (calls)
+        {
+            calls.Add(since);
+            if (calls.Count == 2)
+            {
+                twoPasses.TrySetResult();
+            }
+        }
+    }
+
     private static ResourceTypeCountFillService CreateService(IDataAcquisitionLogManager manager,
                                                               DateTime? createdAt,
-                                                              TimeSpan secondPassDelay)
+                                                              TimeSpan passInterval)
     {
         var queries = new Mock<IDataAcquisitionLogQueries>();
         queries
             .Setup(q => q.GetResourceTypeCountsCreatedAtAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdAt);
 
+        return CreateService(manager, queries.Object, passInterval);
+    }
+
+    private static ResourceTypeCountFillService CreateService(IDataAcquisitionLogManager manager,
+                                                              IDataAcquisitionLogQueries queries,
+                                                              TimeSpan passInterval)
+    {
         var provider = new ServiceCollection()
             .AddScoped(_ => manager)
-            .AddScoped(_ => queries.Object)
+            .AddScoped(_ => queries)
             .BuildServiceProvider();
 
         return new ResourceTypeCountFillService(provider.GetRequiredService<IServiceScopeFactory>(),
                                                 NullLogger<ResourceTypeCountFillService>.Instance,
-                                                secondPassDelay);
+                                                passInterval);
     }
 }

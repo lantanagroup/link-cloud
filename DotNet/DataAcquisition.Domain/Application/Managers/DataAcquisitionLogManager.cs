@@ -213,6 +213,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     // Bounds retries of one batch, so a conflict that cannot clear (rather than a competing instance) ends the fill.
     private const int ResourceTypeCountFillMaxConflicts = 5;
 
+    // Listing every status lets the fill seek IX_DataAcquisitionLogs_Status_ModifyDate once per status instead of
+    // scanning the log table; the fill runs every hour, so the scan would repeat.
+    private static readonly RequestStatus[] AllRequestStatuses = Enum.GetValues<RequestStatus>();
+
     // Soft deletes all logs for a facility in batches to avoid large update locks
     public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
     {
@@ -358,6 +362,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             var logIds = await _dbContext.DataAcquisitionLogs
                 .AsNoTracking()
                 .Where(l => l.Id > lastId &&
+                            EF.Constant(AllRequestStatuses).Contains(l.Status!.Value) &&
                             l.ModifyDate >= modifiedSince &&
                             _dbContext.DataAcquisitionLogResourceIds.Any(r => r.DataAcquisitionLogId == l.Id) &&
                             !_dbContext.DataAcquisitionLogResourceTypeCounts.Any(c => c.DataAcquisitionLogId == l.Id))
