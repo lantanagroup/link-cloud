@@ -5,7 +5,9 @@ import ca.uhn.fhir.fhirpath.IFhirPath;
 import ca.uhn.fhir.fhirpath.IFhirPathEvaluationContext;
 import org.hl7.fhir.instance.model.api.IBase;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -40,7 +42,18 @@ import java.util.Optional;
  */
 public class ThreadLocalFhirPath implements IFhirPath {
 
+    // Bounds each thread's parsed-expression cache. A rubric has about a hundred expressions; the bound only
+    // matters if many different rubrics are evaluated, and then the least recently used are parsed again.
+    static final int PARSED_EXPRESSIONS_PER_THREAD = 2_000;
+
     private final ThreadLocal<IFhirPath> delegate;
+    private final ThreadLocal<Map<String, IParsedExpression>> parsedExpressions = ThreadLocal.withInitial(() ->
+            new LinkedHashMap<>(256, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, IParsedExpression> eldest) {
+                    return size() > PARSED_EXPRESSIONS_PER_THREAD;
+                }
+            });
     private volatile IFhirPathEvaluationContext evaluationContext;
 
     public ThreadLocalFhirPath(FhirContext fhirContext) {
@@ -57,6 +70,11 @@ public class ThreadLocalFhirPath implements IFhirPath {
         delegate.get();
     }
 
+    /** How many expressions the calling thread has parsed and kept. Package-private for tests. */
+    int parsedExpressionCount() {
+        return parsedExpressions.get().size();
+    }
+
     /** The calling thread's engine. Package-private for tests. */
     IFhirPath current() {
         return delegate.get();
@@ -64,7 +82,10 @@ public class ThreadLocalFhirPath implements IFhirPath {
 
     @Override
     public <T extends IBase> List<T> evaluate(IBase input, String path, Class<T> returnType) {
-        return current().evaluate(input, path, returnType);
+        IParsedExpression parsed = parsedOnThisThread(path);
+        return parsed != null
+                ? current().evaluate(input, parsed, returnType)
+                : current().evaluate(input, path, returnType);
     }
 
     @Override
@@ -74,7 +95,30 @@ public class ThreadLocalFhirPath implements IFhirPath {
 
     @Override
     public <T extends IBase> Optional<T> evaluateFirst(IBase input, String path, Class<T> returnType) {
-        return current().evaluateFirst(input, path, returnType);
+        IParsedExpression parsed = parsedOnThisThread(path);
+        return parsed != null
+                ? current().evaluateFirst(input, parsed, returnType)
+                : current().evaluateFirst(input, path, returnType);
+    }
+
+    /**
+     * The expression as parsed by this thread's engine, parsing it the first time this thread sees it. A rubric
+     * check evaluates the same expression against every resource in a bundle, and parsing it each time was a large
+     * share of the check's cost. Returns null when the expression doesn't parse, so the caller evaluates the text
+     * and the engine reports the error exactly as before.
+     */
+    private IParsedExpression parsedOnThisThread(String path) {
+        Map<String, IParsedExpression> cache = parsedExpressions.get();
+        IParsedExpression expression = cache.get(path);
+        if (expression == null && !cache.containsKey(path)) {
+            try {
+                expression = current().parse(path);
+            } catch (Exception e) {
+                expression = null;
+            }
+            cache.put(path, expression);
+        }
+        return expression;
     }
 
     @Override

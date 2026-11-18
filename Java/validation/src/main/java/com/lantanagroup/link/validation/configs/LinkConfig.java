@@ -50,6 +50,15 @@ public class LinkConfig {
     private List<ValidationResultIgnoreRuleConfig> validationResultIgnoreRules = new ArrayList<>();
 
     /**
+     * Resource types the legacy (HAPI) validator leaves out of a patient bundle, matched ignoring case; empty validates
+     * every entry. Typically {@code MeasureReport}: validating it costs more than the rest of the patient and its
+     * findings aren't used. Findings still name each entry's position in the bundle as submitted. The rubric engine
+     * isn't affected; its checks choose the resources they apply to.
+     */
+    @Getter @Setter
+    private List<String> validationExcludedResourceTypes = new ArrayList<>();
+
+    /**
      * How many bundle entries HAPI validates at once. Passed to
      * {@code FhirValidator.setExecutorService} with concurrent bundle validation enabled,
      * so only this many InstanceValidator runs are in flight.

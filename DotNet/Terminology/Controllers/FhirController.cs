@@ -49,6 +49,39 @@ public class FhirController(FhirService fhirService) : Controller
         return string.Equals(values.ToString(), "performance", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Undoes FHIR search-value escaping: in a search parameter's value, <c>$</c>, <c>,</c>, <c>|</c> and
+    /// <c>\</c> are escaped with a backslash (https://hl7.org/fhir/R4/search.html#escaping).
+    /// </summary>
+    /// <remarks>
+    /// HAPI's client escapes them, so a search for a version-pinned canonical arrives as
+    /// <c>url=http://hl7.org/fhir/us/core/ValueSet/us-core-vital-signs\|6.1.0</c>. Matched literally it finds
+    /// nothing, and Validation then treats the value set as one Terminology doesn't hold and falls back to an
+    /// in-memory expansion that can't expand LOINC or SNOMED value sets, failing every code. Only the
+    /// search endpoints take escaped values; operation parameters such as <c>$validate-code</c>'s
+    /// <c>url</c> are not escaped. An unescaped comma is left as it is (a list of values is not supported).
+    /// </remarks>
+    internal static string? UnescapeSearchValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || !value.Contains('\\'))
+        {
+            return value;
+        }
+
+        var builder = new System.Text.StringBuilder(value.Length);
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (value[i] == '\\' && i + 1 < value.Length && value[i + 1] is '$' or ',' or '|' or '\\')
+            {
+                i++;
+            }
+
+            builder.Append(value[i]);
+        }
+
+        return builder.ToString();
+    }
+
     private static string? SanitizeTerminologyValue(string? value, string parameterName)
     {
         if (value is null)
@@ -168,7 +201,7 @@ public class FhirController(FhirService fhirService) : Controller
         {
             // count and offset bind as int? and are never compared against cached terminology content,
             // so they do not go through the sanitizers the string parameters need.
-            return Ok(fhirService.GetValueSets(url?.Sanitize(), summary, count, offset));
+            return Ok(fhirService.GetValueSets(UnescapeSearchValue(url)?.Sanitize(), summary, count, offset));
         }
         catch (ArgumentException ex)
         {
@@ -295,7 +328,7 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.GetCodeSystems(url?.Sanitize(), summary, count, offset));
+            return Ok(fhirService.GetCodeSystems(UnescapeSearchValue(url)?.Sanitize(), summary, count, offset));
         }
         catch (ArgumentException ex)
         {

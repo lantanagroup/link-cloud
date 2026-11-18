@@ -38,7 +38,8 @@ public class OpenTelemetryConfig {
   public OpenTelemetry openTelemetry () {
     Resource resource = Resource.getDefault().toBuilder().put(ResourceAttributes.SERVICE_NAME, serviceName).build();
 
-    if (this.telemetryConfig == null || this.telemetryConfig.getExporterEndpoint() == null) {
+    // An empty endpoint turns telemetry off, as it does in Validation; the exporters refuse one outright.
+    if (this.telemetryConfig == null || this.telemetryConfig.getExporterEndpoint() == null || this.telemetryConfig.getExporterEndpoint().isBlank()) {
       logger.warn("Telemetry configuration is not set. OpenTelemetry will not be initialized.");
       return OpenTelemetry.noop();
     }

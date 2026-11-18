@@ -3,8 +3,6 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
@@ -18,8 +16,6 @@ import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
-import com.lantanagroup.link.validation.exceptions.PayloadParseException;
-import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
@@ -69,12 +65,6 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final boolean bridgeEnabled;
     private final boolean shadowEnabled;
     private final String rubricId;
-
-    private static final Set<RubricResultStatus> VALID_STATUSES = Set.of(
-            RubricResultStatus.ACCEPTABLE,
-            RubricResultStatus.ACCEPTABLE_WITH_WARNINGS,
-            RubricResultStatus.INCONCLUSIVE
-    );
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -175,7 +165,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         if (shadowEnabled) {
             try {
                 publishShadowCompareEvent(requestId, correlationId, facilityId, patientId, reportId, payloadUri,
-                        bridgeEnabled, results);
+                        bridgeEnabled, isValid, results);
             } catch (Exception e) {
                 _logger.warn("Failed to publish ShadowCompareEvent for report {}; skipping shadow comparison",
                         LogUtils.sanitize(reportId), e);
@@ -193,7 +183,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
      */
     private void publishShadowCompareEvent(
             UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
-            String payloadUri, boolean ranNewEngine, List<Result> results) {
+            String payloadUri, boolean ranNewEngine, boolean isValid, List<Result> results) {
         ShadowCompareEvent event = new ShadowCompareEvent();
         event.setRequestId(requestId);
         event.setCorrelationId(correlationId);
@@ -202,6 +192,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         event.setReportId(reportId);
         event.setPayloadUri(payloadUri);
         event.setRanNewEngine(ranNewEngine);
+        event.setAuthoritativeValid(isValid);
         event.setAuthoritativeResult(results.stream().map(ShadowFindingDto::from).toList());
 
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
@@ -368,15 +359,13 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         ValidationResultEnvelope envelope;
 
         try (Timer timer = Timer.start()) {
-            EvaluateRequestDto request = EvaluateRequestDto.builder()
-                    .subject(SubjectDto.builder()
-                            .facilityId(facilityId)
-                            .patientId(patientId)
-                            .reportId(reportId)
-                            .build())
-                    .payload(bundleToJsonNode(bundle))
+            SubjectDto subject = SubjectDto.builder()
+                    .facilityId(facilityId)
+                    .patientId(patientId)
+                    .reportId(reportId)
                     .build();
-            envelope = rubricExecutionService.evaluate(rubricId, null, request, true, correlationId);
+            // The bundle as already parsed; encoding it to JSON for the engine to parse again doubled the parsing cost.
+            envelope = rubricExecutionService.evaluate(rubricId, null, subject, bundle, true, correlationId);
             outcome = legacyResultMapper.toResults(envelope, facilityId, patientId, reportId);
             _logger.debug("Rubric evaluation completed with {} results (interpretation {}) in {} seconds",
                     outcome.results().size(), outcome.status(), String.format("%.2f", timer.getSeconds()));
@@ -391,14 +380,6 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         return new RubricEngineResult(outcome.results(), outcome.status(), envelope.getRequestId());
     }
 
-    private JsonNode bundleToJsonNode(Bundle bundle) {
-        try {
-            String json = fhirContext.newJsonParser().encodeResourceToString(bundle);
-            return objectMapper.readTree(json);
-        } catch (JsonProcessingException e) {
-            throw new PayloadParseException("Failed to convert bundle to JSON for rubric evaluation", e);
-        }
-    }
 
     private Attributes buildMetricAttributes(List<Result> results, String facilityId) {
         int[] counts = countIssuesBySeverity(results);
@@ -472,11 +453,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
      */
     boolean checkIsValid(List<Result> results, RubricResultStatus status) {
         if (bridgeEnabled && status != null) {
-            return VALID_STATUSES.contains(status);
+            return ValidationVerdict.rubricValid(status);
         }
-        return results.stream()
-                .flatMap(res -> res.getCategories() == null
-                        ? java.util.stream.Stream.empty() : res.getCategories().stream())
-                .allMatch(Category::isAcceptable);
+        return ValidationVerdict.legacyValid(results);
     }
 }

@@ -11,7 +11,7 @@ import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
-import com.lantanagroup.link.validation.models.EvaluateRequestDto;
+import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
@@ -844,26 +844,18 @@ public class ReadyForValidationConsumerTest {
     // Rubric bridge (ADR-0003 step 2)
     // -------------------------------------------------------------------------
 
-    /** Stubs fhirContext so the bundle can be re-encoded to JSON for the rubric-evaluate request. */
-    private void stubBundleJsonEncoding() {
-        IParser jsonParser = mock(IParser.class);
-        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
-        when(jsonParser.encodeResourceToString(bundle)).thenReturn("{\"resourceType\":\"Bundle\"}");
-    }
-
     @Test
     void process_bridgeEnabled_callsRubricEngineInsteadOfLegacyValidation() throws Exception {
         stubRestRetrieval();
-        stubBundleJsonEncoding();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
-        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull());
+        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), isNull());
         verify(validationService, never()).validate(any(), any(), any());
         verify(categorizationService, never()).categorize(any());
     }
@@ -871,28 +863,26 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_bridgeEnabled_requestCarriesSubjectIdentifiers() throws Exception {
         stubRestRetrieval();
-        stubBundleJsonEncoding();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        ArgumentCaptor<EvaluateRequestDto> captor = ArgumentCaptor.forClass(EvaluateRequestDto.class);
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), captor.capture(), eq(true), isNull()))
+        ArgumentCaptor<SubjectDto> captor = ArgumentCaptor.forClass(SubjectDto.class);
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), captor.capture(), any(Bundle.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
-        assertEquals(FACILITY_ID, captor.getValue().getSubject().getFacilityId());
-        assertEquals(PATIENT_ID, captor.getValue().getSubject().getPatientId());
-        assertEquals(REPORT_ID, captor.getValue().getSubject().getReportId());
+        assertEquals(FACILITY_ID, captor.getValue().getFacilityId());
+        assertEquals(PATIENT_ID, captor.getValue().getPatientId());
+        assertEquals(REPORT_ID, captor.getValue().getReportId());
     }
 
     @Test
     void process_bridgeEnabled_replacesMappedPatientResults() throws Exception {
         stubRestRetrieval();
-        stubBundleJsonEncoding();
         Result mapped = resultWithCategories(List.of(categoryWithAcceptable(true)));
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(List.of(mapped), RubricResultStatus.ACCEPTABLE));
@@ -913,9 +903,8 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     private ValidationComplete captureBridgeValidationComplete(BridgeOutcome outcome) throws Exception {
         stubRestRetrieval();
-        stubBundleJsonEncoding();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull()))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), isNull()))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID)).thenReturn(outcome);
 
@@ -1000,6 +989,7 @@ public class ReadyForValidationConsumerTest {
         ShadowCompareEvent event = captor.getValue().value();
         assertFalse(event.isRanNewEngine());
         assertEquals(1, event.getAuthoritativeResult().size());
+        assertEquals(Boolean.TRUE, event.getAuthoritativeValid(), "the primary engine's verdict travels with the event");
         assertEquals(FACILITY_ID, captor.getValue().key());
         assertNull(event.getRequestId(), "legacy engine has no request id to share, unlike the rubric engine");
         assertEquals(CORRELATION_ID, event.getCorrelationId(),
@@ -1010,10 +1000,9 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_shadowEnabledBridgeOn_publishesEventWithRanNewEngineTrue() throws Exception {
         stubRestRetrieval();
-        stubBundleJsonEncoding();
         UUID rubricRequestId = UUID.randomUUID();
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().requestId(rubricRequestId).build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), eq(CORRELATION_ID)))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.ACCEPTABLE));
@@ -1027,6 +1016,7 @@ public class ReadyForValidationConsumerTest {
 
         ShadowCompareEvent event = captor.getValue().value();
         assertTrue(event.isRanNewEngine());
+        assertEquals(Boolean.TRUE, event.getAuthoritativeValid(), "an ACCEPTABLE rubric status is a pass");
         assertEquals(rubricRequestId, event.getRequestId(),
                 "the rubric engine's own request id (already on its rubric_result row) should be forwarded as-is");
         assertEquals(CORRELATION_ID, event.getCorrelationId(),
