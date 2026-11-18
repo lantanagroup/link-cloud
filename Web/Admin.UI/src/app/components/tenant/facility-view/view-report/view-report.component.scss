@@ -200,4 +200,13 @@ $failed-status: #a1030eb3;
     color: #b3261e;
     font-weight: 600;
   }
+
+  .query-analysis-error-detail {
+    max-width: 80ch;
+    color: #5f6672;
+    font-weight: 400;
+    font-size: 0.9em;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
 }

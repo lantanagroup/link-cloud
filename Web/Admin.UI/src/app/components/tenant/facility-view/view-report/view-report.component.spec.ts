@@ -3,6 +3,7 @@ import { ViewReportComponent } from './view-report.component';
 import { SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
 import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
 import { LoadingService } from '../../../../services/loading.service';
+import { ErrorHandlingService } from '../../../../services/error-handling.service';
 import {
   IDataAcquisitionLogStatistics
 } from '../../../../interfaces/data-acquisition/data-acquisition-log-statistics.interface';
@@ -19,7 +20,7 @@ describe('ViewReportComponent submission status presentation', () => {
 
   beforeEach(() => {
     component = new ViewReportComponent(
-      null!, null!, null!, null!, null!, null!, null!, null!, null!);
+      null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
   });
 
   describe('NotSubmitted', () => {
@@ -94,14 +95,17 @@ describe('ViewReportComponent query analysis loading', () => {
 
   let acquisitionLogService: jasmine.SpyObj<AcquisitionLogService>;
   let loadingService: jasmine.SpyObj<LoadingService>;
+  let errorHandlingService: jasmine.SpyObj<ErrorHandlingService>;
   let component: ViewReportComponent;
 
   beforeEach(() => {
     acquisitionLogService = jasmine.createSpyObj<AcquisitionLogService>(
       'AcquisitionLogService', ['getAcquisitionLogStatistics']);
     loadingService = jasmine.createSpyObj<LoadingService>('LoadingService', ['show', 'hide']);
+    errorHandlingService = jasmine.createSpyObj<ErrorHandlingService>('ErrorHandlingService', ['formatError']);
+    errorHandlingService.formatError.and.returnValue('Bad Gateway (502): Trace ID: abc');
     component = new ViewReportComponent(
-      null!, null!, null!, null!, null!, acquisitionLogService, loadingService, null!, null!);
+      null!, null!, null!, null!, null!, acquisitionLogService, loadingService, null!, null!, errorHandlingService);
   });
 
   it('shows the statistics and no error when the request succeeds', () => {
@@ -123,6 +127,7 @@ describe('ViewReportComponent query analysis loading', () => {
     component.onViewQueryAnalysis();
 
     expect(component.queryAnalysisLoadFailed).toBeTrue();
+    expect(component.queryAnalysisErrorDetail).toBe('Bad Gateway (502): Trace ID: abc');
     expect(component.dataAcquisitionLogStatistics).toBeUndefined();
     expect(loadingService.hide).toHaveBeenCalled();
   });
@@ -137,6 +142,7 @@ describe('ViewReportComponent query analysis loading', () => {
     component.onViewQueryAnalysis();
 
     expect(component.queryAnalysisLoadFailed).toBeFalse();
+    expect(component.queryAnalysisErrorDetail).toBe('');
     expect(component.dataAcquisitionLogStatistics).toBe(statistics);
   });
 });

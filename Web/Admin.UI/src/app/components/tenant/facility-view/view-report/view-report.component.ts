@@ -35,6 +35,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { LoadingService } from 'src/app/services/loading.service';
 import { ChartColorService } from 'src/app/services/chart-color.service';
+import { ErrorHandlingService } from 'src/app/services/error-handling.service';
 import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
 import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
 import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
@@ -98,6 +99,7 @@ export class ViewReportComponent implements OnInit {
   reportSummary: IReportSchedule | undefined;
   dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
   queryAnalysisLoadFailed = false;
+  queryAnalysisErrorDetail = '';
 
   // Add summary data for donut charts
   reportEntrySummary: IReportEntrySummary | undefined;
@@ -174,7 +176,8 @@ export class ViewReportComponent implements OnInit {
     private acquisitionLogService: AcquisitionLogService,
     private loadingService: LoadingService,
     private reportService: ReportService,
-    private chartColorService: ChartColorService) { }
+    private chartColorService: ChartColorService,
+    private errorHandlingService: ErrorHandlingService) { }
 
   ngOnInit(): void {
     const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
@@ -386,6 +389,7 @@ export class ViewReportComponent implements OnInit {
 
   onViewQueryAnalysis(): void {
     this.queryAnalysisLoadFailed = false;
+    this.queryAnalysisErrorDetail = '';
     this.loadingService.show();
     this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId).subscribe({
       next: (response: IDataAcquisitionLogStatistics) => {
@@ -396,6 +400,7 @@ export class ViewReportComponent implements OnInit {
         console.error('Error loading acquisition log statistics:', error);
         // Drop any earlier result so the tab never shows numbers the server did not just return.
         this.dataAcquisitionLogStatistics = undefined;
+        this.queryAnalysisErrorDetail = this.errorHandlingService.formatError(error, 'An unknown error occurred');
         this.queryAnalysisLoadFailed = true;
         this.loadingService.hide();
       }
