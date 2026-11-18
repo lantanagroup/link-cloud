@@ -404,6 +404,13 @@ public sealed class ConfigurationController : Controller
 
     private void Temp(ConfigurationAction result)
     {
+        if (result.DialogTitle is not null)
+        {
+            TempData["DialogTitle"] = result.DialogTitle;
+            TempData["DialogMessage"] = result.Message;
+            return;
+        }
+
         if (result.Succeeded)
             TempData["Message"] = result.Message;
         else

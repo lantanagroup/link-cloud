@@ -5,8 +5,12 @@ public sealed class ConfigurationAction
     public bool Succeeded { get; init; }
     public string Message { get; init; } = "";
 
+    /// <summary>When set, the page opens a dialog with this title instead of the warning banner.</summary>
+    public string? DialogTitle { get; init; }
+
     public static ConfigurationAction Ok(string message) => new() { Succeeded = true, Message = message };
     public static ConfigurationAction Fail(string message) => new() { Message = message };
+    public static ConfigurationAction Dialog(string title, string message) => new() { DialogTitle = title, Message = message };
 }
 
 public sealed class ConfigurationHomePage

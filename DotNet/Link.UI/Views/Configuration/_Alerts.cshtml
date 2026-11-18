@@ -6,3 +6,37 @@
 {
     <div class="alert alert-warning lu-alert"><span class="lu-alert-text">@actionError</span><button type="button" class="lu-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button></div>
 }
+@if (TempData["DialogTitle"] is string dialogTitle)
+{
+    var dialogMessage = TempData["DialogMessage"] as string ?? "";
+    <div class="modal fade" id="actionDialog" tabindex="-1" aria-labelledby="actionDialogTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="actionDialogTitle">@dialogTitle</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" style="white-space: pre-wrap;">@dialogMessage</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            function openActionDialog() {
+                var el = document.getElementById("actionDialog");
+                if (!el || !window.bootstrap || el.getAttribute("data-opened") === "1") return;
+                el.setAttribute("data-opened", "1");
+                if (el.parentElement !== document.body) document.body.appendChild(el);
+                window.bootstrap.Modal.getOrCreateInstance(el).show();
+            }
+            if (document.readyState === "loading")
+                document.addEventListener("DOMContentLoaded", openActionDialog);
+            document.addEventListener("au-refreshed", openActionDialog);
+        })();
+    </script>
+}

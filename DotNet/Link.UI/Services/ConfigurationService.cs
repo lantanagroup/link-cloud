@@ -301,7 +301,7 @@ public sealed partial class ConfigurationService
             var response = await _tenant.DeleteVendorAsync(id, cancellationToken);
             return Ok(response)
                 ? ConfigurationAction.Ok("Vendor was deleted.")
-                : ConfigurationAction.Fail(Fail("Tenant", response.StatusCode, response.RawBody));
+                : VendorDeleteNotice.From(response, version: false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -406,7 +406,7 @@ public sealed partial class ConfigurationService
             var response = await _tenant.DeleteVendorVersionAsync(versionId, cancellationToken);
             return Ok(response)
                 ? ConfigurationAction.Ok("Version was deleted.")
-                : ConfigurationAction.Fail(Fail("Tenant", response.StatusCode, response.RawBody));
+                : VendorDeleteNotice.From(response, version: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
