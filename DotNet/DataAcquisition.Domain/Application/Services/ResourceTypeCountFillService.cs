@@ -7,14 +7,15 @@ using Microsoft.Extensions.Logging;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
 /// <summary>
-/// Stores per-type resource counts for logs that have resource ids but no counts, such as logs the previous version
-/// completed after the database update created the counts table, including while its pods were being replaced.
+/// Keeps the per-type resource counts of completed logs in step with their resource ids while a previous version,
+/// which writes resource ids but not counts, may still be running alongside this one.
 /// </summary>
 /// <remarks>
-/// Registered in both the Data Acquisition service and the acquisition worker. The first pass covers every log
-/// modified since the counts table was created; later passes run every hour for as long as the process runs and cover
-/// logs modified since the previous successful pass. An old pod that completes a log after a pass stamps it with its
-/// completion time, so the next pass in any running new pod fills it, however the rollout is ordered.
+/// Registered in both the Data Acquisition service and the acquisition worker. The first pass reconciles every
+/// completed log modified since the counts table was created; later passes run every hour for as long as the process
+/// runs and reconcile logs modified since the previous successful pass. An old pod that completes or re-processes a
+/// log stamps it with that time, so the next pass in any running new pod replaces its missing or stale counts,
+/// however the rollout is ordered.
 /// Needed only until every environment has started a version that writes the counts; remove it after that.
 /// The migration that created the counts table filled them for all earlier logs.
 /// </remarks>
@@ -23,7 +24,7 @@ public class ResourceTypeCountFillService : BackgroundService
     private static readonly TimeSpan DefaultPassInterval = TimeSpan.FromHours(1);
 
     // The table's create_date is in the database server's local time, not UTC; a day covers any offset. Starting
-    // earlier than needed costs nothing, because only logs without counts are filled.
+    // earlier than needed only rechecks logs whose counts are already right.
     private static readonly TimeSpan CreatedAtMargin = TimeSpan.FromDays(1);
 
     // Later passes reach back past the previous pass's start to cover clock differences between pods and logs
@@ -59,7 +60,7 @@ public class ResourceTypeCountFillService : BackgroundService
 
                 try
                 {
-                    if (await FillAsync(modifiedSince, stoppingToken))
+                    if (await ReconcileAsync(modifiedSince, stoppingToken))
                     {
                         modifiedSince = passStarted - PassOverlap;
                     }
@@ -69,7 +70,7 @@ public class ResourceTypeCountFillService : BackgroundService
                 {
                     // The next pass retries the same window.
                     _logger.LogWarning(ex,
-                                       "Could not fill missing resource-type counts; retrying in {Interval}.",
+                                       "Could not reconcile resource-type counts; retrying in {Interval}.",
                                        _passInterval);
                 }
 
@@ -78,12 +79,12 @@ public class ResourceTypeCountFillService : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.LogDebug("Stopped filling missing resource-type counts.");
+            _logger.LogDebug("Stopped reconciling resource-type counts.");
         }
     }
 
-    // Returns false when there was nothing to fill from yet, so the next pass starts from the table's creation again.
-    private async Task<bool> FillAsync(DateTime? modifiedSince, CancellationToken stoppingToken)
+    // Returns false when there was nothing to reconcile from yet, so the next pass starts from the table's creation.
+    private async Task<bool> ReconcileAsync(DateTime? modifiedSince, CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
@@ -94,22 +95,22 @@ public class ResourceTypeCountFillService : BackgroundService
             var createdAt = await queries.GetResourceTypeCountsCreatedAtAsync(stoppingToken);
             if (createdAt is null)
             {
-                _logger.LogInformation("The resource-type counts table does not exist yet; nothing to fill.");
+                _logger.LogInformation("The resource-type counts table does not exist yet; nothing to reconcile.");
                 return false;
             }
 
             modifiedSince = createdAt.Value - CreatedAtMargin;
         }
 
-        var filled = await manager.FillMissingResourceTypeCountsAsync(modifiedSince.Value, stoppingToken);
+        var replaced = await manager.ReconcileResourceTypeCountsAsync(modifiedSince.Value, stoppingToken);
 
-        if (filled > 0)
+        if (replaced > 0)
         {
-            _logger.LogInformation("Stored resource-type counts for {LogCount} logs that had none.", filled);
+            _logger.LogInformation("Replaced missing or stale resource-type counts for {LogCount} logs.", replaced);
         }
         else
         {
-            _logger.LogDebug("No logs were missing resource-type counts.");
+            _logger.LogDebug("No completed logs had missing or stale resource-type counts.");
         }
 
         return true;

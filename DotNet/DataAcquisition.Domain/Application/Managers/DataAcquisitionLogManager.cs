@@ -16,6 +16,8 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Medallion.Threading;
 using Microsoft.Data.SqlClient;
+using System.Data;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -37,11 +39,11 @@ public interface IDataAcquisitionLogManager
     Task UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Stores per-type resource counts for logs modified since <paramref name="modifiedSince"/> that have resource
-    /// ids but no counts, such as logs a previous version completed during a deployment.
-    /// Returns how many logs got counts.
+    /// Recalculates the per-type resource counts of completed logs modified since <paramref name="modifiedSince"/>
+    /// from their current resource ids, and replaces any that are missing or differ, such as counts for logs a
+    /// previous version wrote during a deployment. Returns how many logs had their counts replaced.
     /// </summary>
-    Task<int> FillMissingResourceTypeCountsAsync(DateTime modifiedSince, CancellationToken cancellationToken = default);
+    Task<int> ReconcileResourceTypeCountsAsync(DateTime modifiedSince, CancellationToken cancellationToken = default);
 
     Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, bool incrementRetry = false, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
@@ -208,14 +210,70 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     }
 
     private const int SoftDeleteBatchSize = 1000;
-    private const int ResourceTypeCountFillBatchSize = 500;
+    private const int ResourceTypeCountReconcileBatchSize = 500;
 
-    // Bounds retries of one batch, so a conflict that cannot clear (rather than a competing instance) ends the fill.
-    private const int ResourceTypeCountFillMaxConflicts = 5;
+    // Recalculates the counts of one batch of logs (@logIds, a JSON array) from their resource ids, using the same
+    // rule as the StoreResourceTypeCountsPerLog backfill, and replaces only the logs whose stored counts differ.
+    // The application lock keeps two instances from reconciling at once, so they cannot insert the same counts.
+    // Only logs still Completed when the batch runs are touched: a log being re-processed is not Completed, so
+    // its own update writes its counts.
+    private const string ReconcileResourceTypeCountsSql = """
+        SET NOCOUNT ON;
 
-    // Listing every status lets the fill seek IX_DataAcquisitionLogs_Status_ModifyDate once per status instead of
-    // scanning the log table; the fill runs every hour, so the scan would repeat.
-    private static readonly RequestStatus[] AllRequestStatuses = Enum.GetValues<RequestStatus>();
+        DECLARE @lockResult int;
+        EXEC @lockResult = sp_getapplock @Resource = N'DataAcquisitionLogResourceTypeCounts.Reconcile',
+                                         @LockMode = N'Exclusive', @LockOwner = N'Transaction',
+                                         @LockTimeout = 60000;
+        IF @lockResult < 0
+            THROW 50001, N'Timed out waiting for another instance to finish reconciling resource-type counts.', 1;
+
+        DECLARE @logs TABLE (Id bigint PRIMARY KEY);
+        INSERT INTO @logs (Id)
+        SELECT d.[Id]
+        FROM OPENJSON(@logIds) AS j
+        JOIN [DataAcquisitionLog] AS d ON d.[Id] = CAST(j.[value] AS bigint)
+        WHERE d.[Status] = N'Completed';
+
+        DECLARE @expected TABLE (LogId bigint NOT NULL, ResourceType nvarchar(512) NOT NULL, [Count] int NOT NULL);
+        INSERT INTO @expected (LogId, ResourceType, [Count])
+        SELECT r.[DataAcquisitionLogId], x.[ResourceType], COUNT(*)
+        FROM [DataAcquisitionLogResourceIds] AS r
+        JOIN @logs AS l ON l.Id = r.[DataAcquisitionLogId]
+        CROSS APPLY (SELECT CASE
+                                WHEN CHARINDEX(N'/', r.[ResourceId]) > 1
+                                    THEN SUBSTRING(r.[ResourceId], 1, CHARINDEX(N'/', r.[ResourceId]) - 1)
+                                ELSE r.[ResourceId]
+                            END AS [ResourceType]) AS x
+        WHERE r.[ResourceId] <> N''
+        GROUP BY r.[DataAcquisitionLogId], x.[ResourceType];
+
+        DECLARE @stored TABLE (LogId bigint NOT NULL, ResourceType nvarchar(512) NOT NULL, [Count] int NOT NULL);
+        INSERT INTO @stored (LogId, ResourceType, [Count])
+        SELECT c.[DataAcquisitionLogId], c.[ResourceType], c.[Count]
+        FROM [DataAcquisitionLogResourceTypeCounts] AS c
+        JOIN @logs AS l ON l.Id = c.[DataAcquisitionLogId];
+
+        DECLARE @changed TABLE (Id bigint PRIMARY KEY);
+        INSERT INTO @changed (Id)
+        SELECT LogId FROM (SELECT LogId, ResourceType, [Count] FROM @expected
+                           EXCEPT
+                           SELECT LogId, ResourceType, [Count] FROM @stored) AS missing
+        UNION
+        SELECT LogId FROM (SELECT LogId, ResourceType, [Count] FROM @stored
+                           EXCEPT
+                           SELECT LogId, ResourceType, [Count] FROM @expected) AS extra;
+
+        DELETE c
+        FROM [DataAcquisitionLogResourceTypeCounts] AS c
+        JOIN @changed AS ch ON ch.Id = c.[DataAcquisitionLogId];
+
+        INSERT INTO [DataAcquisitionLogResourceTypeCounts] ([DataAcquisitionLogId], [ResourceType], [Count])
+        SELECT e.LogId, e.ResourceType, e.[Count]
+        FROM @expected AS e
+        JOIN @changed AS ch ON ch.Id = e.LogId;
+
+        SELECT @changedCount = COUNT(*) FROM @changed;
+        """;
 
     // Soft deletes all logs for a facility in batches to avoid large update locks
     public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
@@ -348,73 +406,52 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return totalUpdated;
     }
 
-    public async Task<int> FillMissingResourceTypeCountsAsync(DateTime modifiedSince,
-                                                              CancellationToken cancellationToken = default)
+    public async Task<int> ReconcileResourceTypeCountsAsync(DateTime modifiedSince,
+                                                            CancellationToken cancellationToken = default)
     {
-        var filled = 0;
-        var conflicts = 0;
+        var replaced = 0;
         long lastId = 0;
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Equality on Status and a range on ModifyDate seek IX_DataAcquisitionLogs_Status_ModifyDate, so the
+            // hourly pass does not scan the log table.
             var logIds = await _dbContext.DataAcquisitionLogs
                 .AsNoTracking()
                 .Where(l => l.Id > lastId &&
-                            EF.Constant(AllRequestStatuses).Contains(l.Status!.Value) &&
-                            l.ModifyDate >= modifiedSince &&
-                            _dbContext.DataAcquisitionLogResourceIds.Any(r => r.DataAcquisitionLogId == l.Id) &&
-                            !_dbContext.DataAcquisitionLogResourceTypeCounts.Any(c => c.DataAcquisitionLogId == l.Id))
+                            l.Status == RequestStatus.Completed &&
+                            l.ModifyDate >= modifiedSince)
                 .OrderBy(l => l.Id)
                 .Select(l => l.Id)
-                .Take(ResourceTypeCountFillBatchSize)
+                .Take(ResourceTypeCountReconcileBatchSize)
                 .ToListAsync(cancellationToken);
 
             if (logIds.Count == 0)
             {
-                return filled;
+                return replaced;
             }
 
-            var resourceIds = await _dbContext.DataAcquisitionLogResourceIds
-                .AsNoTracking()
-                .Where(r => r.DataAcquisitionLogId != null && logIds.Contains(r.DataAcquisitionLogId.Value))
-                .Select(r => new { LogId = r.DataAcquisitionLogId!.Value, r.ResourceId })
-                .ToListAsync(cancellationToken);
-
-            var counts = resourceIds
-                .GroupBy(r => r.LogId)
-                .SelectMany(g => g
-                    .Select(r => r.ResourceId)
-                    .ToResourceTypeCounts(g.Key))
-                .ToList();
-
-            _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(counts);
-
-            try
+            var logIdsJson = new SqlParameter("@logIds", SqlDbType.NVarChar, -1)
             {
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex) &&
-                                               ++conflicts <= ResourceTypeCountFillMaxConflicts)
+                Value = JsonSerializer.Serialize(logIds)
+            };
+            var changedCount = new SqlParameter("@changedCount", SqlDbType.Int)
             {
-                // Another instance filled some of this batch first, and the conflict rolled back the whole batch.
-                // Query again from the same cursor: the logs it filled drop out, and the rest are retried.
-                _dbContext.ChangeTracker.Clear();
-                _logger.LogDebug("Another instance stored resource-type counts for logs after {LastLogId}; " +
-                                 "retrying the rest of the batch.",
-                                 lastId);
-                continue;
+                Direction = ParameterDirection.Output
+            };
+
+            await using (var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken))
+            {
+                await _dbContext.Database.ExecuteSqlRawAsync(ReconcileResourceTypeCountsSql,
+                                                             [logIdsJson, changedCount],
+                                                             cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
 
-            _dbContext.ChangeTracker.Clear();
+            replaced += (int)changedCount.Value;
             lastId = logIds[^1];
-            conflicts = 0;
-
-            filled += counts
-                .Select(c => c.DataAcquisitionLogId)
-                .Distinct()
-                .Count();
         }
     }
 
@@ -1142,20 +1179,5 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .SetProperty(l => l.TailClaimedAt, (DateTime?)null)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
-    }
-
-    // SQL Server: 2627 = unique constraint, 2601 = unique index.
-    // Providers can wrap the SqlException, so walk the chain.
-    private static bool IsUniqueConstraintViolation(Exception ex)
-    {
-        for (var current = ex; current is not null; current = current.InnerException)
-        {
-            if (current is SqlException { Number: 2601 or 2627 })
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

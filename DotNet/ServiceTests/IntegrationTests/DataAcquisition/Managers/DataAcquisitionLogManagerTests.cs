@@ -331,7 +331,7 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
-    public async Task FillMissingResourceTypeCountsAsync_RecentLogWithOnlyResourceIds_StoresItsCounts()
+    public async Task ReconcileResourceTypeCountsAsync_CompletedLogWithOnlyResourceIds_StoresItsCounts()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -342,9 +342,9 @@ public class DataAcquisitionLogManagerTests
                                                    "Condition/c1");
         var manager = CreateManager(scope);
 
-        var filled = await manager.FillMissingResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
+        var replaced = await manager.ReconcileResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
 
-        Assert.True(filled >= 1);
+        Assert.True(replaced >= 1);
         var expected = new Dictionary<string, int>
         {
             ["Observation"] = 2,
@@ -354,37 +354,89 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
-    public async Task FillMissingResourceTypeCountsAsync_LogModifiedBeforeCutoff_LeavesItAlone()
+    public async Task ReconcileResourceTypeCountsAsync_ResourceIdsReplacedWithoutCounts_ReplacesTheStaleCounts()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(dbContext);
+        var manager = CreateManager(scope);
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Status = RequestStatus.Completed,
+            ResourceAcquiredIds = ["Observation/1", "Observation/2"]
+        });
+
+        // What the previous version does when it re-processes a log: it replaces the resource ids and leaves
+        // the counts table, which it does not know about, as it was.
+        await dbContext.DataAcquisitionLogResourceIds
+            .Where(r => r.DataAcquisitionLogId == log.Id)
+            .ExecuteDeleteAsync();
+        dbContext.DataAcquisitionLogResourceIds.AddRange(
+            new DataAcquisitionLogResourceId { DataAcquisitionLogId = log.Id, ResourceId = "Condition/c1" },
+            new DataAcquisitionLogResourceId { DataAcquisitionLogId = log.Id, ResourceId = "Encounter/e1" });
+        await dbContext.SaveChangesAsync();
+        await dbContext.DataAcquisitionLogs
+            .Where(l => l.Id == log.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(l => l.ModifyDate, DateTime.UtcNow));
+
+        await manager.ReconcileResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
+
+        var expected = new Dictionary<string, int>
+        {
+            ["Condition"] = 1,
+            ["Encounter"] = 1
+        };
+        Assert.Equal(expected, await GetResourceTypeCountsAsync(dbContext, log.Id));
+    }
+
+    [Fact]
+    public async Task ReconcileResourceTypeCountsAsync_CountsAlreadyMatch_LeavesTheRowsUntouched()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(dbContext);
+        var manager = CreateManager(scope);
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Status = RequestStatus.Completed,
+            ResourceAcquiredIds = ["Observation/1", "Condition/c1"]
+        });
+        var rowIdsBefore = await GetResourceTypeCountRowIdsAsync(dbContext, log.Id);
+
+        await manager.ReconcileResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
+
+        Assert.Equal(rowIdsBefore, await GetResourceTypeCountRowIdsAsync(dbContext, log.Id));
+    }
+
+    [Fact]
+    public async Task ReconcileResourceTypeCountsAsync_LogModifiedBeforeCutoff_LeavesItAlone()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var log = await AddLogWithResourceIdsAsync(dbContext, DateTime.UtcNow.AddDays(-3), "Observation/1");
         var manager = CreateManager(scope);
 
-        await manager.FillMissingResourceTypeCountsAsync(DateTime.UtcNow.AddDays(-1));
+        await manager.ReconcileResourceTypeCountsAsync(DateTime.UtcNow.AddDays(-1));
 
         Assert.Empty(await GetResourceTypeCountsAsync(dbContext, log.Id));
     }
 
     [Fact]
-    public async Task FillMissingResourceTypeCountsAsync_LogThatHasCounts_LeavesThemAlone()
+    public async Task ReconcileResourceTypeCountsAsync_LogNotCompleted_LeavesItAlone()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        var log = await AddLogWithResourceIdsAsync(dbContext, DateTime.UtcNow.AddMinutes(-5), "Encounter/e1");
-        dbContext.DataAcquisitionLogResourceTypeCounts.Add(new DataAcquisitionLogResourceTypeCount
-        {
-            DataAcquisitionLogId = log.Id,
-            ResourceType = "Encounter",
-            Count = 7
-        });
-        await dbContext.SaveChangesAsync();
+        var log = await AddLogWithResourceIdsAsync(dbContext, DateTime.UtcNow.AddMinutes(-5), "Observation/1");
+        await dbContext.DataAcquisitionLogs
+            .Where(l => l.Id == log.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(l => l.Status, RequestStatus.Processing));
         var manager = CreateManager(scope);
 
-        await manager.FillMissingResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
+        await manager.ReconcileResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
 
-        Assert.Equal(new Dictionary<string, int> { ["Encounter"] = 7 },
-                     await GetResourceTypeCountsAsync(dbContext, log.Id));
+        Assert.Empty(await GetResourceTypeCountsAsync(dbContext, log.Id));
     }
 
     [Fact]
@@ -1248,35 +1300,6 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
-    public async Task FillMissingResourceTypeCountsAsync_AnotherInstanceFillsFirst_KeepsItsCountsAndFillsTheRest()
-    {
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var setupContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        var log = await AddLogWithResourceIdsAsync(setupContext, DateTime.UtcNow.AddMinutes(-5), "Observation/1");
-        var otherLog = await AddLogWithResourceIdsAsync(setupContext, DateTime.UtcNow.AddMinutes(-5), "Condition/c1");
-        var connectionString = setupContext.Database.GetConnectionString()!;
-        var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
-            .UseSqlServer(connectionString)
-            .AddInterceptors(new CompetingCountInserter(connectionString, log.Id))
-            .Options;
-        await using var racingContext = new DataAcquisitionDbContext(options);
-        var manager = new DataAcquisitionLogManager(
-            new Mock<ILogger<DataAcquisitionLogManager>>().Object,
-            scope.ServiceProvider.GetRequiredService<IDatabase>(),
-            racingContext,
-            scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
-            CreateSemaphoreProviderMock(),
-            scope.ServiceProvider.GetRequiredService<IResourceCache>());
-
-        await manager.FillMissingResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
-
-        Assert.Equal(new Dictionary<string, int> { ["Observation"] = 99 },
-                     await GetResourceTypeCountsAsync(setupContext, log.Id));
-        Assert.Equal(new Dictionary<string, int> { ["Condition"] = 1 },
-                     await GetResourceTypeCountsAsync(setupContext, otherLog.Id));
-    }
-
-    [Fact]
     public async Task UpdateAsync_RetryAfterFailingBetweenTheDeletes_ReplacesTheCounts()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -1349,6 +1372,17 @@ public class DataAcquisitionLogManagerTests
         await dbContext.SaveChangesAsync();
 
         return log;
+    }
+
+    private static async Task<List<long>> GetResourceTypeCountRowIdsAsync(DataAcquisitionDbContext dbContext,
+                                                                          long logId)
+    {
+        return await dbContext.DataAcquisitionLogResourceTypeCounts
+            .AsNoTracking()
+            .Where(c => c.DataAcquisitionLogId == logId)
+            .OrderBy(c => c.Id)
+            .Select(c => c.Id)
+            .ToListAsync();
     }
 
     private static async Task<Dictionary<string, int>> GetResourceTypeCountsAsync(DataAcquisitionDbContext dbContext,
@@ -1443,41 +1477,6 @@ public class DataAcquisitionLogManagerTests
         {
             lock (Commands) Commands.Add(command.CommandText);
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
-        }
-    }
-
-    // Stands in for another service instance: commits counts for the log just before this context saves its own.
-    private sealed class CompetingCountInserter : SaveChangesInterceptor
-    {
-        private readonly string _connectionString;
-        private readonly long _logId;
-        private bool _inserted;
-
-        public CompetingCountInserter(string connectionString, long logId)
-        {
-            _connectionString = connectionString;
-            _logId = logId;
-        }
-
-        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default)
-        {
-            if (!_inserted)
-            {
-                _inserted = true;
-                await using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
-                await connection.OpenAsync(cancellationToken);
-                await using var command = connection.CreateCommand();
-                command.CommandText = "INSERT INTO [DataAcquisitionLogResourceTypeCounts] " +
-                                      "([DataAcquisitionLogId], [ResourceType], [Count]) " +
-                                      "VALUES (@logId, N'Observation', 99)";
-                command.Parameters.AddWithValue("@logId", _logId);
-                await command.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            return await base.SavingChangesAsync(eventData, result, cancellationToken);
         }
     }
 

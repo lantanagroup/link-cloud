@@ -20,7 +20,7 @@ public class ResourceTypeCountFillServiceTests
         var twoPasses = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var manager = new Mock<IDataAcquisitionLogManager>();
         manager
-            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.ReconcileResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Callback<DateTime, CancellationToken>((since, _) => RecordCall(calls, since, twoPasses))
             .ReturnsAsync(3);
         var service = CreateService(manager.Object, CountsTableCreatedAt, TimeSpan.Zero);
@@ -43,7 +43,7 @@ public class ResourceTypeCountFillServiceTests
         var attempts = 0;
         var manager = new Mock<IDataAcquisitionLogManager>();
         manager
-            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.ReconcileResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Returns((DateTime since, CancellationToken _) =>
             {
                 RecordCall(calls, since, twoPasses);
@@ -86,7 +86,7 @@ public class ResourceTypeCountFillServiceTests
         await service.StopAsync(CancellationToken.None);
 
         Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
-        manager.Verify(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+        manager.Verify(m => m.ReconcileResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
                        Times.Never);
     }
 
@@ -96,7 +96,7 @@ public class ResourceTypeCountFillServiceTests
         var fillStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var manager = new Mock<IDataAcquisitionLogManager>();
         manager
-            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.ReconcileResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Returns(async (DateTime _, CancellationToken token) =>
             {
                 fillStarted.SetResult();
@@ -119,7 +119,7 @@ public class ResourceTypeCountFillServiceTests
         var firstPassDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var manager = new Mock<IDataAcquisitionLogManager>();
         manager
-            .Setup(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.ReconcileResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Callback(() => firstPassDone.TrySetResult())
             .ReturnsAsync(0);
         var service = CreateService(manager.Object, CountsTableCreatedAt, TimeSpan.FromHours(1));
@@ -129,7 +129,7 @@ public class ResourceTypeCountFillServiceTests
         await service.StopAsync(CancellationToken.None);
 
         Assert.True(service.ExecuteTask!.IsCompletedSuccessfully);
-        manager.Verify(m => m.FillMissingResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+        manager.Verify(m => m.ReconcileResourceTypeCountsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
                        Times.Once);
     }
 
