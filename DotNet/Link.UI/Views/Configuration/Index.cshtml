@@ -45,6 +45,19 @@
     </div>
     <div class="col-12 col-md-6">
         <div class="au-card card h-100">
+            <div class="card-header">Validation rubrics</div>
+            <div class="card-body">
+                <p>Draft, import, compare, dry-run, publish, and retire the rubrics validation runs.</p>
+                @if (!Model.ValidationConfigured)
+                {
+                    <p class="text-muted">Validation service URL is not configured.</p>
+                }
+                <a class="btn btn-au-link" asp-action="Rubrics">Open rubrics</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
             <div class="card-header">Query plans</div>
             <div class="card-body">
                 <p>Look up the discharge, daily, weekly, and monthly plans saved on a facility, then open that facility's editor.</p>

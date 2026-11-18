@@ -1,0 +1,109 @@
+@model RubricVersionPage
+@{
+    var version = Model.Version;
+    var definition = version?.Definition;
+    var checks = RubricText.OrderedChecks(definition);
+    var rubricId = Model.RubricId;
+    var compareWith = RubricLifecycle.CompareWith(Model.Rubric, version?.Semver);
+    var active = version is not null && version.Status == "PUBLISHED" && version.Semver == Model.Rubric?.LatestPublishedSemver;
+    ViewData["RubricId"] = rubricId;
+    ViewData["Semver"] = version?.Semver ?? "";
+    ViewData["Checksum"] = version?.Checksum;
+    ViewData["DryRun"] = version is null ? "" : RubricText.DryRunLabel(version.DryRunCompletedAt, version.DryRunStatus);
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Rubric", new { rubricId })!, "Back to rubric"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">@(string.IsNullOrWhiteSpace(definition?.Title) ? rubricId : definition.Title)</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (version is not null)
+{
+    <p>
+        <span class="badge @RubricText.StatusBadge(version.Status)">@RubricText.StatusLabel(version.Status)</span>
+        @if (active)
+        {
+            <span class="badge @RubricText.ActiveBadge">Active</span>
+        }
+        <span class="ms-2">@version.Semver</span>
+    </p>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        @if (version.Status == "DRAFT")
+        {
+            <a class="btn btn-success" asp-action="EditRubric" asp-route-rubricId="@rubricId" asp-route-semver="@version.Semver">Edit</a>
+        }
+        <a class="btn btn-success" asp-action="NewRubricVersion" asp-route-rubricId="@rubricId" asp-route-from="@version.Semver">New version from this one</a>
+        @if (version.Status != "RETIRED")
+        {
+            <a class="btn btn-au-link" asp-action="DryRunRubric" asp-route-rubricId="@rubricId" asp-route-semver="@version.Semver">Dry run</a>
+        }
+        @if (!string.IsNullOrEmpty(compareWith))
+        {
+            <a class="btn btn-au-link" asp-action="CompareRubrics" asp-route-rubricId="@rubricId" asp-route-from="@compareWith" asp-route-to="@version.Semver">Compare with @compareWith</a>
+        }
+        <a class="btn btn-au-link" asp-action="ExportRubric" asp-route-rubricId="@rubricId" asp-route-semver="@version.Semver" asp-route-format="yaml">Export YAML</a>
+        <a class="btn btn-au-link" asp-action="ExportRubric" asp-route-rubricId="@rubricId" asp-route-semver="@version.Semver" asp-route-format="json">Export JSON</a>
+    </div>
+
+    @foreach (var action in RubricLifecycle.ActionsFor(version.Status))
+    {
+        var enabled = definition is null ? (int?)null : checks.Count(RubricText.IsCheckEnabled);
+        var plan = RubricLifecycle.Plan(action, rubricId, version.Semver, version.Status, version.DryRunCompletedAt, Model.Rubric, Model.Settings, enabled);
+        <partial name="_RubricPlan" model="plan" />
+    }
+
+    <div class="au-card card mb-3">
+        <div class="card-header">Details</div>
+        <div class="card-body">
+            <p>Owner: @(string.IsNullOrWhiteSpace(definition?.Owner) ? "—" : definition.Owner)</p>
+            <p>Dimensions: @(definition is null ? "—" : string.Join(", ", definition.Dimensions.Select(RubricText.DimensionLabel)))</p>
+            <p>Scoring: @RubricText.ScoringLabel(definition?.ScoringPolicy)</p>
+            <p>Resource types: @(definition?.ApplicableContext?.FhirResources is { Count: > 0 } list ? string.Join(", ", list) : "—")</p>
+            <p>Workflow tags: @(definition?.ApplicableContext?.WorkflowTags is { Count: > 0 } tags ? string.Join(", ", tags) : "—")</p>
+            <p>Checksum: @(version.Checksum ?? "—")</p>
+            <p class="mb-0">Created @LinkUiTime.Display(version.CreatedAt) @(version.CreatedBy ?? "")</p>
+        </div>
+    </div>
+
+    <div class="au-card card">
+        <div class="card-header">Checks (@checks.Count)</div>
+        <div class="card-body">
+            @if (checks.Count == 0)
+            {
+                <p class="mb-0">This version has no checks.</p>
+            }
+            else
+            {
+                @foreach (var check in checks)
+                {
+                    <details class="mb-2">
+                        <summary>
+                            <span class="badge @RubricText.SeverityBadge(check.SeverityOverride)">@RubricText.SeverityLabel(check.SeverityOverride)</span>
+                            @check.Id
+                            <span class="text-muted">@RubricText.CheckTypeLabel(check.Type)</span>
+                            @if (!RubricText.IsCheckEnabled(check))
+                            {
+                                <span class="badge au-badge-muted">Disabled</span>
+                            }
+                            — @RubricText.CheckSummary(check)
+                        </summary>
+                        <p class="mb-1">@RubricText.DimensionLabel(check.Dimension)</p>
+                        <ul class="mb-0">
+                            @foreach (var setting in RubricText.CheckSettings(check))
+                            {
+                                <li>@setting.Label: @setting.Value</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            }
+        </div>
+    </div>
+}

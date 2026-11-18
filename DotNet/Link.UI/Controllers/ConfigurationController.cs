@@ -5,13 +5,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace Link.UI.Controllers;
 
 [Route("Configuration")]
-public sealed class ConfigurationController : Controller
+public sealed partial class ConfigurationController : Controller
 {
     private readonly ConfigurationService _configuration;
+    private readonly RubricService _rubrics;
 
-    public ConfigurationController(ConfigurationService configuration)
+    public ConfigurationController(ConfigurationService configuration, RubricService rubrics)
     {
         _configuration = configuration;
+        _rubrics = rubrics;
     }
 
     [HttpGet("")]

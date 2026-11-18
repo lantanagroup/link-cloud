@@ -1,0 +1,235 @@
+@model RubricEditorPage
+@{
+    var index = Model.EditIndex;
+    var checks = Model.Definition.Checks;
+    if (index < 0 || index >= checks.Count)
+        return;
+    var check = checks[index];
+    var settings = Model.Settings;
+    var readOnly = RubricDraft.ReadOnlyReason(check);
+    var kind = RubricDraft.CheckKind(check);
+    var required = RubricDraft.RequiredDimension(check.Type, settings);
+    var dimensions = Model.Definition.Dimensions.ToList();
+    foreach (var extra in RubricDraft.DimensionChoices(settings).Where(item => !dimensions.Contains(item)))
+        dimensions.Add(extra);
+    if (!string.IsNullOrEmpty(check.Dimension) && !dimensions.Contains(check.Dimension))
+        dimensions.Add(check.Dimension);
+    var severities = RubricDraft.SeverityChoices(settings);
+    var types = RubricDraft.FormTypes(settings).ToList();
+    if (!types.Contains(check.Type))
+        types.Add(check.Type);
+    var childTypes = types.Where(type => type is not ("FHIR_CONFORMANCE" or "TERMINOLOGY")).ToList();
+    var children = check.Parameters?.Checks ?? [];
+    var parameters = check.Parameters ?? new RubricCheckParameters();
+}
+
+<div class="au-card card mt-3" id="check-editor">
+    <div class="card-header">Check</div>
+    <div class="card-body">
+        @if (readOnly is not null)
+        {
+            <div class="alert alert-warning">@readOnly</div>
+            <p>@RubricText.CheckTypeLabel(check.Type) — @RubricText.CheckSummary(check)</p>
+            <ul>
+                @foreach (var setting in RubricText.CheckSettings(check))
+                {
+                    <li>@setting.Label: @setting.Value</li>
+                }
+            </ul>
+            <button type="submit" class="btn btn-warning" name="intent" value="cancel-check">Close</button>
+        }
+        else
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="checkId">Id</label>
+                    <input id="checkId" name="checkId" value="@check.Id" class="form-control" maxlength="128" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="checkType">Type</label>
+                    <select id="checkType" name="checkType" class="form-select" onchange="var b=document.getElementById('applyOpenCheck'); if(b) b.click();">
+                        @foreach (var type in types)
+                        {
+                            <option value="@type" selected="@(type == check.Type ? "selected" : null)">@RubricText.CheckTypeLabel(type)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="checkSeverity">Severity</label>
+                    <select id="checkSeverity" name="checkSeverity" class="form-select">
+                        <option value="" selected="@(string.IsNullOrEmpty(check.SeverityOverride) ? "selected" : null)">Default</option>
+                        @foreach (var severity in severities)
+                        {
+                            <option value="@severity" selected="@(severity == check.SeverityOverride ? "selected" : null)">@RubricText.SeverityLabel(severity)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="checkDimension">Dimension</label>
+                    @if (required is not null)
+                    {
+                        <input type="hidden" name="checkDimension" value="@required" />
+                        <p id="checkDimension" class="form-control-plaintext">@RubricText.DimensionLabel(required)</p>
+                    }
+                    else
+                    {
+                        <select id="checkDimension" name="checkDimension" class="form-select">
+                            <option value="">Any declared dimension</option>
+                            @foreach (var dimension in dimensions)
+                            {
+                                <option value="@dimension" selected="@(dimension == check.Dimension ? "selected" : null)">@RubricText.DimensionLabel(dimension)</option>
+                            }
+                        </select>
+                    }
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="checkEnabled" name="checkEnabled" value="true" checked="@(RubricText.IsCheckEnabled(check) ? "checked" : null)" />
+                        <label class="form-check-label" for="checkEnabled">Enabled</label>
+                    </div>
+                </div>
+            </div>
+
+            @if (kind == "expression")
+            {
+                <div class="mt-3">
+                    <label class="form-label" for="expression">Expression</label>
+                    <textarea id="expression" name="expression" class="form-control" rows="4">@parameters.Expression</textarea>
+                </div>
+            }
+            @if (kind == "valueset")
+            {
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4">
+                        <label class="form-label" for="path">Path</label>
+                        <input id="path" name="path" value="@parameters.Path" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="valueSet">Value set</label>
+                        <input id="valueSet" name="valueSet" value="@parameters.ValueSet" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="system">Code system</label>
+                        <input id="system" name="system" value="@parameters.System" class="form-control" />
+                    </div>
+                </div>
+            }
+            @if (kind == "conformance")
+            {
+                <div class="mt-3">
+                    <label class="form-label" for="profiles">Profiles</label>
+                    <textarea id="profiles" name="profiles" class="form-control" rows="4">@string.Join("\n", parameters.Profiles ?? [])</textarea>
+                    <p class="form-text">One canonical URL on each line. Leave this empty to check each resource against its own profile.</p>
+                </div>
+            }
+            @if (kind == "terminology")
+            {
+                <div class="mt-3">
+                    <input type="hidden" name="validateCodingsPosted" value="1" />
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="validateCodings" name="validateCodings" value="true" checked="@(parameters.ValidateCodings == true ? "checked" : null)" />
+                        <label class="form-check-label" for="validateCodings">Validate codings</label>
+                    </div>
+                    <label class="form-label mt-2" for="whitelist">Value sets matching</label>
+                    <input id="whitelist" name="whitelist" value="@parameters.ValueSetWhitelistRegex" class="form-control" maxlength="@RubricDraft.MaxRegex" />
+                </div>
+            }
+            @if (kind is "expression" or "valueset" or "combined")
+            {
+                <div class="row g-3 mt-1">
+                    <div class="col-md-8">
+                        <label class="form-label" for="failureMessage">Failure message</label>
+                        <input id="failureMessage" name="failureMessage" value="@parameters.FailureMessage" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="code">Code</label>
+                        <input id="code" name="code" value="@parameters.Code" class="form-control" maxlength="@RubricDraft.MaxCode" />
+                    </div>
+                </div>
+            }
+            @if (kind == "combined")
+            {
+                <div class="mt-3">
+                    <label class="form-label" for="matchMode">Passes when</label>
+                    <select id="matchMode" name="matchMode" class="form-select">
+                        <option value="ANY" selected="@(parameters.MatchMode != "ALL" ? "selected" : null)">Any of its checks passes</option>
+                        <option value="ALL" selected="@(parameters.MatchMode == "ALL" ? "selected" : null)">All of its checks pass</option>
+                    </select>
+                </div>
+                <h2 class="h6 mt-3">Included checks</h2>
+                @for (var c = 0; c < children.Count; c++)
+                {
+                    var child = children[c];
+                    var childParameters = child.Parameters ?? new RubricCheckParameters();
+                    var childType = string.IsNullOrEmpty(child.Type) ? "VALUESET" : child.Type;
+                    var options = childTypes.ToList();
+                    if (!options.Contains(childType))
+                        options.Add(childType);
+                    var expression = RubricDraft.CheckKind(child) == "expression";
+                    <div class="border rounded p-2 mb-2">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label">Id</label>
+                                <input class="form-control" name="childId" value="@child.Id" maxlength="128" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Type</label>
+                                <select class="form-select" name="childType" onchange="var b=document.getElementById('applyOpenCheck'); if(b) b.click();">
+                                    @foreach (var type in options)
+                                    {
+                                        <option value="@type" selected="@(type == childType ? "selected" : null)">@RubricText.CheckTypeLabel(type)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="submit" class="btn btn-au-link" name="intent" value="remove-child:@c">Remove</button>
+                            </div>
+                        </div>
+                        @if (expression)
+                        {
+                            <label class="form-label mt-2">Expression</label>
+                            <textarea class="form-control" name="childExpression" rows="3">@childParameters.Expression</textarea>
+                            <input type="hidden" name="childPath" value="" />
+                            <input type="hidden" name="childValueSet" value="" />
+                            <input type="hidden" name="childSystem" value="" />
+                        }
+                        else
+                        {
+                            <input type="hidden" name="childExpression" value="" />
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-4">
+                                    <label class="form-label">Path</label>
+                                    <input class="form-control" name="childPath" value="@childParameters.Path" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Value set</label>
+                                    <input class="form-control" name="childValueSet" value="@childParameters.ValueSet" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Code system</label>
+                                    <input class="form-control" name="childSystem" value="@childParameters.System" />
+                                </div>
+                            </div>
+                        }
+                        <div class="row g-2 mt-1">
+                            <div class="col-md-8">
+                                <label class="form-label">Failure message</label>
+                                <input class="form-control" name="childFailure" value="@childParameters.FailureMessage" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Code</label>
+                                <input class="form-control" name="childCode" value="@childParameters.Code" maxlength="@RubricDraft.MaxCode" />
+                            </div>
+                        </div>
+                    </div>
+                }
+                <button type="submit" class="btn btn-success" name="intent" value="add-child">Add included check</button>
+            }
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button type="submit" id="applyOpenCheck" class="btn btn-au-execute" name="intent" value="apply-check">Update check</button>
+                <button type="submit" class="btn btn-warning" name="intent" value="cancel-check">Cancel</button>
+            </div>
+        }
+    </div>
+</div>
