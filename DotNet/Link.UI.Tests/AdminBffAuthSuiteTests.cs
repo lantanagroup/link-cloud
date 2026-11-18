@@ -4,6 +4,7 @@ using Automation.UI.Services.ApiHealth.TestSuites;
 using FluentAssertions;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Xunit;
 using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.AdminBffAuthSteps;
@@ -31,17 +32,41 @@ public class AdminBffAuthSuiteTests
             {
                 Content = new StringContent("ok", Encoding.UTF8, "text/plain")
             };
-        });
+        }, allowAnonymousAccess: true);
 
         var results = await suite.ExecuteAsync(CancellationToken.None);
 
-        calls.Should().Be(1);
+        calls.Should().Be(0);
         var negatives = results.Where(result => NegativeSteps.Contains(result.EndpointName)).ToList();
         negatives.Should().HaveCount(4);
         negatives.Should().OnlyContain(result =>
             result.Skipped
             && result.SkipReason == AdminBffAuthTestSuite.AnonymousAccessSkipReason
             && result.Passed == false);
+    }
+
+    [Fact]
+    public async Task Unauthenticated_200_fails_when_anonymous_access_is_not_expected()
+    {
+        var calls = 0;
+        var suite = CreateSuite(_ =>
+        {
+            calls++;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("ok", Encoding.UTF8, "text/plain")
+            };
+        });
+
+        var results = await suite.ExecuteAsync(CancellationToken.None);
+
+        calls.Should().Be(4);
+        var negatives = results.Where(result => NegativeSteps.Contains(result.EndpointName)).ToList();
+        negatives.Should().HaveCount(4);
+        negatives.Should().OnlyContain(result =>
+            result.Skipped == false
+            && result.Passed == false
+            && result.ActualStatusCode == 200);
     }
 
     [Fact]
@@ -59,24 +84,33 @@ public class AdminBffAuthSuiteTests
 
         var results = await suite.ExecuteAsync(CancellationToken.None);
 
-        calls.Should().Be(5);
+        calls.Should().Be(4);
         var negatives = results.Where(result => NegativeSteps.Contains(result.EndpointName)).ToList();
         negatives.Should().HaveCount(4);
         negatives.Should().OnlyContain(result => result.Skipped == false && result.Passed && result.ActualStatusCode == 401);
     }
 
-    private static AdminBffAuthTestSuite CreateSuite(Func<HttpRequestMessage, HttpResponseMessage> responder)
+    private static AdminBffAuthTestSuite CreateSuite(
+        Func<HttpRequestMessage, HttpResponseMessage> responder,
+        bool allowAnonymousAccess = false)
     {
         var registry = Options.Create(new ServiceRegistry
         {
             AdminBffServiceUrl = "http://bff.local"
         });
         var tokens = Options.Create(new LinkTokenServiceSettings());
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:EnableAnonymousAccess"] = allowAnonymousAccess ? "true" : "false"
+            })
+            .Build();
         return new AdminBffAuthTestSuite(
             new StubFactory(new StubHandler(responder)),
             registry,
             tokens,
-            new UnusedTokenService());
+            new UnusedTokenService(),
+            configuration);
     }
 
     private sealed class UnusedTokenService : ICreateSystemToken

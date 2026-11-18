@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
@@ -26,6 +27,7 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
     private readonly IOptions<LinkTokenServiceSettings> _tokenSettings;
     private readonly ICreateSystemToken _createSystemToken;
+    private readonly bool _allowAnonymousAccess;
 
     public override string ServiceName => ApiEndPointLibrary.ServiceNames.AdminBffAuth;
 
@@ -33,12 +35,14 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
         IHttpClientFactory httpClientFactory,
         IOptions<ServiceRegistry> serviceRegistry,
         IOptions<LinkTokenServiceSettings> tokenSettings,
-        ICreateSystemToken createSystemToken)
+        ICreateSystemToken createSystemToken,
+        IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
         _serviceRegistry = serviceRegistry;
         _tokenSettings = tokenSettings;
         _createSystemToken = createSystemToken;
+        _allowAnonymousAccess = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     }
 
     public override IReadOnlyList<ApiEndpointDefinition> GetEndpointDefinitions() =>
@@ -138,7 +142,7 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
             results.Add(SkipStepAsync(StepNames.CrossApiTokenReuseGet401, tokenConfigError!));
         }
 
-        if (await AdminBffAllowsAnonymousAsync(endpointUrl, ct))
+        if (_allowAnonymousAccess)
         {
             results.Add(SkipStepAsync(StepNames.EmptyBearerGet401, AnonymousAccessSkipReason));
             results.Add(SkipStepAsync(StepNames.MalformedBearerGet401, AnonymousAccessSkipReason));
@@ -159,12 +163,6 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
 
     public const string AnonymousAccessSkipReason =
         "Admin BFF allows anonymous access (Authentication:EnableAnonymousAccess=true)";
-
-    private async Task<bool> AdminBffAllowsAnonymousAsync(string endpointUrl, CancellationToken ct)
-    {
-        var probe = await CallEndpointAsync(StepNames.MissingAuthHeaderGet401, endpointUrl, 200, null, false, ct);
-        return probe.ActualStatusCode == 200;
-    }
 
     private async Task<ApiTestRunResult> CallEndpointAsync(
         string endpointName,

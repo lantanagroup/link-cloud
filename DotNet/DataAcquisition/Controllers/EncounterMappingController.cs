@@ -327,7 +327,7 @@ public class EncounterMappingController : Controller
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteByFacilityIdAsync(string facilityId)
+    public async Task<IActionResult> DeleteByFacilityIdAsync(string facilityId, CancellationToken cancellationToken)
     {
         try
         {
@@ -338,7 +338,7 @@ public class EncounterMappingController : Controller
             if (string.IsNullOrWhiteSpace(facilityId))
                 throw new BadRequestException("facilityId is required.");
 
-            await _manager.DeleteByFacilityIdAsync(facilityId);
+            await _manager.DeleteByFacilityIdAsync(facilityId, cancellationToken);
             return Accepted();
         }
         catch (BadRequestException ex)
