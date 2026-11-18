@@ -1799,6 +1799,18 @@ public class DataAcquisitionLogQueriesTests
         Assert.Contains(columnName, includedColumns);
     }
 
+    [Fact]
+    public async Task GetResourceTypeCountsCreatedAtAsync_AfterMigrations_ReturnsWhenTheTableWasCreated()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var createdAt = await queries.GetResourceTypeCountsCreatedAtAsync();
+
+        Assert.NotNull(createdAt);
+        Assert.InRange(createdAt.Value, DateTime.Now.AddDays(-2), DateTime.Now.AddDays(1));
+    }
+
     private static ScheduledReportEntity NewSchedule(Guid reportTrackingId)
     {
         return new ScheduledReportEntity

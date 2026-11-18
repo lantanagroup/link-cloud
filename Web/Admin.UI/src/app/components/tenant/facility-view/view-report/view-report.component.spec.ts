@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { ViewReportComponent } from './view-report.component';
 import { SubmissionStatus } from '../../../../interfaces/report/report-entry.interface';
 import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
@@ -143,6 +143,22 @@ describe('ViewReportComponent query analysis loading', () => {
 
     expect(component.queryAnalysisLoadFailed).toBeFalse();
     expect(component.queryAnalysisErrorDetail).toBe('');
+    expect(component.dataAcquisitionLogStatistics).toBe(statistics);
+  });
+
+  it('ignores an earlier request that finishes after a newer one', () => {
+    const earlier = new Subject<IDataAcquisitionLogStatistics>();
+    acquisitionLogService.getAcquisitionLogStatistics.and.returnValues(
+      earlier.asObservable(),
+      of(statistics));
+    spyOn(console, 'error');
+
+    component.onViewQueryAnalysis();
+    component.onViewQueryAnalysis();
+    earlier.error(new Error('timeout'));
+
+    expect(earlier.observed).toBeFalse();
+    expect(component.queryAnalysisLoadFailed).toBeFalse();
     expect(component.dataAcquisitionLogStatistics).toBe(statistics);
   });
 });

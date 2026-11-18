@@ -210,6 +210,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     private const int SoftDeleteBatchSize = 1000;
     private const int ResourceTypeCountFillBatchSize = 500;
 
+    // Bounds retries of one batch, so a conflict that cannot clear (rather than a competing instance) ends the fill.
+    private const int ResourceTypeCountFillMaxConflicts = 5;
+
     // Soft deletes all logs for a facility in batches to avoid large update locks
     public async Task<int> SoftDeleteByFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
     {
@@ -345,6 +348,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                                                               CancellationToken cancellationToken = default)
     {
         var filled = 0;
+        var conflicts = 0;
         long lastId = 0;
 
         while (true)
@@ -381,23 +385,26 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .ToList();
 
             _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(counts);
-            lastId = logIds[^1];
 
             try
             {
                 await _dbContext.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex) &&
+                                               ++conflicts <= ResourceTypeCountFillMaxConflicts)
             {
-                // Another service instance filled some of this batch first; its counts stand.
+                // Another instance filled some of this batch first, and the conflict rolled back the whole batch.
+                // Query again from the same cursor: the logs it filled drop out, and the rest are retried.
                 _dbContext.ChangeTracker.Clear();
-                _logger.LogDebug("Another instance stored resource-type counts for logs up to {LastLogId}; " +
-                                 "skipped them.",
+                _logger.LogDebug("Another instance stored resource-type counts for logs after {LastLogId}; " +
+                                 "retrying the rest of the batch.",
                                  lastId);
                 continue;
             }
 
             _dbContext.ChangeTracker.Clear();
+            lastId = logIds[^1];
+            conflicts = 0;
 
             filled += counts
                 .Select(c => c.DataAcquisitionLogId)
@@ -466,7 +473,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (resourceAcquiredIds is { Count: > 0 })
         {
             // Delete old rows first (idempotent on re-process)
-            var replacedResourceIds = await _dbContext.DataAcquisitionLogResourceIds
+            await _dbContext.DataAcquisitionLogResourceIds
                 .Where(r => r.DataAcquisitionLogId == logId)
                 .ExecuteDeleteAsync(cancellationToken);
 
@@ -479,13 +486,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
             _dbContext.DataAcquisitionLogResourceIds.AddRange(resourceRows);
 
-            // Counts only ever exist alongside resource ids, so a first save has none to replace.
-            if (replacedResourceIds > 0)
-            {
-                await _dbContext.DataAcquisitionLogResourceTypeCounts
-                    .Where(c => c.DataAcquisitionLogId == logId)
-                    .ExecuteDeleteAsync(cancellationToken);
-            }
+            // Always cleared, even when no old resource ids were found: the resource-id delete commits on its own,
+            // so an update interrupted after it can leave old counts with no ids, and the retry must clear them.
+            await _dbContext.DataAcquisitionLogResourceTypeCounts
+                .Where(c => c.DataAcquisitionLogId == logId)
+                .ExecuteDeleteAsync(cancellationToken);
 
             _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(resourceAcquiredIds.ToResourceTypeCounts(logId));
         }

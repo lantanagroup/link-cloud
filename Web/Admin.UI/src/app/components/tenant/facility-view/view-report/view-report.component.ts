@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Subscription, finalize } from 'rxjs';
 import { CommonModule, Location } from '@angular/common';
 
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from "@angular/router";
@@ -100,6 +101,7 @@ export class ViewReportComponent implements OnInit {
   dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
   queryAnalysisLoadFailed = false;
   queryAnalysisErrorDetail = '';
+  private queryAnalysisSubscription?: Subscription;
 
   // Add summary data for donut charts
   reportEntrySummary: IReportEntrySummary | undefined;
@@ -194,7 +196,7 @@ export class ViewReportComponent implements OnInit {
   }
 
   ngOnDestroy(): void {
-
+    this.queryAnalysisSubscription?.unsubscribe();
   }
 
   loadReportSchedule(): void {
@@ -388,23 +390,25 @@ export class ViewReportComponent implements OnInit {
   }
 
   onViewQueryAnalysis(): void {
+    // Only the latest request may update the tab, so an earlier one still running is canceled.
+    this.queryAnalysisSubscription?.unsubscribe();
     this.queryAnalysisLoadFailed = false;
     this.queryAnalysisErrorDetail = '';
     this.loadingService.show();
-    this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId).subscribe({
-      next: (response: IDataAcquisitionLogStatistics) => {
-        this.dataAcquisitionLogStatistics = response;
-        this.loadingService.hide();
-      },
-      error: (error: unknown) => {
-        console.error('Error loading acquisition log statistics:', error);
-        // Drop any earlier result so the tab never shows numbers the server did not just return.
-        this.dataAcquisitionLogStatistics = undefined;
-        this.queryAnalysisErrorDetail = this.errorHandlingService.formatError(error, 'An unknown error occurred');
-        this.queryAnalysisLoadFailed = true;
-        this.loadingService.hide();
-      }
-    });
+    this.queryAnalysisSubscription = this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId)
+      .pipe(finalize(() => this.loadingService.hide()))
+      .subscribe({
+        next: (response: IDataAcquisitionLogStatistics) => {
+          this.dataAcquisitionLogStatistics = response;
+        },
+        error: (error: unknown) => {
+          console.error('Error loading acquisition log statistics:', error);
+          // Drop any earlier result so the tab never shows numbers the server did not just return.
+          this.dataAcquisitionLogStatistics = undefined;
+          this.queryAnalysisErrorDetail = this.errorHandlingService.formatError(error, 'An unknown error occurred');
+          this.queryAnalysisLoadFailed = true;
+        }
+      });
   }
 
   onTabSelected(event: any): void {

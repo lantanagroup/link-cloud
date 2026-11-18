@@ -1248,11 +1248,12 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
-    public async Task FillMissingResourceTypeCountsAsync_AnotherInstanceFillsFirst_KeepsItsCountsWithoutThrowing()
+    public async Task FillMissingResourceTypeCountsAsync_AnotherInstanceFillsFirst_KeepsItsCountsAndFillsTheRest()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var setupContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var log = await AddLogWithResourceIdsAsync(setupContext, DateTime.UtcNow.AddMinutes(-5), "Observation/1");
+        var otherLog = await AddLogWithResourceIdsAsync(setupContext, DateTime.UtcNow.AddMinutes(-5), "Condition/c1");
         var connectionString = setupContext.Database.GetConnectionString()!;
         var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
             .UseSqlServer(connectionString)
@@ -1270,6 +1271,49 @@ public class DataAcquisitionLogManagerTests
         await manager.FillMissingResourceTypeCountsAsync(DateTime.UtcNow.AddHours(-1));
 
         Assert.Equal(new Dictionary<string, int> { ["Observation"] = 99 },
+                     await GetResourceTypeCountsAsync(setupContext, log.Id));
+        Assert.Equal(new Dictionary<string, int> { ["Condition"] = 1 },
+                     await GetResourceTypeCountsAsync(setupContext, otherLog.Id));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_RetryAfterFailingBetweenTheDeletes_ReplacesTheCounts()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var setupContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(setupContext);
+        await CreateManager(scope).UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Observation/1", "Observation/2"]
+        });
+
+        var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
+            .UseSqlServer(setupContext.Database.GetConnectionString())
+            .AddInterceptors(new FailFirstCountDelete())
+            .Options;
+        await using (var failingContext = new DataAcquisitionDbContext(options))
+        {
+            var failingManager = new DataAcquisitionLogManager(
+                new Mock<ILogger<DataAcquisitionLogManager>>().Object,
+                scope.ServiceProvider.GetRequiredService<IDatabase>(),
+                failingContext,
+                scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
+                CreateSemaphoreProviderMock(),
+                scope.ServiceProvider.GetRequiredService<IResourceCache>());
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => failingManager.UpdateAsync(
+                new UpdateDataAcquisitionLogModel { Id = log.Id, ResourceAcquiredIds = ["Observation/1"] }));
+        }
+
+        using var retryScope = _fixture.ServiceProvider.CreateScope();
+        await CreateManager(retryScope).UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Observation/1"]
+        });
+
+        Assert.Equal(new Dictionary<string, int> { ["Observation"] = 1 },
                      await GetResourceTypeCountsAsync(setupContext, log.Id));
     }
 
@@ -1434,6 +1478,29 @@ public class DataAcquisitionLogManagerTests
             }
 
             return await base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    // Fails the first delete of a log's resource-type counts, after the resource-id delete has already committed.
+    private sealed class FailFirstCountDelete : DbCommandInterceptor
+    {
+        private bool _failed;
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            System.Data.Common.DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_failed &&
+                command.CommandText.Contains("DELETE", StringComparison.OrdinalIgnoreCase) &&
+                command.CommandText.Contains("DataAcquisitionLogResourceTypeCounts", StringComparison.Ordinal))
+            {
+                _failed = true;
+                throw new InvalidOperationException("Simulated failure between the resource-id and count deletes.");
+            }
+
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
         }
     }
 }

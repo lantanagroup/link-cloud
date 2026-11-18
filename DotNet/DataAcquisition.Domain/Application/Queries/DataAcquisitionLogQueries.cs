@@ -114,6 +114,12 @@ public interface IDataAcquisitionLogQueries
     /// </summary>
     Task<bool> HasNoteContainingAsync(long logId, string text, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// When the database created the per-log resource-type counts table, in the server's clock,
+    /// or null when the table does not exist yet.
+    /// </summary>
+    Task<DateTime?> GetResourceTypeCountsCreatedAtAsync(CancellationToken cancellationToken = default);
+
 }
 
 public sealed record AcquiredResourceCountByPatient(string PatientId, string ResourceType, int Count);
@@ -1220,6 +1226,16 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return logs;
+    }
+
+    public async Task<DateTime?> GetResourceTypeCountsCreatedAtAsync(CancellationToken cancellationToken = default)
+    {
+        var created = await _dbContext.Database
+            .SqlQuery<DateTime>(
+                $"SELECT create_date AS [Value] FROM sys.tables WHERE name = N'DataAcquisitionLogResourceTypeCounts'")
+            .ToListAsync(cancellationToken);
+
+        return created.Count == 0 ? null : created[0];
     }
 
     public async Task<bool> HasNoteContainingAsync(long logId, string text, CancellationToken cancellationToken = default)
