@@ -4,6 +4,8 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -58,28 +60,36 @@ namespace LantanaGroup.Link.Census.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.CernerPatientsAcquired));
+                consumer.Subscribe(KafkaTopicNames.Subscription(
+                    nameof(KafkaTopic.CernerPatientsAcquired),
+                    CensusConstants.ServiceName));
                 _logger.LogInformation("Started {name} consumer on {date} for topic '{TopicName}'", ClassName, DateTime.UtcNow, nameof(KafkaTopic.CernerPatientsAcquired));
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    string facilityId = string.Empty;
-
                     try
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
+                            var accounted = false;
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
+                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result?.Message)),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(result, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, FacilityIdOf(result?.Message));
+                                accounted = true;
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -87,21 +97,23 @@ namespace LantanaGroup.Link.Census.Listeners
                             }
                             catch (OperationCanceledException ex)
                             {
-                                _transientExceptionHandler.HandleException(result, new TransientException("Operation canceled (non-shutdown): " + ex.Message, ex), facilityId);
+                                _transientExceptionHandler.HandleException(result, new TransientException("Operation canceled (non-shutdown): " + ex.Message, ex), FacilityIdOf(result?.Message));
+                                accounted = true;
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), facilityId);
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), FacilityIdOf(result?.Message)),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             finally
                             {
-                                if (!consumeCancellationToken.IsCancellationRequested)
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
                                 {
-                                    if (result != null)
-                                    {
-                                        assignmentTracker.MarkProcessed(result);
-                                    }
-
+                                    assignmentTracker.MarkProcessed(result);
                                     consumer.SafeCommit(result, _logger);
                                 }
                             }
@@ -116,6 +128,7 @@ namespace LantanaGroup.Link.Census.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
+                        var facilityId = FacilityIdFromConsumeException(ex);
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
@@ -128,7 +141,6 @@ namespace LantanaGroup.Link.Census.Listeners
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error encountered in CernerPatientsAcquiredListener");
-                        consumer.SafeCommit(_logger);
                     }
                 }
             }
@@ -150,7 +162,7 @@ namespace LantanaGroup.Link.Census.Listeners
             var facilityId = KafkaIdentity.Facility(result.Message.Value.FacilityId, result.Message.Key);
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                throw new DeadLetterException($"{ClassName}: CernerPatientsAcquired event is missing a facility id.");
+                throw new DeadLetterException($"{ClassName}: Facility id is missing from the message.");
             }
 
             _logger.LogDebug("Consuming Event (Facility = {FacilityId})", facilityId);
@@ -171,6 +183,38 @@ namespace LantanaGroup.Link.Census.Listeners
             {
                 await _eventProducerService.ProduceEventsAsync(facilityId, processedEvents, cancellationToken);
             }
+        }
+
+        private static string FacilityIdOf(Message<string, CernerPatientsAcquired>? message) =>
+            KafkaIdentity.Facility(message?.Value?.FacilityId, message?.Key) ?? string.Empty;
+
+        private static string FacilityIdFromConsumeException(ConsumeException exception)
+        {
+            string? keyText = null;
+            if (exception.ConsumerRecord?.Message?.Key is { Length: > 0 } keyBytes)
+            {
+                keyText = Encoding.UTF8.GetString(keyBytes);
+            }
+
+            string? valueFacilityId = null;
+            if (exception.ConsumerRecord?.Message?.Value is { Length: > 0 } valueBytes)
+            {
+                try
+                {
+                    var value = JsonSerializer.Deserialize<CernerPatientsAcquired>(valueBytes, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        AllowTrailingCommas = true
+                    });
+                    valueFacilityId = value?.FacilityId;
+                }
+                catch (JsonException)
+                {
+                    // The value is not readable. The legacy key is the remaining source.
+                }
+            }
+
+            return KafkaIdentity.Facility(valueFacilityId, keyText) ?? string.Empty;
         }
     }
 }

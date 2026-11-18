@@ -9,8 +9,8 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.PatientEvent));
+                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.PatientEvent), "Report"));
 
                 _logger.LogInformation("{Name}: Started PatientEvent consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PatientEvent), DateTime.UtcNow);
 
@@ -84,13 +84,27 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            await ProcessMessageAsync(result, consumeCancellationToken);
-                            if (result != null)
+                            var accounted = false;
+                            try
                             {
-                                assignmentTracker.MarkProcessed(result);
+                                accounted = await ProcessMessageAsync(result, consumeCancellationToken);
+                                if (!accounted && result != null)
+                                {
+                                    await DeadLetterCommit.RewindAsync(consumer, result, _logger, consumeCancellationToken);
+                                }
                             }
-
-                            consumer.SafeCommit(result, _logger);
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            finally
+                            {
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                    consumer.SafeCommit(result, _logger);
+                                }
+                            }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
@@ -123,12 +137,12 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, PatientEventValue>? result, CancellationToken cancellationToken)
+        public async Task<bool> ProcessMessageAsync(ConsumeResult<string, PatientEventValue>? result, CancellationToken cancellationToken)
         {
             if (result == null)
             {
                 _logger.LogWarning("Null PatientEvent consumer result found");
-                return;
+                return true;
             }
 
             using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
@@ -138,7 +152,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 if (result == null)
                 {
-                    return;
+                    return true;
                 }
 
                 using var scope = _serviceScopeFactory.CreateScope();
@@ -152,20 +166,20 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new DeadLetterException("Invalid Patient Event");
                 }
 
-                var resolvedPatientId = KafkaIdentity.Patient(value.PatientId, result.Message.Key);
-                if (!string.IsNullOrWhiteSpace(resolvedPatientId))
+                var patientId = KafkaIdentity.Patient(value.PatientId, result.Message.Key);
+                if (!string.IsNullOrWhiteSpace(patientId))
                 {
-                    value.PatientId = resolvedPatientId;
+                    value.PatientId = patientId;
                 }
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(
                         scope.ServiceProvider, _logger, Name, facilityId, reportId: null, cancellationToken))
-                    return;
+                    return true;
 
                 if (value.EventType != PatientEvents.Admit.ToString() && value.EventType != PatientEvents.Discharge.ToString())
                 {
                     _logger.LogDebug("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
-                    return;
+                    return true;
                 }
 
                 _logger.LogDebug("Consuming {EventType} PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(value.EventType), HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
@@ -228,14 +242,17 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     await reportEntryManager.UpdateAsync(entryToUpdate, cancellationToken);
                 }
+
+                return true;
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                return result != null && _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
             }
             catch (TransientException ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -243,7 +260,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
+                return result != null && _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
             }
         }
 

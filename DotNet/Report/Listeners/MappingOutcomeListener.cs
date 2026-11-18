@@ -18,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners;
 
@@ -75,7 +76,7 @@ public class MappingOutcomeListener : BackgroundService
             EnableAutoCommit = false
         }, assignmentTracker: assignmentTracker);
 
-        kafkaConsumer.Subscribe(new string[] { KafkaTopic.MappingOutcomeEvaluated.ToString() });
+        kafkaConsumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.MappingOutcomeEvaluated), "Report"));
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
@@ -90,40 +91,28 @@ public class MappingOutcomeListener : BackgroundService
                     }
 
                     var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key) ?? string.Empty;
+                    var accounted = false;
 
-                    // Every branch below commits. An exception that escaped here would reach ExecuteAsync,
-                    // and .NET's default BackgroundServiceExceptionBehavior of StopHost would take the
-                    // whole Report service down -- every listener, the API and the Quartz jobs -- over one
-                    // unparseable mapping outcome.
+                    // An exception that escaped here would reach ExecuteAsync, and .NET's default
+                    // BackgroundServiceExceptionBehavior of StopHost would take the whole Report service down.
                     try
                     {
                         await ConsumeMessageAsync(result, consumeCancellationToken);
-                        if (result != null)
-                        {
-                            assignmentTracker.MarkProcessed(result);
-                        }
-
-                        kafkaConsumer.SafeCommit(result, _logger);
+                        accounted = true;
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                        if (result != null)
-                        {
-                            assignmentTracker.MarkProcessed(result);
-                        }
-
-                        kafkaConsumer.SafeCommit(result, _logger);
+                        accounted = await DeadLetterCommit.AccountAsync(
+                            _deadLetterExceptionHandler.HandleException(result, ex, facilityId),
+                            kafkaConsumer,
+                            result,
+                            _logger,
+                            consumeCancellationToken);
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(result, ex, facilityId);
-                        if (result != null)
-                        {
-                            assignmentTracker.MarkProcessed(result);
-                        }
-
-                        kafkaConsumer.SafeCommit(result, _logger);
+                        accounted = true;
                     }
                     catch (TimeoutException ex)
                     {
@@ -131,12 +120,7 @@ public class MappingOutcomeListener : BackgroundService
                             $"Timeout encountered at offset {result.TopicPartitionOffset}.", ex);
 
                         _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                        if (result != null)
-                        {
-                            assignmentTracker.MarkProcessed(result);
-                        }
-
-                        kafkaConsumer.SafeCommit(result, _logger);
+                        accounted = true;
                     }
                     catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                     {
@@ -150,12 +134,15 @@ public class MappingOutcomeListener : BackgroundService
                         // from the outcome upsert, or a transient SQL fault, should be retried rather than
                         // discarded or allowed to stop the service.
                         _transientExceptionHandler.HandleException(result, ex, facilityId);
-                        if (result != null)
+                        accounted = true;
+                    }
+                    finally
+                    {
+                        if (accounted && !consumeCancellationToken.IsCancellationRequested)
                         {
                             assignmentTracker.MarkProcessed(result);
+                            kafkaConsumer.SafeCommit(result, _logger);
                         }
-
-                        kafkaConsumer.SafeCommit(result, _logger);
                     }
                 }, cancellationToken);
             }
@@ -169,13 +156,12 @@ public class MappingOutcomeListener : BackgroundService
                     throw new OperationCanceledException(ex.Error.Reason, ex);
                 }
 
-                string? keyText = null;
-                if (ex.ConsumerRecord?.Message?.Key is { Length: > 0 } keyBytes)
+                string facilityId = string.Empty;
+                if (ex.ConsumerRecord?.Message?.Key != null)
                 {
-                    keyText = System.Text.Encoding.UTF8.GetString(keyBytes);
+                    var keyText = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key);
+                    facilityId = KafkaIdentity.Facility(null, keyText) ?? string.Empty;
                 }
-
-                var facilityId = KafkaIdentity.Facility(null, keyText) ?? string.Empty;
 
                 _consumeExceptionHandler.HandleConsumeException(ex, facilityId);
                 var offset = ex.ConsumerRecord?.TopicPartitionOffset;
@@ -203,11 +189,6 @@ public class MappingOutcomeListener : BackgroundService
         var reportEntryMappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
         var value = result.Message.Value;
-
-        // Read through the key rather than off it. A message whose key failed to deserialize arrives here
-        // with a null Key, and dereferencing it would raise a NullReferenceException that the listener's
-        // catch-all classifies as transient -- retrying a record that can never succeed. Malformed input
-        // belongs in the dead letter topic, which is what the guard below routes it to.
         var facilityId = KafkaIdentity.Facility(value?.FacilityId, result.Message.Key);
         var patientId = KafkaIdentity.Patient(value?.PatientId, result.Message.Key);
         if (!string.IsNullOrWhiteSpace(patientId))

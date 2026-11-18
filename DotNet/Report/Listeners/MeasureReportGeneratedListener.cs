@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Report.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.MeasureReportGenerated));
+                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.MeasureReportGenerated), "Report"));
                 _logger.LogInformation("{Name}: Started MeasureReportGenerated consumer on {date} for topic '{MeasureReportGeneratedName}'", Name, DateTime.UtcNow, nameof(KafkaTopic.MeasureReportGenerated));
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -90,18 +90,26 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
+                            var accounted = false;
                             try
                             {
                                 facilityId = KafkaIdentity.Facility(result?.Message?.Value?.FacilityId, result?.Message?.Key) ?? string.Empty;
                                 await ProcessMessageAsync(result, facilityId, consumeCancellationToken);
+                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                                accounted = true;
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -109,17 +117,18 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             finally
                             {
-                                if (!consumeCancellationToken.IsCancellationRequested)
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
                                 {
-                                    if (result != null)
-                                    {
-                                        assignmentTracker.MarkProcessed(result);
-                                    }
-
+                                    assignmentTracker.MarkProcessed(result);
                                     consumer.SafeCommit(result, _logger);
                                 }
                             }

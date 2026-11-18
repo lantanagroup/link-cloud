@@ -39,6 +39,9 @@ public class ResourcesAcquiredListenerCacheCleanupTests
     {
         var purger = new Mock<IResourceCachePurger>();
         var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
+        deadLetterHandler
+            .Setup(item => item.HandleException(It.IsAny<ConsumeResult<string, ResourcesAcquiredValue>>(), It.IsAny<DeadLetterException>(), It.IsAny<string>()))
+            .Returns(true);
         var listener = BuildListener(purger, deadLetterHandler: deadLetterHandler);
 
         // A missing patient id fails validation, which raises a DeadLetterException.
