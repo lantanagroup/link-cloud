@@ -100,8 +100,10 @@ spring:
       group-id: ${spring.application.name}
 
     producer:
-      client-id: ${spring.application.name}
+      client-id: ${spring.application.name}-${HOSTNAME:local}-p
+      acks: all
       properties:
+        enable.idempotence: true
         max.request.size: 10485760
 
     retry:

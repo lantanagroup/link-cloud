@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using HealthChecks.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Shared.Application.Health
 {
@@ -30,6 +31,8 @@ namespace LantanaGroup.Link.Shared.Application.Health
                 producerConfig.SaslUsername = _connection.SaslUsername;
                 producerConfig.SaslPassword = _connection.SaslPassword;
             }
+
+            KafkaClientDefaults.ApplyProducer(producerConfig, _serviceName);
 
             return new KafkaHealthCheckOptions()
             {

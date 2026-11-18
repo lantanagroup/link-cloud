@@ -58,7 +58,10 @@ spring:
     consumer:
       group-id: validation
     producer:
-      client-id: validation-service
+      client-id: validation-${HOSTNAME:local}-p
+      acks: all
+      properties:
+        enable.idempotence: true
     retry:
       # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
       # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).

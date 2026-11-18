@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 
@@ -41,6 +42,8 @@ public class KafkaConnection
             config.SaslPassword = SaslPassword;
             config.SaslMechanism = Mechanism;
         }
+
+        KafkaClientDefaults.ApplyProducer(config, ClientId);
 
         return config;
     }
