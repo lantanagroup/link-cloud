@@ -41,9 +41,9 @@ public class KafkaErrorMonitor : IAsyncDisposable
 
     /// <summary>
     /// Counts captured -Error and -Retry messages that belong to the supplied facility
-    /// (JSON ResourceKey / ReadyForValidation.Key, X-Exception-Facility-Id, or a raw
-    /// facility-id key). Messages with no identifiable facility still count so they
-    /// cannot be ruled out as foreign.
+    /// (composite patient key, X-Exception-Facility-Id, or a raw facility-id key).
+    /// A per-service retry topic ({topic}-Retry-{service}) counts as retry.
+    /// Messages with no identifiable facility still count so they cannot be ruled out as foreign.
     /// </summary>
     public int GetErrorCountForFacility(string? facilityId) =>
         CountForFacility(facilityId, e => true);
@@ -92,7 +92,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
     }
 
     /// <summary>
-    /// Queries the Kafka REST Proxy v3 API to discover all topics ending in -Error or -Retry.
+    /// Queries the Kafka REST Proxy v3 API for -Error topics and for -Retry or -Retry-{service} topics.
     /// </summary>
     private async Task<string[]> DiscoverErrorAndRetryTopicsAsync()
     {
@@ -112,8 +112,8 @@ public class KafkaErrorMonitor : IAsyncDisposable
         return JObject.Parse(topicsResponse.Content)["data"]!
             .Select(t => t["topic_name"]?.ToString())
             .Where(t => t != null &&
-                        (t.EndsWith("-Error", StringComparison.OrdinalIgnoreCase) ||
-                         t.EndsWith("-Retry", StringComparison.OrdinalIgnoreCase)))
+                        (KafkaDeadLetterContract.IsErrorTopic(t) ||
+                         KafkaDeadLetterContract.IsRetryTopic(t)))
             .Order()
             .ToArray()!;
     }
