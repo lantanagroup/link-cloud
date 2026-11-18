@@ -55,6 +55,11 @@ public class RetryJob : IJob
                 var darKey = retryModel.Key;
                 var darValue = retryModel.Value;
                 var destination = KafkaTopicNames.Redrive(retryModel.Topic, retryModel.ServiceName);
+                if (PayloadSubmittedRedrive.Applies(retryModel.Topic))
+                {
+                    destination = nameof(KafkaTopic.PayloadSubmitted);
+                    darKey = PayloadSubmittedRedrive.Key(retryModel.Key, retryModel.Value);
+                }
 
                 // ProduceAsync throws when the broker rejects the record. Flush with no
                 // delivery handler does not, and the job delete below would drop the redrive.

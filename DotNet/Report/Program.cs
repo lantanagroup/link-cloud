@@ -135,7 +135,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PayloadSubmittedValue>, KafkaConsumerFactory<string, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, MeasureReportGeneratedValue>, KafkaConsumerFactory<string, MeasureReportGeneratedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<string, MappingOutcomeEvaluatedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, RetentionCheckCompleteValue>, KafkaConsumerFactory<string, RetentionCheckCompleteValue>>();
@@ -148,7 +148,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PayloadSubmittedValue>, KafkaProducerFactory<string, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, MeasureReportGeneratedValue>, KafkaProducerFactory<string, MeasureReportGeneratedValue>>();
 

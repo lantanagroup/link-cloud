@@ -47,7 +47,8 @@ namespace IntegrationTests.Report
 
         public Mock<ISchedulerFactory> SchedulerFactoryMock { get; } = new();
 
-        public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<string, SubmitPayloadValue>> SubmitPayloadKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<string, PayloadSubmittedValue>> PayloadSubmittedKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, ReadyForValidationValue>> ReadyForValidationKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, AuditEventMessage>> AuditableEventKafkaProducerMock { get; private set; } = new();
@@ -68,9 +69,9 @@ namespace IntegrationTests.Report
         public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, string, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
 
-        public Mock<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedDeadLetterHandlerMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, PayloadSubmittedValue>> PayloadSubmittedConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PayloadSubmittedListener, string, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PayloadSubmittedListener, string, PayloadSubmittedValue>> PayloadSubmittedDeadLetterHandlerMock { get; } = new();
 
         public Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>> ValidationCompleteConsumerFactoryMock { get; } = new();
         public Mock<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; } = new();
@@ -83,6 +84,28 @@ namespace IntegrationTests.Report
         public Mock<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
+
+        public void ResetSubmitPayloadProducer()
+        {
+            SubmitPayloadKafkaProducerMock.Reset();
+            SubmitPayloadKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>());
+        }
+
+        public void ResetPayloadSubmittedProducer()
+        {
+            PayloadSubmittedKafkaProducerMock.Reset();
+            PayloadSubmittedKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, PayloadSubmittedValue>());
+        }
 
         public async Task InitializeAsync()
         {
@@ -142,8 +165,23 @@ namespace IntegrationTests.Report
 
             builder.Services.AddSingleton(serviceInformation);
 
+            SubmitPayloadKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>());
+            PayloadSubmittedKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, PayloadSubmittedValue>());
+
             builder.Services.AddTransient<SubmitPayloadProducer>(sp =>
                 new SubmitPayloadProducer(sp.GetRequiredService<IServiceScopeFactory>(), SubmitPayloadKafkaProducerMock.Object, new Mock<ILogger<SubmitPayloadProducer>>().Object));
+            builder.Services.AddSingleton<IProducer<string, PayloadSubmittedValue>>(PayloadSubmittedKafkaProducerMock.Object);
+            builder.Services.AddTransient<PayloadSubmittedSignalProducer>();
 
             builder.Services.AddTransient<ReadyForValidationProducer>(sp =>
                 new ReadyForValidationProducer(ReadyForValidationKafkaProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>(), new Mock<ILogger<ReadyForValidationProducer>>().Object));
@@ -183,10 +221,10 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<IProducer<string, EvaluationRequestedValue>>(EvaluationRequestedProducerMock.Object);
 
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, GenerateReportValue>>(GenerateReportConsumerFactoryMock.Object);
-            builder.Services.AddSingleton<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedTransientHandlerMock.Object);
-            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PayloadSubmittedListener, string, PayloadSubmittedValue>>(PayloadSubmittedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PayloadSubmittedListener, string, PayloadSubmittedValue>>(PayloadSubmittedDeadLetterHandlerMock.Object);
 
-            builder.Services.AddSingleton<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, PayloadSubmittedValue>>(PayloadSubmittedConsumerFactoryMock.Object);
             builder.Services.AddSingleton<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
 

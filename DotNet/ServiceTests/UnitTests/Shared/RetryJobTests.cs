@@ -16,6 +16,33 @@ namespace UnitTests.Shared;
 public class RetryJobTests
 {
     [Fact]
+    public async Task Execute_PayloadSubmitted_PublishesTheReportKeyThenDeletesTheJob()
+    {
+        var scheduleId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var model = Model(nameof(KafkaTopic.PayloadSubmitted), KafkaKeys.ForReport("facility-1", scheduleId));
+        var producer = new Mock<IProducer<string, string>>();
+        string? topic = null;
+        string? key = null;
+        producer
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, string>>(), It.IsAny<CancellationToken>()))
+            .Callback<string, Message<string, string>, CancellationToken>((publishedTopic, message, _) =>
+            {
+                topic = publishedTopic;
+                key = message.Key;
+            })
+            .ReturnsAsync(new DeliveryResult<string, string> { Status = PersistenceStatus.Persisted });
+        var scheduler = new Mock<IScheduler>();
+        scheduler.Setup(s => s.DeleteJob(It.IsAny<JobKey>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var job = Job(producer, scheduler, out var context, model);
+
+        await job.Execute(context);
+
+        Assert.Equal(nameof(KafkaTopic.PayloadSubmitted), topic);
+        Assert.Equal(KafkaKeys.ForReport("facility-1", scheduleId), key);
+        scheduler.Verify(s => s.DeleteJob(new JobKey(model.JobId), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Execute_PublishRejected_KeepsTheJobAndAsksQuartzToRunItAgain()
     {
         var model = Model("PatientEvent", "facility-key");
