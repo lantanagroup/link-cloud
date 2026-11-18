@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class KafkaPartitionProofTest {
 
@@ -28,9 +29,7 @@ class KafkaPartitionProofTest {
     @ValueSource(ints = {3, 6, 12})
     void dataAcquisitionRequestedKeyLandsOnTheMurmur2Partition(int partitionCount) throws Exception {
         String bootstrap = System.getenv("KAFKA_BOOTSTRAP");
-        if (bootstrap == null || bootstrap.isBlank()) {
-            return;
-        }
+        assumeTrue(bootstrap != null && !bootstrap.isBlank(), () -> "KAFKA_BOOTSTRAP is unset");
 
         String key = KafkaKeys.forPatient("facility-proof", "patient-proof");
         String topic = "proof-data-acquisition-requested-" + partitionCount;

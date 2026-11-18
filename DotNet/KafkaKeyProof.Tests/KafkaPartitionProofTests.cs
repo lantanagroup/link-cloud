@@ -26,14 +26,14 @@ public class KafkaPartitionProofTests
         Assert.Equal(expected, KafkaMurmur2.Partition(key, partitionCount));
     }
 
-    [Theory]
+    [KafkaBrokerTheory]
     [MemberData(nameof(PartitionCounts))]
     public async Task DataAcquisitionRequestedKey_LandsOnTheMurmur2Partition(int partitionCount)
     {
         var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
         if (string.IsNullOrWhiteSpace(bootstrap))
         {
-            return;
+            throw new InvalidOperationException("KAFKA_BOOTSTRAP is unset.");
         }
 
         var key = KafkaKeys.ForPatient("facility-proof", "patient-proof");

@@ -6,17 +6,17 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 namespace LantanaGroup.Link.KafkaKeyProof.Tests;
 
 /// <summary>
-/// Broker checks. Each test returns immediately when KAFKA_BOOTSTRAP is unset.
+/// Broker checks. Each test is skipped when KAFKA_BOOTSTRAP is unset.
 /// </summary>
 public class KafkaBrokerProofTests
 {
-    [Fact]
+    [KafkaBrokerFact]
     public async Task RetryTopicIsNotVisibleToTheMainTopicConsumer()
     {
         var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
         if (string.IsNullOrWhiteSpace(bootstrap))
         {
-            return;
+            throw new InvalidOperationException("KAFKA_BOOTSTRAP is unset.");
         }
 
         var main = "proof-retry-main-" + Guid.NewGuid().ToString("N");
@@ -43,13 +43,13 @@ public class KafkaBrokerProofTests
         Assert.Equal("retry-value", retryRecord.Message.Value);
     }
 
-    [Fact]
+    [KafkaBrokerFact]
     public async Task TwoConsumersRebalanceWithoutLossOrDuplicate()
     {
         var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
         if (string.IsNullOrWhiteSpace(bootstrap))
         {
-            return;
+            throw new InvalidOperationException("KAFKA_BOOTSTRAP is unset.");
         }
 
         var topic = "proof-rebalance-" + Guid.NewGuid().ToString("N");
@@ -97,13 +97,13 @@ public class KafkaBrokerProofTests
         Assert.All(produced, key => Assert.Equal(1, seen[key]));
     }
 
-    [Fact]
+    [KafkaBrokerFact]
     public async Task GrowingPartitionsKeepsAnExistingKeyOnItsPartition()
     {
         var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
         if (string.IsNullOrWhiteSpace(bootstrap))
         {
-            return;
+            throw new InvalidOperationException("KAFKA_BOOTSTRAP is unset.");
         }
 
         var topic = "proof-grow-" + Guid.NewGuid().ToString("N");
