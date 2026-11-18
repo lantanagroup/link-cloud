@@ -154,22 +154,40 @@ public class ValidationService {
     public List<Result> validate(IBaseResource resource, String facilityId, String reportId) {
         try {
             String detail = "FHIR resource";
+            IBaseResource toValidate = resource;
+            BundleEntryExclusion exclusion = null;
             if (resource instanceof Bundle bundle) {
-                detail = "FHIR bundle " + bundle.getEntry().size() + " entries";
-                logger.info("Starting validation of Bundle with {} entries facility={} report={}",
-                        bundle.getEntry().size(),
-                        LogUtils.sanitize(facilityId),
-                        LogUtils.sanitize(reportId));
+                // Resource types configured to be left out (link.validation-excluded-resource-types)
+                exclusion = BundleEntryExclusion.of(bundle, linkConfig.getValidationExcludedResourceTypes());
+                toValidate = exclusion.bundle();
+                detail = "FHIR bundle " + exclusion.bundle().getEntry().size() + " entries";
+                if (exclusion.excludedAny()) {
+                    logger.info("Starting validation of Bundle with {} of {} entries, leaving out {} facility={} report={}",
+                            exclusion.bundle().getEntry().size(), exclusion.originalCount(), exclusion.skipped(),
+                            LogUtils.sanitize(facilityId), LogUtils.sanitize(reportId));
+                } else {
+                    logger.info("Starting validation of Bundle with {} entries facility={} report={}",
+                            bundle.getEntry().size(),
+                            LogUtils.sanitize(facilityId),
+                            LogUtils.sanitize(reportId));
+                }
             }
             ValidationResult validationResult;
             try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(logger, detail, facilityId, reportId)) {
-                validationResult = getValidator().validateWithResult(resource);
+                validationResult = getValidator().validateWithResult(toValidate);
             } catch (IOException ex) {
                 throw new UncheckedIOException("Failed to load artifact validation support", ex);
             }
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
                     .toList();
+            if (exclusion != null && exclusion.excludedAny()) {
+                // Findings must name an entry's position in the bundle as submitted, not in the filtered copy.
+                for (Result result : results) {
+                    result.setLocation(exclusion.toOriginalPath(result.getLocation()));
+                    result.setExpression(exclusion.toOriginalPath(result.getExpression()));
+                }
+            }
             List<Result> deduplicated = deduplicateInactiveResults(results);
             Map<String, Long> bySeverity = deduplicated.stream()
                     .collect(Collectors.groupingBy(

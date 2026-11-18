@@ -30,4 +30,9 @@ public class ShadowCompareEvent {
     private UUID requestId;
 
     private List<ShadowFindingDto> authoritativeResult;
+    /**
+     * Whether the primary engine passed the patient (the {@code ValidationComplete.valid} it produced), so the shadow
+     * comparison can set it against the other engine's verdict. Null on events published before it was added.
+     */
+    private Boolean authoritativeValid;
 }

@@ -3,6 +3,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -228,6 +230,168 @@ public class OrganizationLocationMappingManagerTests
     }
 
     [Fact]
+    public async Task SetParentForChildrenAsync_WhenChildrenAlreadyCurrent_WritesNothing()
+    {
+        var facilityId = NewFacilityId("Current");
+        var parentLocationId = NewLocationId("Parent");
+        int parentMappingId;
+        int childMappingId;
+
+        using (var seedScope = _fixture.ServiceProvider.CreateScope())
+        {
+            var seedManager = CreateManager(seedScope);
+            var parent = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = parentLocationId,
+                IsOrgLocation = true,
+                IsActive = true
+            });
+            var child = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = NewLocationId("Child"),
+                PartOfValue = parentLocationId,
+                PartOfId = parent.LocationMappingId,
+                IsOrgLocation = true,
+                IsActive = true
+            });
+            parentMappingId = parent.LocationMappingId;
+            childMappingId = child.LocationMappingId;
+
+            await CreateEncounterMappingAsync(seedScope, facilityId, "Enc-1", mappedToOrg: true, childMappingId);
+        }
+
+        var childBefore = await ReadLocationMappingAsync(childMappingId);
+        var encounterBefore = await ReadEncounterMappingAsync(facilityId, "Enc-1");
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var updatedCount = await CreateManager(scope).SetParentForChildrenAsync(
+            facilityId,
+            parentLocationId,
+            parentMappingId,
+            isOrgLocation: true,
+            CancellationToken.None);
+
+        var childAfter = await ReadLocationMappingAsync(childMappingId);
+        var encounterAfter = await ReadEncounterMappingAsync(facilityId, "Enc-1");
+
+        Assert.Equal(0, updatedCount);
+        Assert.Equal(childBefore.ModifiedDate, childAfter.ModifiedDate);
+        Assert.Equal(encounterBefore.ModifiedDate, encounterAfter.ModifiedDate);
+    }
+
+    [Fact]
+    public async Task SetParentForChildrenAsync_WhenChildPromoted_RecomputesItsEncounters()
+    {
+        var facilityId = NewFacilityId("Promote");
+        var parentLocationId = NewLocationId("Parent");
+        int parentMappingId;
+
+        using (var seedScope = _fixture.ServiceProvider.CreateScope())
+        {
+            var seedManager = CreateManager(seedScope);
+            var parent = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = parentLocationId,
+                IsOrgLocation = true,
+                IsActive = true
+            });
+            var child = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = NewLocationId("Child"),
+                PartOfValue = parentLocationId,
+                PartOfId = parent.LocationMappingId,
+                IsOrgLocation = false,
+                IsActive = true
+            });
+            parentMappingId = parent.LocationMappingId;
+
+            await CreateEncounterMappingAsync(seedScope, facilityId, "Enc-1", mappedToOrg: false, child.LocationMappingId);
+        }
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        await CreateManager(scope).SetParentForChildrenAsync(
+            facilityId,
+            parentLocationId,
+            parentMappingId,
+            isOrgLocation: true,
+            CancellationToken.None);
+
+        var encounter = await ReadEncounterMappingAsync(facilityId, "Enc-1");
+
+        Assert.True(encounter.MappedToOrg);
+    }
+
+    [Fact]
+    public async Task SetParentForChildrenAsync_WhenParentNotOrg_LinksChildWithoutTouchingDescendants()
+    {
+        var facilityId = NewFacilityId("NonOrg");
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+        int parentMappingId;
+        int childMappingId;
+        int grandchildMappingId;
+
+        using (var seedScope = _fixture.ServiceProvider.CreateScope())
+        {
+            var seedManager = CreateManager(seedScope);
+            var child = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = childLocationId,
+                PartOfValue = parentLocationId,
+                IsOrgLocation = false,
+                IsActive = true
+            });
+            var grandchild = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = NewLocationId("Grandchild"),
+                PartOfValue = childLocationId,
+                PartOfId = child.LocationMappingId,
+                IsOrgLocation = false,
+                IsActive = true
+            });
+            var parent = await seedManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = parentLocationId,
+                IsOrgLocation = false,
+                IsActive = true
+            });
+            parentMappingId = parent.LocationMappingId;
+            childMappingId = child.LocationMappingId;
+            grandchildMappingId = grandchild.LocationMappingId;
+
+            await CreateEncounterMappingAsync(seedScope, facilityId, "Enc-1", mappedToOrg: false, childMappingId);
+        }
+
+        var grandchildBefore = await ReadLocationMappingAsync(grandchildMappingId);
+        var encounterBefore = await ReadEncounterMappingAsync(facilityId, "Enc-1");
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var updatedCount = await CreateManager(scope).SetParentForChildrenAsync(
+            facilityId,
+            parentLocationId,
+            parentMappingId,
+            isOrgLocation: false,
+            CancellationToken.None);
+
+        var childAfter = await ReadLocationMappingAsync(childMappingId);
+        var grandchildAfter = await ReadLocationMappingAsync(grandchildMappingId);
+        var encounterAfter = await ReadEncounterMappingAsync(facilityId, "Enc-1");
+
+        Assert.Equal(1, updatedCount);
+        Assert.Equal(parentMappingId, childAfter.PartOfId);
+        Assert.False(childAfter.IsOrgLocation);
+        Assert.Equal(grandchildBefore.ModifiedDate, grandchildAfter.ModifiedDate);
+        Assert.Equal(encounterBefore.ModifiedDate, encounterAfter.ModifiedDate);
+    }
+
+    [Fact]
     public async Task DeleteByIdAsync_Existing_DeletesRecord()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -271,5 +435,42 @@ public class OrganizationLocationMappingManagerTests
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             manager.UpdateByIdAsync(99999, new UpdateOrganizationLocationMappingModel()));
+    }
+
+    private static async Task CreateEncounterMappingAsync(IServiceScope scope,
+                                                          string facilityId,
+                                                          string encounterId,
+                                                          bool mappedToOrg,
+                                                          int locationMappingId)
+    {
+        var encounterMappingManager = scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>();
+        await encounterMappingManager.CreateFromAcquisitionAsync(new CreateEncounterMappingModel
+        {
+            FacilityId = facilityId,
+            PatientId = "Patient-1",
+            EncounterId = encounterId,
+            MappedToOrg = mappedToOrg,
+            OrganizationLocationMappingIds = [locationMappingId]
+        });
+    }
+
+    // The manager writes through ExecuteUpdateAsync, which bypasses the change tracker, so reads use a
+    // fresh scope to see what the database holds.
+    private async Task<OrganizationLocationMapping> ReadLocationMappingAsync(int locationMappingId)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        return await dbContext.OrganizationLocationMappings
+            .AsNoTracking()
+            .SingleAsync(m => m.LocationMappingId == locationMappingId);
+    }
+
+    private async Task<EncounterMapping> ReadEncounterMappingAsync(string facilityId, string encounterId)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        return await dbContext.EncounterMappings
+            .AsNoTracking()
+            .SingleAsync(m => m.FacilityId == facilityId && m.EncounterId == encounterId);
     }
 }

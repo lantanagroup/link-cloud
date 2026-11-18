@@ -44,13 +44,40 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, Lo
     // see it's no longer DRAFT and touch nothing (0). returns rows affected.
     @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    // the checksum is guarded too, so the definition published is the one the caller checked (its dry run);
+    // a draft replaced in between changes the checksum and this touches nothing
     @Query("update RubricVersion v set v.status = :target, v.publishedAt = :publishedAt, v.publishedBy = :publishedBy "
-            + "where v.rubricVersionId = :rubricVersionId and v.status = :expected")
+            + "where v.rubricVersionId = :rubricVersionId and v.status = :expected and v.checksum = :checksum")
     int publishIfStatus(@Param("rubricVersionId") Long rubricVersionId,
                         @Param("expected") RubricVersionStatus expected,
+                        @Param("checksum") String checksum,
                         @Param("target") RubricVersionStatus target,
                         @Param("publishedAt") OffsetDateTime publishedAt,
                         @Param("publishedBy") String publishedBy);
+
+    // guarded draft replacement, like publish: the status (and, when the caller sent If-Match, the checksum it
+    // read) is checked under the update's row lock, so a save made on a stale read touches nothing (0 rows)
+    // instead of writing a DRAFT back over a version published in between, or over another person's save.
+    // The dry run is cleared only when the definition changes; the CASE reads the row's checksum before the
+    // update, so a dry run recorded since the caller's read survives a save that changes nothing.
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update RubricVersion v set v.checksum = :checksum, v.definitionJson = :definitionJson, "
+            + "v.dimensionsJson = :dimensionsJson, v.applicableContextJson = :applicableContextJson, "
+            + "v.scoringPolicyJson = :scoringPolicyJson, v.createdBy = :createdBy, "
+            + "v.dryRunCompletedAt = case when v.checksum = :checksum then v.dryRunCompletedAt else null end, "
+            + "v.dryRunStatus = case when v.checksum = :checksum then v.dryRunStatus else null end "
+            + "where v.rubricVersionId = :rubricVersionId and v.status = :draft "
+            + "and (:expectedChecksum is null or v.checksum = :expectedChecksum)")
+    int replaceDraftIfUnchanged(@Param("rubricVersionId") Long rubricVersionId,
+                                @Param("draft") RubricVersionStatus draft,
+                                @Param("expectedChecksum") String expectedChecksum,
+                                @Param("checksum") String checksum,
+                                @Param("definitionJson") String definitionJson,
+                                @Param("dimensionsJson") String dimensionsJson,
+                                @Param("applicableContextJson") String applicableContextJson,
+                                @Param("scoringPolicyJson") String scoringPolicyJson,
+                                @Param("createdBy") String createdBy);
 
     // same trick for retire: status <> RETIRED makes a double retire a no-op (0 rows) so we don't
     // overwrite retiredAt/retiredBy or record a second event
@@ -62,4 +89,26 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, Lo
                            @Param("retired") RubricVersionStatus retired,
                            @Param("retiredAt") OffsetDateTime retiredAt,
                            @Param("retiredBy") String retiredBy);
+
+    // guarded delete of a draft: the status check runs under the delete's row lock, so a version that
+    // was published or retired between the caller's read and here is left alone (0 rows)
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from RubricVersion v where v.rubricVersionId = :rubricVersionId and v.status = :expected")
+    int deleteIfStatus(@Param("rubricVersionId") Long rubricVersionId,
+                       @Param("expected") RubricVersionStatus expected);
+
+    // for a delete made on condition that the draft is the one the caller read: a draft saved in between
+    // changes the checksum and this touches nothing
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from RubricVersion v where v.rubricVersionId = :rubricVersionId and v.status = :expected "
+            + "and v.checksum = :checksum")
+    int deleteIfStatusAndChecksum(@Param("rubricVersionId") Long rubricVersionId,
+                                  @Param("expected") RubricVersionStatus expected,
+                                  @Param("checksum") String checksum);
+
+    long countByRubricId(String rubricId);
+
+    // a count, not entities, so it reads the database and not versions this transaction already loaded
+    long countByRubricIdAndStatusAndRubricVersionIdNot(String rubricId, RubricVersionStatus status, Long rubricVersionId);
 }

@@ -53,7 +53,7 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
 
         ValidationResult result = fhirValidator.validateWithResult(context.getResource(), options);
         List<SingleValidationMessage> messages = result.getMessages();
-        log.info("HAPI validation (rubric engine) returned {} messages for check {}", messages.size(), check.getCheckLocalId());
+        log.debug("HAPI validation (rubric engine) returned {} messages for check {}", messages.size(), check.getCheckLocalId());
 
         Set<String> unresolvedLocations = new HashSet<>();
         for (SingleValidationMessage msg : messages) {
