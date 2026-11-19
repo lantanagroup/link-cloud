@@ -128,7 +128,9 @@ management:
 
 logging:
   level:
-    com.lantanagroup.link: debug
+    # info, not debug: the rubric engine logs a line per check per patient at debug. The local profile turns
+    # debug back on; elsewhere, set logging.level.com.lantanagroup.link (or a narrower package) to debug.
+    com.lantanagroup.link: info
 
 secret-management:
   key-vault-uri: ''
@@ -141,6 +143,8 @@ authentication:
 link:
   info-route: /api/validation/info
   bundle-validation-parallelism: 4
+  # Resource types the legacy validator does not validate.
+  validation-excluded-resource-types: []
   terminology-service-url: ''
   rubric:
     max-payload-bytes: 262144

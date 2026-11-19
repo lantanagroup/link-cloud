@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricResult;
@@ -34,6 +35,7 @@ public class RubricResultQueryService {
     private final RubricFindingRepository rubricFindingRepository;
     private final RubricCheckRepository rubricCheckRepository;
     private final ObjectMapper objectMapper;
+    private final ValidationPolicyConfig policyConfig;
 
     @Transactional(readOnly = true)
     public Optional<RubricResultDto> findByRequestId(UUID requestId) {
@@ -43,6 +45,8 @@ public class RubricResultQueryService {
     private RubricResultDto toDto(RubricResult r) {
         List<RubricFinding> findings = rubricFindingRepository.findByResultId(r.getResultId());
         Map<Long, String> localIdByCheckId = resolveCheckLocalIds(findings);
+        // The same flag that governs these fields on a fresh evaluation's response.
+        boolean includeOriginalSeverity = policyConfig.getResponse().isIncludeOriginalSeverity();
 
         List<FindingDto> findingDtos = findings.stream()
                 .map(f -> FindingDto.builder()
@@ -51,6 +55,9 @@ public class RubricResultQueryService {
                                 f.getCheckId() != null ? f.getCheckId().toString() : null))
                         .dimension(f.getDimension())
                         .severity(f.getSeverity())
+                        .originalSeverity(includeOriginalSeverity ? f.getOriginalSeverity() : null)
+                        .overriddenSeverity(includeOriginalSeverity && f.getOriginalSeverity() != null
+                                && f.getOriginalSeverity() != f.getSeverity() ? f.getSeverity() : null)
                         .code(f.getCode())
                         .message(f.getMessage())
                         .location(f.getLocation())

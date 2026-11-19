@@ -1,0 +1,380 @@
+<div class="rubric-editor">
+  <div class="rubric-editor-banner">
+    <div>
+      <div class="rubric-banner-kicker">
+        Configuration &gt; <a routerLink="/rubrics">Validation Rubrics</a>
+        @if (rubricId) {
+          &gt; <a [routerLink]="['/rubrics', rubricId]">{{ rubricId }}</a>
+        }
+      </div>
+      <h2 class="rubric-banner-heading">{{ title }}</h2>
+      @if (!loading && !loadError && !locked) {
+        <div class="rubric-banner-meta">
+          <span class="rubric-chip rubric-chip--draft">Draft</span>
+          <span aria-live="polite">{{ dirty ? 'Unsaved changes' : 'All changes saved' }}</span>
+        </div>
+      }
+    </div>
+    @if (!loading && !loadError && !locked) {
+      <div class="rubric-banner-actions">
+        <button type="button" class="rubric-button rubric-button--on-banner" [disabled]="busy !== null" (click)="validate()">
+          {{ busy === 'validating' ? 'Validating…' : 'Validate' }}
+        </button>
+        <button type="button" class="rubric-button rubric-button--on-banner rubric-button--on-banner-primary"
+          [disabled]="busy !== null || !dirty" (click)="save()">
+          {{ busy === 'saving' ? 'Saving…' : 'Save draft' }}
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="rubric-editor-body">
+    @if (loading) {
+      <div class="rubric-message">
+        <mat-spinner diameter="32" aria-label="Loading draft"></mat-spinner>
+      </div>
+    } @else if (loadError) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The draft could not be opened.</strong></p>
+        <p>{{ loadError }}</p>
+        <p><a class="rubric-link" [routerLink]="rubricId ? ['/rubrics', rubricId] : ['/rubrics']">Back</a></p>
+      </div>
+    } @else if (locked) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>This version cannot be edited.</strong></p>
+        <p>{{ locked }}</p>
+        <p>
+          <a class="rubric-link" [routerLink]="['/rubrics', rubricId, 'versions', 'new']"
+            [queryParams]="{ from: definition.semver }">Create a new version from it</a>
+          ·
+          <a class="rubric-link" [routerLink]="['/rubrics', rubricId, 'versions', definition.semver]">View it</a>
+        </p>
+      </div>
+    } @else {
+      @if (notice) {
+        <div class="rubric-message rubric-editor-notice" role="status">
+          <p>{{ notice }}</p>
+        </div>
+      }
+      @if (failure) {
+        <div class="rubric-message rubric-message--error" role="alert">
+          <p><strong>That did not work.</strong></p>
+          <p>{{ failure }}</p>
+        </div>
+      }
+      @if (staleDraft) {
+        <div class="rubric-message rubric-message--error" role="alert">
+          <p><strong>This draft was changed by someone else after you opened it, so it was not saved.</strong></p>
+          <p>
+            Reload to see their version; your changes here will be lost. Or save anyway, which replaces their version with
+            yours.
+          </p>
+          <div class="rubric-editor-inline-actions">
+            <button type="button" class="rubric-button" (click)="reload()">Reload their version</button>
+            <button type="button" class="rubric-button" (click)="save(true)">Save mine anyway</button>
+          </div>
+        </div>
+      }
+      @if (issues.length > 0) {
+        <div class="rubric-message rubric-message--error" role="alert" aria-labelledby="issueSummaryHeading">
+          <p id="issueSummaryHeading">
+            <strong>
+              {{ issues.length === 1 ? 'There is a problem' : 'There are ' + issues.length + ' problems' }} to fix before
+              this draft can be saved.
+            </strong>
+          </p>
+          <ul class="rubric-editor-issues">
+            @for (issue of issues; track $index) {
+              <li>
+                <button type="button" class="rubric-editor-issue" (click)="goToIssue(issue)">{{ issueLabel(issue) }}</button>:
+                {{ issue.message }}
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
+      <mat-tab-group animationDuration="0ms" [(selectedIndex)]="selectedTab">
+        <mat-tab [label]="'Details' + (detailIssueCount ? ' (' + detailIssueCount + ' to fix)' : '')">
+          <div class="rubric-editor-panel">
+            <div class="rubric-editor-grid">
+              <div class="rubric-editor-field rubric-editor-field--wide">
+                <label for="rubricIdField">Rubric id</label>
+                <input id="rubricIdField" type="text" class="rubric-mono" [(ngModel)]="definition.id"
+                  (ngModelChange)="onChanged()" [disabled]="!idEditable" maxlength="128" autocomplete="off"
+                  spellcheck="false" [attr.aria-invalid]="errors('id').length > 0"
+                  aria-describedby="rubricIdHelp rubricIdError">
+                <span id="rubricIdHelp" class="rubric-editor-help">
+                  @if (idEditable) {
+                    Lower-case letters and digits, in parts separated by a dot or a hyphen. It cannot be changed later.
+                  } @else {
+                    The id cannot be changed.
+                  }
+                </span>
+                <span id="rubricIdError" class="rubric-editor-error">
+                  @for (error of errors('id'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+
+              <div class="rubric-editor-field">
+                <label for="rubricVersionField">Version</label>
+                <input id="rubricVersionField" type="text" [(ngModel)]="definition.semver" (ngModelChange)="onChanged()"
+                  maxlength="32" autocomplete="off" [attr.aria-invalid]="errors('semver').length > 0"
+                  aria-describedby="rubricVersionHelp rubricVersionError">
+                <span id="rubricVersionHelp" class="rubric-editor-help">
+                  Next:
+                  <button type="button" class="rubric-editor-issue" (click)="setVersion('patch')">patch</button>,
+                  <button type="button" class="rubric-editor-issue" (click)="setVersion('minor')">minor</button>,
+                  <button type="button" class="rubric-editor-issue" (click)="setVersion('major')">major</button>
+                </span>
+                <span id="rubricVersionError" class="rubric-editor-error">
+                  @for (error of errors('semver'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+
+              <div class="rubric-editor-field rubric-editor-field--wide">
+                <label for="rubricTitleField">Title</label>
+                <input id="rubricTitleField" type="text" [(ngModel)]="definition.title" (ngModelChange)="onChanged()"
+                  maxlength="256" autocomplete="off" [attr.aria-invalid]="errors('title').length > 0"
+                  aria-describedby="rubricTitleError">
+                <span id="rubricTitleError" class="rubric-editor-error">
+                  @for (error of errors('title'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+
+              <div class="rubric-editor-field">
+                <label for="rubricOwnerField">Owner</label>
+                <input id="rubricOwnerField" type="text" [(ngModel)]="definition.owner" (ngModelChange)="onChanged()"
+                  maxlength="128" autocomplete="off" [attr.aria-invalid]="errors('owner').length > 0"
+                  aria-describedby="rubricOwnerError">
+                <span id="rubricOwnerError" class="rubric-editor-error">
+                  @for (error of errors('owner'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+            </div>
+
+            <fieldset class="rubric-editor-group" aria-describedby="rubricDimensionsError">
+              <legend>Dimensions</legend>
+              <div class="rubric-editor-options">
+                @for (dimension of dimensions; track dimension) {
+                  <label [title]="dimensionInUse(dimension) ? 'A check uses this dimension, so it cannot be removed.' : ''">
+                    <input type="checkbox" [checked]="hasDimension(dimension)" [disabled]="dimensionInUse(dimension)"
+                      (change)="toggleDimension(dimension, $any($event.target).checked)">
+                    {{ dimensionLabel(dimension) }}
+                  </label>
+                }
+              </div>
+              <span class="rubric-editor-help">A dimension that a check uses cannot be removed.</span>
+              <span id="rubricDimensionsError" class="rubric-editor-error">
+                @for (error of errors('dimensions'); track $index) { {{ error.message }} }
+              </span>
+            </fieldset>
+
+            <div class="rubric-editor-grid">
+              <div class="rubric-editor-field">
+                <label for="rubricScoringField">Scoring</label>
+                <select id="rubricScoringField" [(ngModel)]="definition.scoringPolicy.type"
+                  (ngModelChange)="onScoringPolicyChanged()" [attr.aria-invalid]="errors('scoringPolicy.type').length > 0"
+                  aria-describedby="rubricScoringError">
+                  @for (policy of scoringPolicies; track policy.type) {
+                    <option [value]="policy.type">{{ policy.label }}</option>
+                  }
+                </select>
+                <span id="rubricScoringError" class="rubric-editor-error">
+                  @for (error of errors('scoringPolicy.type'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+
+              @if (needsRollup) {
+                <div class="rubric-editor-field">
+                  <label for="rubricRollupField">Roll-up</label>
+                  <select id="rubricRollupField" [(ngModel)]="definition.scoringPolicy.rollup" (ngModelChange)="onChanged()"
+                    [attr.aria-invalid]="errors('scoringPolicy.rollup').length > 0" aria-describedby="rubricRollupError">
+                    @for (rollup of rollups; track rollup.value) {
+                      <option [value]="rollup.value">{{ rollup.label }}</option>
+                    }
+                  </select>
+                  <span id="rubricRollupError" class="rubric-editor-error">
+                    @for (error of errors('scoringPolicy.rollup'); track $index) { {{ error.message }} }
+                  </span>
+                </div>
+              }
+            </div>
+
+            <fieldset class="rubric-editor-group">
+              <legend>Applies to</legend>
+              <p class="rubric-editor-help">Optional. Says where the rubric is meant to be used; it does not limit what it checks.</p>
+
+              <div class="rubric-editor-list">
+                <label for="rubricResourceTypeField">Resource types</label>
+                <div class="rubric-editor-list-add">
+                  <input id="rubricResourceTypeField" type="text" list="rubricResourceTypes" [(ngModel)]="newResourceType"
+                    (keydown.enter)="addResourceType(); $event.preventDefault()" autocomplete="off"
+                    aria-describedby="rubricResourceTypesError">
+                  <datalist id="rubricResourceTypes">
+                    @for (type of resourceTypes; track type) {
+                      <option [value]="type"></option>
+                    }
+                  </datalist>
+                  <button type="button" class="rubric-button" (click)="addResourceType()">Add</button>
+                </div>
+                <ul class="rubric-editor-chips" aria-label="Resource types">
+                  @for (type of fhirResources; track type) {
+                    <li>
+                      {{ type }}
+                      <button type="button" (click)="removeFromContext('fhirResources', type)"
+                        [attr.aria-label]="'Remove ' + type">×</button>
+                    </li>
+                  }
+                </ul>
+                <span id="rubricResourceTypesError" class="rubric-editor-error">
+                  @for (error of errors('applicableContext.fhirResources'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+
+              <div class="rubric-editor-list">
+                <label for="rubricWorkflowTagField">Workflow tags</label>
+                <div class="rubric-editor-list-add">
+                  <input id="rubricWorkflowTagField" type="text" [(ngModel)]="newWorkflowTag" maxlength="128"
+                    (keydown.enter)="addWorkflowTag(); $event.preventDefault()" autocomplete="off"
+                    aria-describedby="rubricWorkflowTagsError">
+                  <button type="button" class="rubric-button" (click)="addWorkflowTag()">Add</button>
+                </div>
+                <ul class="rubric-editor-chips" aria-label="Workflow tags">
+                  @for (tag of workflowTags; track tag) {
+                    <li>
+                      {{ tag }}
+                      <button type="button" (click)="removeFromContext('workflowTags', tag)"
+                        [attr.aria-label]="'Remove ' + tag">×</button>
+                    </li>
+                  }
+                </ul>
+                <span id="rubricWorkflowTagsError" class="rubric-editor-error">
+                  @for (error of errors('applicableContext.workflowTags'); track $index) { {{ error.message }} }
+                </span>
+              </div>
+            </fieldset>
+          </div>
+        </mat-tab>
+
+        <mat-tab [label]="'Checks (' + definition.checks.length + ')' + (checksIssueCount ? ' (' + checksIssueCount + ' to fix)' : '')">
+          @if (editing) {
+            <div class="rubric-editor-check">
+              <app-rubric-check-editor [definition]="definition" [index]="editing.index" [check]="editing.check"
+                [adding]="editing.adding" [settings]="settings" [serverIssues]="serverIssuesForCheck(editing.index)"
+                (applied)="applyCheck($event)" (cancelled)="cancelCheck()">
+              </app-rubric-check-editor>
+            </div>
+          } @else {
+            <div class="rubric-editor-panel">
+              <div class="rubric-editor-add-check">
+                <label for="newCheckType">Add a check of type</label>
+                <select id="newCheckType" [(ngModel)]="newCheckType">
+                  @for (type of checkTypes; track type) {
+                    <option [value]="type">{{ checkTypeLabel(type) }}</option>
+                  }
+                </select>
+                <button type="button" class="rubric-button rubric-button--primary" (click)="addCheck()">Add check</button>
+              </div>
+              <span class="rubric-editor-error" role="alert">
+                @for (error of checkListErrors; track $index) { {{ error.message }} }
+              </span>
+
+              @if (definition.checks.length === 0) {
+                <p class="rubric-editor-help">This draft has no checks yet. Choose a type and add the first one.</p>
+              } @else {
+                <p class="rubric-editor-help">The checks run in this order. Move a check to change when it runs.</p>
+                <div class="rubric-editor-checks-scroll">
+                <table class="rubric-editor-checks" aria-label="Checks of this draft">
+                  <thead>
+                    <tr>
+                      <th scope="col">Order</th>
+                      <th scope="col">Check</th>
+                      <th scope="col">Type</th>
+                      <th scope="col">Dimension</th>
+                      <th scope="col">Severity</th>
+                      <th scope="col">Enabled</th>
+                      <th scope="col">Tests</th>
+                      <th scope="col"><span class="rubric-editor-hidden">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (check of definition.checks; track $index; let index = $index, first = $first, last = $last) {
+                      <tr [class.rubric-editor-check-row--invalid]="checkIssueCount(index) > 0">
+                        <td>{{ index + 1 }}</td>
+                        <td>
+                          <span class="rubric-mono">{{ check.id || '(no id)' }}</span>
+                          @if (checkIssueCount(index) > 0) {
+                            <span class="rubric-chip rubric-chip--error">{{ checkIssueCount(index) }} to fix</span>
+                          }
+                          @if (readOnlyReason(check)) {
+                            <span class="rubric-chip" [title]="readOnlyReason(check) || ''">Read-only</span>
+                          }
+                        </td>
+                        <td>{{ checkTypeLabel(check.type) }}</td>
+                        <td>{{ dimensionLabel(check.dimension) }}</td>
+                        <td>{{ severityLabel(check.severityOverride) }}</td>
+                        <td>
+                          <input type="checkbox" [checked]="check.enabled !== false"
+                            (change)="setCheckEnabled(index, $any($event.target).checked)"
+                            [attr.aria-label]="'Enable ' + (check.id || 'check ' + (index + 1))">
+                        </td>
+                        <td><span class="rubric-mono rubric-editor-summary" [title]="checkSummary(check)">{{ checkSummary(check) }}</span></td>
+                        <td class="rubric-editor-row-actions">
+                          <button type="button" class="rubric-editor-issue" (click)="editCheck(index)"
+                            [attr.aria-label]="(readOnlyReason(check) ? 'View ' : 'Edit ') + (check.id || 'check ' + (index + 1))">
+                            {{ readOnlyReason(check) ? 'View' : 'Edit' }}
+                          </button>
+                          <button type="button" class="rubric-editor-issue" (click)="duplicateCheck(index)"
+                            [attr.aria-label]="'Duplicate ' + (check.id || 'check ' + (index + 1))">Duplicate</button>
+                          <button type="button" class="rubric-editor-issue" [disabled]="first" (click)="moveCheck(index, -1)"
+                            [attr.aria-label]="'Move ' + (check.id || 'check ' + (index + 1)) + ' up'">Up</button>
+                          <button type="button" class="rubric-editor-issue" [disabled]="last" (click)="moveCheck(index, 1)"
+                            [attr.aria-label]="'Move ' + (check.id || 'check ' + (index + 1)) + ' down'">Down</button>
+                          <button type="button" class="rubric-editor-issue" (click)="deleteCheck(index)"
+                            [attr.aria-label]="'Delete ' + (check.id || 'check ' + (index + 1))">Delete</button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+                </div>
+              }
+            </div>
+          }
+        </mat-tab>
+
+        <mat-tab label="Definition">
+          <div class="rubric-editor-panel">
+            <p class="rubric-editor-help">
+              The draft as it will be saved. It follows the form; there is no need to edit it. To replace the whole draft
+              with a definition you have as text, paste it.
+            </p>
+            @if (!pasteOpen) {
+              <div class="rubric-editor-inline-actions">
+                <button type="button" class="rubric-button" (click)="pasteOpen = true">Paste a definition</button>
+              </div>
+            } @else {
+              <div class="rubric-editor-field rubric-editor-field--block">
+                <label for="rubricPasteField">Definition, as YAML or JSON</label>
+                <textarea id="rubricPasteField" rows="10" class="rubric-mono" spellcheck="false" [(ngModel)]="pasteText"
+                  aria-describedby="rubricPasteError"></textarea>
+                <ul id="rubricPasteError" class="rubric-editor-error rubric-editor-paste-errors" role="alert">
+                  @for (error of pasteErrors; track $index) {
+                    <li>{{ error }}</li>
+                  }
+                </ul>
+              </div>
+              <div class="rubric-editor-inline-actions">
+                <button type="button" class="rubric-button rubric-button--primary" [disabled]="busy !== null || !pasteText.trim()"
+                  (click)="loadPasted()">Replace the draft with this</button>
+                <button type="button" class="rubric-button" (click)="pasteOpen = false; pasteErrors = []">Cancel</button>
+              </div>
+            }
+            <pre class="rubric-mono" tabindex="0" aria-label="Draft as JSON">{{ definitionJson }}</pre>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    }
+  </div>
+</div>

@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -399,6 +400,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             }).ToList();
 
             _dbContext.DataAcquisitionLogResourceIds.AddRange(resourceRows);
+
+            // Always cleared, even when no old resource ids were found: the resource-id delete commits on its own,
+            // so an update interrupted after it can leave old counts with no ids, and the retry must clear them.
+            await _dbContext.DataAcquisitionLogResourceTypeCounts
+                .Where(c => c.DataAcquisitionLogId == logId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            _dbContext.DataAcquisitionLogResourceTypeCounts.AddRange(resourceAcquiredIds.ToResourceTypeCounts(logId));
         }
 
         // 4. Single SaveChangesAsync for all pending note/resource inserts

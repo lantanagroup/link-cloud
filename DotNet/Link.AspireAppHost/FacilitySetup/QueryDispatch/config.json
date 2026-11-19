@@ -1,0 +1,9 @@
+{
+  "FacilityId": "{{facilityId}}",
+  "DispatchSchedules": [
+    {
+      "Event": "Discharge",
+      "Duration": "PT10S"
+    }
+  ]
+}

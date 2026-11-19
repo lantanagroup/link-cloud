@@ -58,7 +58,7 @@ export class VendorService {
         map((response) => {
           return response;
         }),
-        catchError(this.handleError.bind(this))
+        catchError(this.handleDeleteError.bind(this))
       )
   }
 
@@ -87,12 +87,22 @@ export class VendorService {
    * Save failures are presented by the config dialog, which shows a snackbar and stays open so
    * the admin's input is not thrown away. ErrorHandlingService raises its own toastr by default,
    * so one failed save produced two messages; suppressing the toastr here leaves the dialog as
-   * the single surface. List and delete keep the toastr, having no dialog to carry the news.
+   * the single surface. The vendor list keeps the toastr, having no dialog to carry the news.
    *
    * The rethrown error still carries the sanitized `message` the dialog displays -- that is set
    * regardless of whether the toastr is shown.
    */
   private handleSaveError(err: HttpErrorResponse) {
+    return this.errorHandler.handleError(err, false);
+  }
+
+  /**
+   * A failed delete is presented by the dashboard in an alert dialog, because a refused delete
+   * names the facility configurations still using the vendor and the admin has to act on that --
+   * more than a toastr can carry, and it would scroll away. Suppressing the toastr here leaves the
+   * dialog as the single surface, as it is for a failed save.
+   */
+  private handleDeleteError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err, false);
   }
 

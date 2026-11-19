@@ -1,0 +1,36 @@
+{
+  "facilityId": "{{facilityId}}",
+  "fhirBaseServerUrl": "{{fhirServerBaseUrl}}",
+  "ehrPatientLists": [
+    {
+      "Status": "Admit",
+      "TimeFrame": "LessThan24Hours",
+      "FhirId": "admit-under-24h"
+    },
+    {
+      "Status": "Admit",
+      "TimeFrame": "Between24To48Hours",
+      "FhirId": "admit-24h-to-48h"
+    },
+    {
+      "Status": "Admit",
+      "TimeFrame": "MoreThan48Hours",
+      "FhirId": "admit-over-48h"
+    },
+    {
+      "Status": "Discharge",
+      "TimeFrame": "LessThan24Hours",
+      "FhirId": "discharge-under-24h"
+    },
+    {
+      "Status": "Discharge",
+      "TimeFrame": "Between24To48Hours",
+      "FhirId": "discharge-24h-to-48h"
+    },
+    {
+      "Status": "Discharge",
+      "TimeFrame": "MoreThan48Hours",
+      "FhirId": "discharge-over-48h"
+    }
+  ]
+}

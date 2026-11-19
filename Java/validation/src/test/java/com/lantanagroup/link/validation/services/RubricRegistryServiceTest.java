@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.PipelineRubricConfig;
 import com.lantanagroup.link.validation.configs.RubricDryRunConfig;
 import com.lantanagroup.link.validation.entities.Rubric;
 import com.lantanagroup.link.validation.entities.RubricCheck;
@@ -10,6 +11,7 @@ import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
+import com.lantanagroup.link.validation.exceptions.RubricInUseException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.models.CheckDto;
@@ -48,11 +50,12 @@ class RubricRegistryServiceTest {
     private final RubricDefinitionValidator definitionValidator = mock(RubricDefinitionValidator.class);
     private final RubricDryRunConfig dryRunConfig = new RubricDryRunConfig();
     private final RubricCacheService cacheService = mock(RubricCacheService.class);
+    private final PipelineRubricConfig pipelineRubricConfig = new PipelineRubricConfig();
 
     private RubricRegistryService service() {
         return new RubricRegistryService(
                 rubricRepository, versionRepository, checkRepository, eventRepository,
-                definitionValidator, new ObjectMapper(), dryRunConfig, cacheService);
+                definitionValidator, new ObjectMapper(), dryRunConfig, cacheService, pipelineRubricConfig);
     }
 
     private RubricVersion draftVersion() {
@@ -70,7 +73,8 @@ class RubricRegistryServiceTest {
                 .thenReturn(Optional.of(version));
         when(versionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         // atomic guarded transitions win by default (1 row affected)
-        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any())).thenReturn(1);
+        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any(), any())).thenReturn(1);
+        when(versionRepository.replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         when(versionRepository.retireIfNotRetired(any(), any(), any(), any())).thenReturn(1);
     }
 
@@ -113,6 +117,7 @@ class RubricRegistryServiceTest {
                 .thenReturn(Optional.of(Rubric.builder().rubricId("piqi.core").title("PIQI Core").build()));
         when(rubricRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(versionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(versionRepository.replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
     }
 
     // mirrors the service's definition checksum (SHA-256 over the payload's JSON serialization)
@@ -305,10 +310,30 @@ class RubricRegistryServiceTest {
         when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
                 .thenReturn(Optional.of(draftVersion()))
                 .thenReturn(Optional.of(versionOf("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED)));
-        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any())).thenReturn(0);
+        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any(), any())).thenReturn(0);
 
         assertThatThrownBy(() -> service().publish("piqi.core", "1.0.0", "qa"))
                 .isInstanceOf(RubricLifecycleException.class);
+        verify(eventRepository, never()).save(any());
+        verify(cacheService, never()).evictVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("publish of a draft replaced after its checks (still DRAFT, new checksum) -> 409 saying it changed, nothing published")
+    void publish_draftReplacedMidPublish() {
+        // the read sees the draft and its dry run; a save then replaces the definition before the guarded
+        // UPDATE, which matches no row because the checksum moved on
+        RubricVersion replaced = versionOf("piqi.core", "1.0.0", RubricVersionStatus.DRAFT);
+        replaced.setChecksum("new-definition");
+        when(versionRepository.findByRubricIdAndSemver("piqi.core", "1.0.0"))
+                .thenReturn(Optional.of(draftVersion()))
+                .thenReturn(Optional.of(replaced));
+        when(versionRepository.publishIfStatus(any(), any(), any(), any(), any(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> service().publish("piqi.core", "1.0.0", "qa"))
+                .isInstanceOf(RubricLifecycleException.class)
+                .hasMessageContaining("changed while it was being published");
+        verify(versionRepository).publishIfStatus(any(), any(), org.mockito.ArgumentMatchers.eq("abc123"), any(), any(), any());
         verify(eventRepository, never()).save(any());
         verify(cacheService, never()).evictVersion(any(), any());
     }
@@ -337,7 +362,7 @@ class RubricRegistryServiceTest {
         service().publish("piqi.core", "1.0.0", "qa");
 
         verify(versionRepository).publishIfStatus(any(),
-                org.mockito.ArgumentMatchers.eq(RubricVersionStatus.DRAFT),
+                org.mockito.ArgumentMatchers.eq(RubricVersionStatus.DRAFT), org.mockito.ArgumentMatchers.eq("abc123"),
                 org.mockito.ArgumentMatchers.eq(RubricVersionStatus.PUBLISHED), any(), org.mockito.ArgumentMatchers.eq("qa"));
         verify(versionRepository, never()).save(any());
     }
@@ -423,6 +448,80 @@ class RubricRegistryServiceTest {
         assertThatThrownBy(() -> service().retire("piqi.core", "1.0.0", "qa"))
                 .isInstanceOf(RubricLifecycleException.class);
         verify(eventRepository, never()).save(any());
+    }
+
+    /** The pipeline decides on piqi.core, and the version under test is published. */
+    private RubricVersion publishedPipelineVersion(long otherPublished) {
+        pipelineRubricConfig.setEnabled(true);
+        pipelineRubricConfig.setRubricId("piqi.core");
+        RubricVersion version = draftVersion();
+        version.setStatus(RubricVersionStatus.PUBLISHED);
+        stubVersion(version);
+        when(versionRepository.countByRubricIdAndStatusAndRubricVersionIdNot(
+                "piqi.core", RubricVersionStatus.PUBLISHED, 1L)).thenReturn(otherPublished);
+        return version;
+    }
+
+    @Test
+    @DisplayName("retire the pipeline rubric's only published version, bridge enabled -> 409, nothing retired")
+    void retire_lastPublishedPipelineVersionRefused() {
+        publishedPipelineVersion(0);
+
+        assertThatThrownBy(() -> service().retire("piqi.core", "1.0.0", "qa"))
+                .isInstanceOf(RubricInUseException.class)
+                .hasMessageContaining("piqi.core v1.0.0");
+        verify(rubricRepository).lockById("piqi.core");
+        verify(versionRepository, never()).retireIfNotRetired(any(), any(), any(), any());
+        verify(eventRepository, never()).save(any());
+        verify(cacheService, never()).evictVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("retire a pipeline rubric version while another is published -> allowed")
+    void retire_pipelineVersionWithAnotherPublishedAllowed() {
+        publishedPipelineVersion(1);
+
+        RubricVersion retired = service().retire("piqi.core", "1.0.0", "qa");
+
+        assertThat(retired.getStatus()).isEqualTo(RubricVersionStatus.RETIRED);
+        verify(rubricRepository).lockById("piqi.core");
+    }
+
+    @Test
+    @DisplayName("retire the pipeline rubric's only published version, bridge disabled -> allowed, no lock")
+    void retire_lastPublishedAllowedWhenBridgeDisabled() {
+        publishedPipelineVersion(0);
+        pipelineRubricConfig.setEnabled(false);
+
+        RubricVersion retired = service().retire("piqi.core", "1.0.0", "qa");
+
+        assertThat(retired.getStatus()).isEqualTo(RubricVersionStatus.RETIRED);
+        verify(rubricRepository, never()).lockById(any());
+    }
+
+    @Test
+    @DisplayName("retire the only published version of a rubric the pipeline does not use -> allowed")
+    void retire_lastPublishedOfOtherRubricAllowed() {
+        publishedPipelineVersion(0);
+        pipelineRubricConfig.setRubricId("measure-report-submission-v1");
+
+        RubricVersion retired = service().retire("piqi.core", "1.0.0", "qa");
+
+        assertThat(retired.getStatus()).isEqualTo(RubricVersionStatus.RETIRED);
+        verify(rubricRepository, never()).lockById(any());
+    }
+
+    @Test
+    @DisplayName("retire a draft of the pipeline rubric with nothing published -> allowed, no published version is lost")
+    void retire_pipelineDraftAllowed() {
+        pipelineRubricConfig.setEnabled(true);
+        pipelineRubricConfig.setRubricId("piqi.core");
+        stubVersion(draftVersion());
+
+        RubricVersion retired = service().retire("piqi.core", "1.0.0", "qa");
+
+        assertThat(retired.getStatus()).isEqualTo(RubricVersionStatus.RETIRED);
+        verify(versionRepository, never()).countByRubricIdAndStatusAndRubricVersionIdNot(any(), any(), any());
     }
 
     private RubricVersion versionOf(String rubricId, String semver, RubricVersionStatus status) {
