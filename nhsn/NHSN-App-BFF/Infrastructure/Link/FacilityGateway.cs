@@ -5,6 +5,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Mappers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 
@@ -41,7 +42,7 @@ internal sealed class FacilityGateway : IFacilityGateway
             var createResponse = await _facilityClient.CreateAsync(created, cancellationToken);
             LinkResponseHandler.Require(createResponse, ServiceName, nameof(SaveAsync));
 
-            _logger.LogInformation("Created Tenant facility {FacilityId}.", facilityInfo.FacilityId);
+            _logger.LogInformation("Created Tenant facility {FacilityId}.", facilityInfo.FacilityId.SanitizeForLog());
             return;
         }
 
@@ -51,7 +52,7 @@ internal sealed class FacilityGateway : IFacilityGateway
         var updateResponse = await _facilityClient.UpdateAsync(facilityInfo.FacilityId, updated, cancellationToken);
         LinkResponseHandler.Require(updateResponse, ServiceName, nameof(SaveAsync));
 
-        _logger.LogInformation("Updated Tenant facility {FacilityId}.", facilityInfo.FacilityId);
+        _logger.LogInformation("Updated Tenant facility {FacilityId}.", facilityInfo.FacilityId.SanitizeForLog());
     }
 
     public async Task<string> RequestAdHocReportAsync(AdHocReportCommand command, CancellationToken cancellationToken = default)
@@ -70,7 +71,7 @@ internal sealed class FacilityGateway : IFacilityGateway
 
         _logger.LogInformation(
             "Requested ad hoc report {ReportId} for facility {FacilityId} over {MeasureCount} measure(s) and {PatientCount} patient(s).",
-            generated.ReportId, command.FacilityId, command.ReportTypes.Count, command.PatientIds.Count);
+            generated.ReportId, command.FacilityId.SanitizeForLog(), command.ReportTypes.Count, command.PatientIds.Count);
 
         return generated.ReportId.ToString();
     }

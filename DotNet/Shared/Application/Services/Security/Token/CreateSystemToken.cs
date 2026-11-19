@@ -66,12 +66,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security.Token
 
                 if (_linkTokenServiceConfig.Value.LogToken)
                 {
-                    //LEGLINK-1359: metadata, never the JWT. This token is a bearer credential for the
-                    //Link system account, and the email claim above can now name the caller rather
-                    //than the deployment's admin address - so exporting the serialized token would
-                    //hand every telemetry consumer both a usable credential and a person's address.
-                    //Whether an actor was named is still recorded, as a flag: that is what makes an
-                    //audit event carrying no User diagnosable, and it discloses nobody.
                     Activity.Current?.AddEvent(new("Token generated.", tags: [
                         new KeyValuePair<string, object?>("token.issuer", _linkTokenServiceConfig.Value.Authority),
                         new KeyValuePair<string, object?>("token.audience", LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience),

@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -500,32 +501,43 @@
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-auditableeventoccurred.html">Auditable Event Occurred [event]</a>, <a href="event-reportscheduled.html">Report Scheduled [event]</a>, <a href="command-generatereportrequested.html">Generate Report Requested [command]</a>, <a href="query-getfacilitieslist.html">Get Facilities List [query]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="query-getfacilitieslist.html">Get Facilities List [query]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div>
         <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>The Tenant service is the entry point for configuring a tenant into Link Cloud. The service is responsible for maintaining and generating events for the scheduled measure reporting periods that the tenant is configured for. These events contain the initial information needed for Link Cloud to query resources and perform measure evaluations based on a specific reporting period.</p>
-<p>The Tenant service uses Quartz with ADO Job Stores to manage jobs across multiple instances of the service, primarily for producing ReportScheduled Kafka events.</p>
+<p>The Tenant service is where a tenant (facility) is configured in Link Cloud. It stores each facility's configuration and decides when each facility's reports are due. When a reporting period starts, it produces a <code>ReportScheduled</code> Kafka event. That event carries what the rest of Link Cloud needs to begin: the facility, the measures (dQMs) to evaluate, the frequency, and the start and end of the reporting period.</p>
+<p>The service schedules reports in one of two ways, controlled by the <code>DMRP:Enabled</code> setting:</p>
+<ul>
+<li><strong>DMRP disabled (classic scheduling).</strong> An administrator chooses which measures each facility reports daily, weekly and monthly. The service schedules one job per facility per frequency.</li>
+<li><strong>DMRP enabled.</strong> The measures each facility reports come from the NHSN Digital Monthly Reporting Plan (DMRP) API. Administrators no longer choose them. A nightly job per timezone refreshes the reporting plans from DMRP and produces the <code>ReportScheduled</code> events. See <a href="#dmrp-integration">DMRP Integration</a>.</li>
+</ul>
+<p>Scheduling uses Quartz.NET with a persistent SQL Server job store (the <code>quartz.QRTZ_</code> tables in the Tenant database) running in clustered mode. Every instance of the service shares the same jobs, and each job fires on only one instance.</p>
+<p>The service also produces:</p>
+<ul>
+<li><code>GenerateReportRequested</code> events, when an administrator requests an ad hoc report or regenerates a report.</li>
+<li><code>AuditableEventOccurred</code> events, when facilities or vendors are created, changed or deleted.</li>
+</ul>
+<p>The Tenant service does not consume any Kafka topics.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nTenantService_29AF3ECE["Service: Tenant Service"]
-  nTenantService_29AF3ECE -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
-  nTenantService_29AF3ECE -->|produces| nReportScheduled_4CB82B8["Event: ReportScheduled"]
-  nTenantService_29AF3ECE -->|sends| nGenerateReportRequested_5FF13A3F["Command: GenerateReportRequested"]
-  nTenantService_29AF3ECE -->|provides| nGetFacilitiesList_48F17BCD["Query: GetFacilitiesList"]
-  nTenantService_29AF3ECE -->|provides| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
-  nTenantService_29AF3ECE -->|provides| nGetServiceInfo_56528670["Query: GetServiceInfo"]
-  nTenantService_29AF3ECE -->|requests| nGetFacilitiesList_48F17BCD["Query: GetFacilitiesList"]
-  nTenantService_29AF3ECE -->|requests| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
-  nTenantService_29AF3ECE -->|requests| nGetServiceInfo_56528670["Query: GetServiceInfo"]
-  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
-    nAuditableEventOccurred_AF8D6F7
+nTenantService_26C077D6["Service: Tenant Service"]
+  nTenantService_26C077D6 -->|produces| nAuditableEventOccurred_68176780["Event: AuditableEventOccurred"]
+  nTenantService_26C077D6 -->|produces| nReportScheduled_2017DAE9["Event: ReportScheduled"]
+  nTenantService_26C077D6 -->|sends| nGenerateReportRequested_6C2B00E4["Command: GenerateReportRequested"]
+  nTenantService_26C077D6 -->|provides| nGetFacilitiesList_3F086CDA["Query: GetFacilitiesList"]
+  nTenantService_26C077D6 -->|provides| nGetFacilityConfig_427D2ED9["Query: GetFacilityConfig"]
+  nTenantService_26C077D6 -->|provides| nGetServiceInfo_169D6996["Query: GetServiceInfo"]
+  nTenantService_26C077D6 -->|requests| nGetFacilitiesList_3F086CDA["Query: GetFacilitiesList"]
+  nTenantService_26C077D6 -->|requests| nGetFacilityConfig_427D2ED9["Query: GetFacilityConfig"]
+  nTenantService_26C077D6 -->|requests| nGetServiceInfo_169D6996["Query: GetServiceInfo"]
+  subgraph nCompliance_7C830199_domain["Domain: Compliance"]
+    nAuditableEventOccurred_68176780
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nGenerateReportRequested_5FF13A3F
-    nReportScheduled_4CB82B8
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nGenerateReportRequested_6C2B00E4
+    nReportScheduled_2017DAE9
   end
-  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
-    nGetFacilitiesList_48F17BCD
-    nGetFacilityConfig_3026B4B5
-    nGetServiceInfo_56528670
-    nTenantService_29AF3ECE
+  subgraph nTenant_6236140_domain["Domain: Tenant"]
+    nGetFacilitiesList_3F086CDA
+    nGetFacilityConfig_427D2ED9
+    nGetServiceInfo_169D6996
+    nTenantService_26C077D6
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -533,7 +545,6 @@ nTenantService_29AF3ECE["Service: Tenant Service"]
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#kafka">Kafka Configuration</a></li>
-<li><a href="Entities/Details?type=design&amp;id=dotnet#kafka-consumer-settings">Kafka Consumer Retry Configuration</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#service-registry">Service Registry Configuration</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#cors">CORS Configuration</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#token-service-settings">Token Service Configuration</a></li>
@@ -546,6 +557,7 @@ nTenantService_29AF3ECE["Service: Tenant Service"]
 <tr>
 <th>Name</th>
 <th>Value</th>
+<th>Default</th>
 <th>Secret?</th>
 </tr>
 </thead>
@@ -553,74 +565,632 @@ nTenantService_29AF3ECE["Service: Tenant Service"]
 <tr>
 <td>MeasureConfig__CheckIfMeasureExists</td>
 <td>true or false</td>
+<td>true</td>
+<td>No</td>
+</tr>
+<tr>
+<td>ServiceRegistry__MeasureServiceUrl</td>
+<td>URL of the MeasureEval service</td>
+<td>(none)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>FacilityIdSettings__NumericOnlyFacilityId</td>
+<td>true or false</td>
+<td>false</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Enabled</td>
+<td>true or false</td>
+<td>false</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Api__BaseUrl</td>
+<td>Base URL of the DMRP API</td>
+<td>(none)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Api__TokenUrl</td>
+<td>Full URL of the DMRP token endpoint</td>
+<td>(none)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Api__ClientId</td>
+<td>Client id for the DMRP token endpoint</td>
+<td>(none)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Api__ClientSecret</td>
+<td>Client secret for the DMRP token endpoint</td>
+<td>(none)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DMRP__Api__Scope</td>
+<td>Scope to request with the token</td>
+<td>(none)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Api__TokenExpiryMarginSeconds</td>
+<td>Seconds</td>
+<td>60</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Api__TimeoutSeconds</td>
+<td>Seconds, 1 to 600</td>
+<td>30</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Scheduling__NightlyCron</td>
+<td>Quartz cron expression</td>
+<td><code>0 59 23 * * ?</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Scheduling__Concurrency</td>
+<td>1 to 32</td>
+<td>4</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Scheduling__CatchUpNights</td>
+<td>0 to 28</td>
+<td>3</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DMRP__Scheduling__ScheduledFireTimeOverride</td>
+<td>Local date and time, no offset</td>
+<td>(none)</td>
 <td>No</td>
 </tr>
 </tbody>
 </table>
+<p>What each setting does:</p>
+<ul>
+<li><strong>MeasureConfig__CheckIfMeasureExists</strong>: when true, every measure named in a facility's scheduled reports is checked against MeasureEval before the facility is saved. A measure MeasureEval does not know is rejected.</li>
+<li><strong>ServiceRegistry__MeasureServiceUrl</strong>: where MeasureEval is. Required when <code>CheckIfMeasureExists</code> is true, and also used to verify the dQM on a DMRP measure mapping.</li>
+<li><strong>FacilityIdSettings__NumericOnlyFacilityId</strong>: when true, a facility id must be 1 to 5 digits. When false, it may contain letters, digits and hyphens.</li>
+<li><strong>DMRP__Enabled</strong>: turns the DMRP integration on or off. It must match the Admin UI container's <code>LINK_DMRP_ENABLED</code> value. See <a href="#turning-dmrp-on-or-off">Turning DMRP on or off</a>.</li>
+<li><strong>DMRP__Api__*</strong>: how the service reaches the DMRP API. None of these are required to start the service. Without them, the DMRP endpoints still serve the plans already stored, and any call that needs the DMRP API fails with a message naming this section. Provision <code>ClientSecret</code> as a Key Vault reference.</li>
+<li><strong>DMRP__Scheduling__NightlyCron</strong>: when the nightly DMRP job runs, read in each facility's own timezone. It must fire before local midnight. An invalid expression falls back to the default.</li>
+<li><strong>DMRP__Scheduling__Concurrency</strong>: how many facilities one nightly run processes at the same time. This limits the burst of DMRP API calls at the end of a month.</li>
+<li><strong>DMRP__Scheduling__CatchUpNights</strong>: on how many nights at the start of a month the nightly job retries a facility that has no reporting plan for that month. 0 turns catch-up off.</li>
+<li><strong>DMRP__Scheduling__ScheduledFireTimeOverride</strong>: a testing aid only. When set (for example <code>2026-09-30T23:59:00</code>), every nightly run behaves as if it fired at that local time, so the month-end process can be tested on any date. Never set this in production. The job logs a warning on every run while it is set.</li>
+</ul>
+<p>Any <code>DMRP__Api__*</code> timeout or <code>DMRP__Scheduling__*</code> value outside its accepted range falls back to its default instead of stopping the service.</p>
+<h2 id="facility-endpoints" class="content-heading">Facility Endpoints <a href="#facility-endpoints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility Endpoints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>All routes are under <code>/api/Facility</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Success</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/Facility</code></td>
+<td>Paged search by facility id, name, timezone or vendor</td>
+<td>200 (204 when nothing matches)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/Facility/list</code></td>
+<td>A map of facility id to facility name</td>
+<td>200 (204 when empty)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/Facility/\{facilityId\}</code></td>
+<td>One facility</td>
+<td>200</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/Facility</code></td>
+<td>Create a facility</td>
+<td>201</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/Facility/\{facilityId\}</code></td>
+<td>Update a facility</td>
+<td>200</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/Facility/\{facilityId\}</code></td>
+<td>Permanently delete a facility</td>
+<td>204</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/Facility/softDelete/\{facilityId\}</code></td>
+<td>Soft delete a facility</td>
+<td>204</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/Facility/restore/\{facilityId\}</code></td>
+<td>Restore a soft deleted facility</td>
+<td>204</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/Facility/\{facilityId\}/AdHocReport</code></td>
+<td>Request an ad hoc report</td>
+<td>200</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/Facility/\{facilityId\}/RegenerateReport</code></td>
+<td>Regenerate an existing report</td>
+<td>200</td>
+</tr>
+</tbody>
+</table>
+<p>Every facility must have a name and a valid IANA timezone (for example <code>America/Chicago</code>). Creating, updating, deleting, soft deleting or restoring a facility also updates its scheduled jobs.</p>
+<p>When DMRP is enabled, creating or updating a facility with any measures in <code>scheduledReports</code> returns <code>400 Bad Request</code>. Send empty <code>daily</code>, <code>weekly</code> and <code>monthly</code> arrays instead; the service fills in the schedule from the facility's reporting plans. Creating a facility also reads its current month's plan from DMRP, and returns <code>502 Bad Gateway</code> if DMRP cannot be reached. Nothing is saved in that case, so the request can simply be retried.</p>
 <h2 id="soft-delete" class="content-heading">Soft Delete <a href="#soft-delete" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Soft Delete"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>The Tenant service supports soft deletion of facilities. Rather than permanently removing a facility record, the soft delete endpoint marks the facility with an <code>isDeleted</code> flag set to <code>true</code>. This preserves the facility's configuration and historical data while effectively removing it from active use.</p>
+<p>The Tenant service supports soft deletion of facilities. Instead of removing the facility record, a soft delete sets its <code>isDeleted</code> flag to <code>true</code>. The facility's configuration and history are kept, but the facility is no longer active.</p>
+<p>When a facility is soft deleted:</p>
+<ul>
+<li>Its classic scheduled jobs are removed, so no new reports are scheduled for it.</li>
+<li>The DMRP nightly job skips it, because it only processes active facilities.</li>
+<li>Its DMRP reporting plans are kept. They are the record of what the facility was enrolled to report.</li>
+</ul>
+<p>A soft deleted facility can be restored, which recreates its scheduled jobs. A permanent delete, by contrast, also deletes the facility's DMRP reporting plans.</p>
 <h3 id="delete-api-facility-softdelete-facilityid" class="content-heading">DELETE /api/Facility/softDelete/{facilityId} <a href="#delete-api-facility-softdelete-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DELETE /api/Facility/softDelete/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>Soft deletes a facility by setting its <code>isDeleted</code> flag to <code>true</code>.</p>
+<p>Soft deletes a facility by setting its <code>isDeleted</code> flag to <code>true</code>. Calling it on a facility that is already soft deleted is safe; it removes any jobs left behind.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><code>facilityId</code> (path, required): The unique identifier of the facility to soft delete.</li>
 </ul>
 <p><strong>Response:</strong></p>
 <ul>
-<li><code>200 OK</code>: Facility soft deleted successfully. Returns the updated facility configuration.</li>
-<li><code>400 Bad Request</code>: If the request is invalid.</li>
-<li><code>404 Not Found</code>: If no facility exists for the specified facilityId.</li>
-<li><code>500 Internal Server Error</code>: If an error occurs during processing.</li>
+<li><code>204 No Content</code>: The facility was soft deleted.</li>
+<li><code>400 Bad Request</code>: The request is invalid.</li>
+<li><code>404 Not Found</code>: No facility exists for the specified facilityId.</li>
+<li><code>500 Internal Server Error</code>: An error occurred during processing.</li>
 </ul>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="key-management" class="content-heading">Key Management <a href="#key-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>Keys are managed independently by the tenant service, and then associated with tenants. These keys are used for signing
-authentication JWTs that are passed to /token endpoints at the EHRs. EHRs check that the JWTs are signed using a key
-found in the JWKS endpoint exposed by Link.</p>
+<h3 id="patch-api-facility-restore-facilityid" class="content-heading">PATCH /api/Facility/restore/{facilityId} <a href="#patch-api-facility-restore-facilityid" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PATCH /api/Facility/restore/{facilityId}"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Restores a soft deleted facility by setting its <code>isDeleted</code> flag back to <code>false</code>, and recreates its scheduled jobs.</p>
+<p><strong>Response:</strong></p>
 <ul>
-<li>Key Registry: A global repository where all JWT signing keys are stored and managed. Each key includes metadata such as kid, algorithm, creation timestamp, status (active, disabled, expired), and an optional primary flag.</li>
-<li>Lifecycle Operations:
+<li><code>204 No Content</code>: The facility was restored.</li>
+<li><code>400 Bad Request</code>: The request is invalid.</li>
+<li><code>404 Not Found</code>: No facility exists for the specified facilityId.</li>
+<li><code>500 Internal Server Error</code>: An error occurred during processing.</li>
+</ul>
+<h2 id="report-scheduling" class="content-heading">Report Scheduling <a href="#report-scheduling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Scheduling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Both scheduling methods produce the same <code>ReportScheduled</code> event, so services downstream cannot tell which one produced it. Each event is keyed by facility id and contains:</p>
 <ul>
-<li>Create: Keys can be generated through the admin API/UI with algorithm selection and optional designation as primary.</li>
-<li>Disable/Delete: Keys no longer in use can be deactivated or removed without disrupting tenant authentication, unless actively in use. This can occur when needing to rotate a key.</li>
-<li>Rotating Keys:
+<li><code>ReportTypes</code>: the dQMs to evaluate.</li>
+<li><code>Frequency</code>: <code>Daily</code>, <code>Weekly</code> or <code>Monthly</code>.</li>
+<li><code>StartDate</code> and <code>EndDate</code>: the reporting period, in UTC. Periods are calculated in the facility's own timezone. A day runs from midnight to 23:59:59, a week starts on Sunday, and a month starts on the 1st.</li>
+<li><code>ReportTrackingId</code>: an id for the report, also sent as the <code>X-Correlation-Id</code> header.</li>
+</ul>
+<h3 id="classic-scheduling-dmrp-disabled" class="content-heading">Classic scheduling (DMRP disabled) <a href="#classic-scheduling-dmrp-disabled" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Classic scheduling (DMRP disabled)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Each facility stores the dQMs it reports in three lists: <code>daily</code>, <code>weekly</code> and <code>monthly</code>. For each list that is not empty, the service creates one Quartz job named <code>{facilityId}-{frequency}</code> in the <code>ReportScheduled</code> job group. Each job fires at the start of its period, in the facility's timezone:</p>
+<table>
+<thead>
+<tr>
+<th>Frequency</th>
+<th>Fires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Daily</td>
+<td>Every day at midnight</td>
+</tr>
+<tr>
+<td>Weekly</td>
+<td>Every Sunday at midnight</td>
+</tr>
+<tr>
+<td>Monthly</td>
+<td>The 1st of every month at midnight</td>
+</tr>
+</tbody>
+</table>
+<p>When it fires, the job produces a <code>ReportScheduled</code> event for the period that has just started. Each event gets a new, random <code>ReportTrackingId</code>.</p>
+<p>When the service starts, it creates any missing jobs for every active facility. When a facility's lists change, only the jobs for the changed frequencies are replaced.</p>
+<h3 id="dmrp-scheduling-dmrp-enabled" class="content-heading">DMRP scheduling (DMRP enabled) <a href="#dmrp-scheduling-dmrp-enabled" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DMRP scheduling (DMRP enabled)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>When DMRP is enabled, the classic jobs are not used. Instead, there is one nightly job per timezone in use. See <a href="#the-nightly-scheduling-job">The nightly scheduling job</a> for how it works.</p>
+<h2 id="dmrp-integration" class="content-heading">DMRP Integration <a href="#dmrp-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DMRP Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="what-dmrp-is" class="content-heading">What DMRP is <a href="#what-dmrp-is" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What DMRP is"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>DMRP (Digital Monthly Reporting Plan) is an NHSN API, developed by Leidos for CDC, that says which NHSN measures a facility is enrolled to report for a given month. With DMRP enabled, the reporting plan in NHSN becomes the source of truth for what each facility reports. Administrators no longer choose a facility's measures by hand.</p>
+<p>DMRP is not a separate deployment. It is a module (the <code>DotNet/DMRP</code> project) that runs inside the Tenant service when <code>DMRP:Enabled</code> is true. Its data is stored in the Tenant database, and its endpoints are served by the Tenant service under <code>/api/dmrp</code>. When the flag is false, the module does nothing and the <code>/api/dmrp</code> routes do not exist.</p>
+<h3 id="how-the-dmrp-api-is-called" class="content-heading">How the DMRP API is called <a href="#how-the-dmrp-api-is-called" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How the DMRP API is called"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The service reads a facility's plan in two steps:</p>
 <ol>
-<li>Create a new key</li>
-<li>Associate the new key with tenants</li>
-<li>Delete the old key.</li>
+<li>It requests a token from <code>DMRP:Api:TokenUrl</code> using the OAuth 2.0 client credentials grant (<code>DMRP:Api:ClientId</code> and <code>DMRP:Api:ClientSecret</code>). The token is cached and reused until shortly before it expires.</li>
+<li>It calls two operations under <code>DMRP:Api:BaseUrl</code>, one for each NHSN component, passing the token as a bearer token:</li>
 </ol>
-</li>
-</ul>
-</li>
-<li>Tenant Association (handled separately):
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Component</th>
+<th>Covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /msc?nhsnorgid={facilityId}&amp;year={year}&amp;month={month}</code></td>
+<td><code>MSC</code></td>
+<td>Medicine reports</td>
+</tr>
+<tr>
+<td><code>GET /ps/annual/mrp?nhsnorgid={facilityId}&amp;year={year}&amp;month={month}</code></td>
+<td><code>PS</code></td>
+<td>Patient safety</td>
+</tr>
+</tbody>
+</table>
+<p>Both components are reported monthly. The word &quot;annual&quot; in the patient safety path is part of the operation's name and does not describe how often it is reported.</p>
+<p>The response lists only the measures the facility <strong>is</strong> enrolled in. DMRP has no way to say &quot;not enrolled&quot;; a measure that is missing from the response is not enrolled.</p>
+<h3 id="measure-mappings" class="content-heading">Measure mappings <a href="#measure-mappings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure mappings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>DMRP names NHSN measures (for example <code>HOB</code>). Link evaluates dQMs. A <strong>measure mapping</strong> connects the two: it says which dQM Link runs for an NHSN measure, and at what frequency (<code>Daily</code>, <code>Weekly</code> or <code>Monthly</code>). Each NHSN measure has at most one mapping, and several measures may map to the same dQM.</p>
+<p>Administrators manage mappings through <code>/api/dmrp/measure-mappings</code>. A mapping's dQM is checked against MeasureEval when it is created or updated.</p>
+<p>If DMRP returns a measure that has no mapping, the service records a placeholder mapping for it with no dQM. The placeholder appears in the measure mappings list so an administrator can see it and complete it by setting a dQM and a frequency. Until then, that measure schedules nothing. Once it is completed, every facility enrolled in that measure picks it up without any other change.</p>
+<h3 id="facility-reporting-plans" class="content-heading">Facility reporting plans <a href="#facility-reporting-plans" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility reporting plans"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The service stores what DMRP says in the <code>FacilityReportingPlans</code> table. There is one row per facility, component, measure and month. Each row records:</p>
 <ul>
-<li>Tenants reference keys by kid through the Tenant Service configuration interface.</li>
-<li>A tenant may use a shared or unique key from the registry.</li>
-<li>Changing a tenant’s associated key does not impact the underlying key object—it only changes the reference.</li>
+<li>the facility id, component (<code>MSC</code> or <code>PS</code>) and NHSN measure,</li>
+<li>the reporting month and year,</li>
+<li>the measure mapping it uses, if there is one,</li>
+<li><code>IsReporting</code>: whether the facility is currently enrolled.</li>
 </ul>
-</li>
-<li>JWKS documents are managed automatically
+<h3 id="updating-reporting-plans-from-dmrp" class="content-heading">Updating reporting plans from DMRP <a href="#updating-reporting-plans-from-dmrp" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Updating reporting plans from DMRP"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Updating a facility's plan for a month (a &quot;sync&quot;) works as follows:</p>
+<ol>
+<li>Read the facility's plan for the month from both DMRP operations.</li>
+<li>Match each measure to its measure mapping, creating a placeholder mapping for any measure that has none.</li>
+<li>Add a row for each enrollment that is new.</li>
+<li>Set <code>IsReporting</code> back to true on any row DMRP returns again after it had been withdrawn.</li>
+<li>Set <code>IsReporting</code> to false on any row DMRP no longer returns. The row is kept as history, not deleted.</li>
+</ol>
+<p>Two safety rules apply:</p>
 <ul>
-<li>When keys change the JWKS document is re-generated</li>
-<li>The JWKS document is stored on the file system</li>
-<li>The JWKS document on the file system is exposed via proxy to external parties for verification (such as EHRs)</li>
+<li>If DMRP returns no measures at all for the facility, nothing is changed. An empty answer looks the same as a facility DMRP knows nothing about, so the service does not treat it as a withdrawal from everything.</li>
+<li>A withdrawal only applies within a component that returned data. If the patient safety operation returns nothing, the facility's patient safety rows are left alone even while its medicine rows are updated.</li>
+</ul>
+<p>A sync happens at these times:</p>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What is synced</th>
+<th>If DMRP cannot be reached</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A facility is created</td>
+<td>The facility's current month</td>
+<td>The create fails with <code>502</code> and nothing is saved</td>
+</tr>
+<tr>
+<td>The last night of each month</td>
+<td>The month that starts at midnight, for every active facility</td>
+<td>Retried once, then the job continues using the rows already stored</td>
+</tr>
+<tr>
+<td>The first nights of a month (catch-up)</td>
+<td>The current month, for any facility that has no rows for it</td>
+<td>Retried once, then the job continues using the rows already stored</td>
+</tr>
+<tr>
+<td>An administrator asks for it</td>
+<td>The requested month, using <code>refresh=true</code> on the reporting plan endpoints</td>
+<td>The request fails with <code>502</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-nightly-scheduling-job" class="content-heading">The nightly scheduling job <a href="#the-nightly-scheduling-job" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: The nightly scheduling job"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>When DMRP is enabled, report scheduling is done by one Quartz job per timezone in use (the <code>DmrpNightly</code> job group, one job named after each timezone). By default each job runs at 23:59 in its timezone. It reads the facility table at run time, so it always works from current data.</p>
+<p>Each run does the following:</p>
+<ol>
+<li><strong>Work out which periods start at the coming midnight.</strong> A Daily period starts every night. A Monthly period also starts when the coming midnight is the 1st of a month. Weekly periods are not produced while DMRP is enabled.</li>
+<li><strong>Find the active facilities in the timezone.</strong> Soft deleted facilities are skipped. Facilities are processed in parallel, up to <code>DMRP:Scheduling:Concurrency</code> at a time.</li>
+<li><strong>Refresh the plan from DMRP when due</strong>, for each facility:
+<ul>
+<li>On the last night of a month, sync the month that is about to start.</li>
+<li>On the first <code>CatchUpNights</code> nights of a month (the 1st to the 3rd by default), sync any facility that still has no rows for the month. This repairs a month-end sync that failed, and covers a facility added after the month began. If the catch-up finds an enrollment, the job also produces that month's Monthly event late, so the facility loses a few days of the month instead of the whole month.</li>
 </ul>
 </li>
-</ul>
-<p>The following sequence diagram illustrates how the keys are used during the authentication requests to EHRs:</p>
+<li><strong>Build the facility's schedule.</strong> The job reads the facility's enrolled measures for the month (<code>IsReporting</code> true), looks up each one's mapping, and groups the dQMs by the mapping's frequency. Measures with no dQM are left out. If a measure maps to Weekly, a warning is logged and it is not scheduled.</li>
+<li><strong>Produce the events.</strong> For each period that starts at midnight and has at least one dQM, the job produces a <code>ReportScheduled</code> event. A facility with nothing to report is skipped.</li>
+</ol>
+<p>If one facility fails, the error is logged and counted, and the job carries on with the rest.</p>
+<p>The <code>ReportTrackingId</code> on these events is not random. It is built from the facility id, the frequency and the period start, so it is always the same for the same report. The Report service rejects a <code>ReportScheduled</code> event whose tracking id it has already stored. As a result, running the job again for the same night (after an outage, a restart part way through, or a manual run) cannot create a duplicate report.</p>
+<p>If the service is down when a job should have run, Quartz runs it once when the service comes back, and the job still produces the events for the night that was missed.</p>
 <pre class="mermaid">sequenceDiagram
-    participant L as Link
-    participant J as JWKS Endpoint
-    participant E as EHR Vendor
+    participant Q as Quartz (23:59 local)
+    participant J as DMRP nightly job
+    participant DB as Tenant database
+    participant D as DMRP API
+    participant K as Kafka
 
-    L->>L: Create JWT
-    L->>L: Sign JWT (with kid)
-    L->>J: Publish key to JWKS
-    L->>E: POST /token (with JWT)
-    E->>J: GET /.well-known/jwks.json
-    J-->>E: Return JWKS document
-    E->>E: Verify signature using kid
-    E-->>L: Return access token
+    Q->>J: Fire job for timezone
+    J->>DB: Read active facilities in the timezone
+    loop Each facility
+        alt Last night of the month, or catch-up night with no rows
+            J->>D: Get token, then GET /msc and /ps/annual/mrp
+            D-->>J: Enrolled measures
+            J->>DB: Add, reinstate or withdraw reporting plan rows
+        end
+        J->>DB: Read enrolled measures and their measure mappings
+        J->>J: Group dQMs by frequency
+        J->>K: ReportScheduled (Daily, plus Monthly on the 1st)
+    end
+</pre>
+<p>The job is kept in step with the facilities automatically:</p>
+<ul>
+<li>When the service starts, it creates a job for every timezone used by an active facility, and removes jobs for timezones no facility uses.</li>
+<li>When a facility is created, updated or restored, the service makes sure its timezone has a job.</li>
+<li>A change to a facility's reporting plan never changes the Quartz jobs, because the job reads the plans each time it runs.</li>
+</ul>
+<p>The facility's stored <code>scheduledReports</code> field is also filled in from its reporting plan for the current month whenever the facility is saved. This shows what the facility is reporting. The nightly job does not rely on it; it reads the reporting plans directly.</p>
+<h3 id="turning-dmrp-on-or-off" class="content-heading">Turning DMRP on or off <a href="#turning-dmrp-on-or-off" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Turning DMRP on or off"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Only one scheduling method runs at a time, and the switch happens when the service starts:</p>
+<ul>
+<li><strong>Turning DMRP on:</strong> at startup, the service deletes all classic jobs before it starts the scheduler, so an old job cannot fire with an outdated measure list. It then creates the nightly timezone jobs.</li>
+<li><strong>Turning DMRP off:</strong> at startup, the service deletes the nightly timezone jobs and goes back to classic scheduling, rebuilding each active facility's classic jobs from its stored <code>scheduledReports</code>.</li>
+</ul>
+<p><code>DMRP:Enabled</code> on the Tenant service and <code>LINK_DMRP_ENABLED</code> on the Admin UI must have the same value. If the UI is off and the service is on, the facility form asks for a schedule that the service then rejects. If the UI is on and the service is off, the form sends an empty schedule and the facility is created with no reports scheduled, without any error. Never turn the UI on before the service.</p>
+<h3 id="dmrp-endpoints" class="content-heading">DMRP endpoints <a href="#dmrp-endpoints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DMRP endpoints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>These are only available when DMRP is enabled, and require the Link administrator role.</p>
+<p><strong>Measure mappings:</strong> <code>/api/dmrp/measure-mappings</code></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/measure-mappings/search</code></td>
+<td>Paged search by measure, dQM or frequency</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/measure-mappings/\{id\}</code></td>
+<td>One mapping</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/dmrp/measure-mappings</code></td>
+<td>Create a mapping (the dQM is checked against MeasureEval)</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/dmrp/measure-mappings/\{id\}</code></td>
+<td>Update a mapping</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dmrp/measure-mappings/\{id\}</code></td>
+<td>Delete a mapping (<code>409</code> if a reporting plan still uses it)</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dmrp/measure-mappings</code></td>
+<td>Delete all mappings</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Facility reporting plans:</strong> <code>/api/dmrp/reporting-plans</code></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/reporting-plans</code></td>
+<td>Paged list of every plan row</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/reporting-plans/search</code></td>
+<td>Paged search by facility, measure mapping or period</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/reporting-plans/facilities/\{facilityId\}</code></td>
+<td>A facility's plan rows. Accepts <code>month</code>, <code>year</code>, <code>monthsAhead</code>, <code>isReporting</code> and <code>refresh</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/reporting-plans/facilities/\{facilityId\}/periods</code></td>
+<td>A facility's plan as a calendar, one entry per period with the dQMs it will run. Accepts <code>monthsAhead</code>, <code>isReporting</code> and <code>refresh</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dmrp/reporting-plans/\{id\}</code></td>
+<td>One plan row</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/dmrp/reporting-plans</code></td>
+<td>Create a plan row by hand</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/dmrp/reporting-plans/\{id\}</code></td>
+<td>Update a plan row</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dmrp/reporting-plans/\{id\}</code></td>
+<td>Delete a plan row</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dmrp/reporting-plans/facilities/\{facilityId\}</code></td>
+<td>Delete all of a facility's plan rows</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dmrp/reporting-plans</code></td>
+<td>Delete every plan row</td>
+</tr>
+</tbody>
+</table>
+<p>Passing <code>refresh=true</code> to either facility read syncs the plan from DMRP first. If DMRP cannot be reached, the request fails with <code>502</code> instead of returning data that may be out of date. Leave <code>refresh</code> off to read what Link last stored.</p>
+<h3 id="health-check" class="content-heading">Health check <a href="#health-check" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Health check"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>When DMRP is enabled, the service's <code>/health</code> endpoint includes a <code>DMRP</code> check. It calls the DMRP API's <code>/msc</code> operation with a 5 second timeout. Any answer that shows the API is reachable, including <code>401</code>, <code>400</code> or <code>404</code>, counts as healthy. If DMRP cannot be reached, the check reports <code>Degraded</code> rather than <code>Unhealthy</code>, because the service can still schedule from the plans it has already stored. If <code>DMRP:Api:BaseUrl</code> is not set, the check is skipped.</p>
+<h3 id="mock-dmrp-service-for-local-testing" class="content-heading">Mock DMRP service for local testing <a href="#mock-dmrp-service-for-local-testing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mock DMRP service for local testing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The real DMRP API can only be reached from the CDC development environment. For local development and Link's lower environments, the repository includes a mock DMRP service, <strong>MockDmrpApi</strong> (<code>DotNet/MockDmrpApi</code>). It never runs in production.</p>
+<p>The mock serves the same two operations the Tenant service calls (<code>GET /msc</code> and <code>GET /ps/annual/mrp</code>) and a token endpoint, so the Tenant service follows exactly the same steps against the mock as it will against the real API. It returns whatever enrollments it has been given, which lets a test set up an exact scenario.</p>
+<p>It has two sets of routes:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>DMRP routes</th>
+<th>Mock-only routes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Routes</td>
+<td><code>GET /msc</code>, <code>GET /ps/annual/mrp</code></td>
+<td>Everything under <code>/api/mock-dmrp</code></td>
+</tr>
+<tr>
+<td>Purpose</td>
+<td>Stand in for the real DMRP API</td>
+<td>Issue tokens, and add, change or remove the enrollments the DMRP routes return</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td>Bearer token from the mock's token endpoint</td>
+<td>Link's standard authentication (open locally)</td>
+</tr>
+<tr>
+<td>Exists in real DMRP?</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p>Useful mock-only routes:</p>
+<ul>
+<li><code>POST /api/mock-dmrp/oauth2/token</code>: issues a token for the DMRP routes.</li>
+<li><code>POST /api/mock-dmrp/entries</code>: enrolls a facility in a measure for a month.</li>
+<li><code>GET /api/mock-dmrp/facilities/\{facilityId\}/entries</code>: lists a facility's enrollments.</li>
+<li><code>DELETE /api/mock-dmrp/entries</code>: removes every enrollment.</li>
+<li><code>PUT /api/mock-dmrp/delay</code>: makes the DMRP routes answer slowly, to test timeouts.</li>
+</ul>
+<p><strong>Running it locally.</strong> In the docker-compose stack the service is called <code>mock-dmrp-api</code> and listens on port <strong>6159</strong>. The local stack turns DMRP on for the Tenant service and points it at the mock, so no extra setup is needed:</p>
+<pre><code class="language-bash">docker compose up -d mock-dmrp-api tenant
+</code></pre>
+<p>To test a facility locally:</p>
+<ol>
+<li>Enroll the facility in a measure for a month with <code>POST http://localhost:6159/api/mock-dmrp/entries</code>, for example <code>{&quot;facilityId&quot;:&quot;100&quot;,&quot;component&quot;:&quot;MSC&quot;,&quot;measure&quot;:&quot;HOB&quot;,&quot;reportingMonth&quot;:10,&quot;reportingYear&quot;:2026,&quot;isReporting&quot;:&quot;Y&quot;}</code>.</li>
+<li>Make sure a measure mapping exists for that measure, with a dQM and a frequency of <code>Daily</code> or <code>Monthly</code>, using <code>POST /api/dmrp/measure-mappings</code> on the Tenant service.</li>
+<li>Create the facility, or call <code>GET /api/dmrp/reporting-plans/facilities/100?refresh=true</code> if it already exists, so the Tenant service reads the plan from the mock.</li>
+<li>To test the month-end process without waiting for the end of a month:
+<ul>
+<li>Enroll the facility in the mock for the <strong>following</strong> month as well.</li>
+<li>Set <code>DMRP__Scheduling__ScheduledFireTimeOverride</code> on the Tenant service to the last night of the current month (for example <code>2026-10-31T23:59:00</code>). Each run then behaves as if it were that night: it syncs the next month and produces its Monthly event.</li>
+<li>The job still runs at 23:59 by default. To see it sooner, also set <code>DMRP__Scheduling__NightlyCron</code> to run more often, for example every 5 minutes with <code>0 0/5 * * * ?</code>. Remove both settings when you are done.</li>
+</ul>
+</li>
+</ol>
+<p>The mock's settings are under the <code>MockDmrpApi</code> section. <code>MockDmrpApi:Enabled</code> must be true for it to serve anything; when it is false, every route except <code>/health</code> and <code>/api/mock-dmrp/info</code> returns <code>503</code>. Full details are in <code>DotNet/MockDmrpApi/README.md</code>.</p>
+<p>The mock's API contract is a best guess, because the real DMRP API description has not been published yet. Expect changes when it is. The mock's token is also signed differently from the real NHSN token (a shared secret instead of published public keys), so token validation is the one part that the mock cannot fully test.</p>
+<h2 id="vendors-and-ehr-authentication-keys" class="content-heading">Vendors and EHR Authentication Keys <a href="#vendors-and-ehr-authentication-keys" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendors and EHR Authentication Keys"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Tenant service keeps a list of EHR vendors and their versions. Each facility can be linked to a vendor version.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET, POST</td>
+<td><code>/api/Vendor</code></td>
+<td>List or create vendors</td>
+</tr>
+<tr>
+<td>GET, PUT, DELETE</td>
+<td><code>/api/Vendor/\{id\}</code></td>
+<td>Read, update or delete a vendor</td>
+</tr>
+<tr>
+<td>GET, POST</td>
+<td><code>/api/VendorVersion</code></td>
+<td>List (optionally by <code>vendorId</code>) or create vendor versions</td>
+</tr>
+<tr>
+<td>GET, PUT, DELETE</td>
+<td><code>/api/VendorVersion/\{id\}</code></td>
+<td>Read, update or delete a vendor version</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Creating a vendor also creates a version named <code>default</code> for it.</li>
+<li>A vendor or vendor version cannot be deleted while Normalization still uses it; the delete returns <code>409 Conflict</code>.</li>
+<li>Creating, changing and deleting a vendor produces an audit event.</li>
+</ul>
+<h3 id="signing-keys" class="content-heading">Signing keys <a href="#signing-keys" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Signing keys"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Some EHRs (for example Epic) require Link to authenticate by sending a signed JWT to the EHR's <code>/token</code> endpoint. The private keys used to sign these JWTs are not stored in the Tenant service. They are stored as PEM secrets in Azure Key Vault.</p>
+<p>A vendor can name the Key Vault secret to use, in its <code>authentication.signingKeySecretId</code> field. The name must be 1 to 127 letters, digits or hyphens. Sending <code>null</code> removes it.</p>
+<p>When DataAcquisition needs to authenticate a facility, it chooses the key like this:</p>
+<ol>
+<li>If the facility's vendor has a <code>signingKeySecretId</code>, it uses that secret. This lets every facility on the same vendor share one key.</li>
+<li>Otherwise, it uses the secret named <code>{facilityId}-pem</code>.</li>
+</ol>
+<p>(DataAcquisition's <code>DataSourceAuth:KeySource</code> setting can instead read the key from the facility's authentication configuration in the database. This is a temporary fallback that will be removed.)</p>
+<p><strong>Rotating a key:</strong></p>
+<ol>
+<li>Add the new key to Key Vault as a new secret, and give its public key to the EHR.</li>
+<li>Update the vendor's <code>signingKeySecretId</code> to the new secret name.</li>
+<li>Once the new key is working, remove the old secret.</li>
+</ol>
+<p>The following sequence diagram shows how the key is used when Link authenticates with an EHR:</p>
+<pre class="mermaid">sequenceDiagram
+    participant DA as DataAcquisition
+    participant T as Tenant service
+    participant KV as Azure Key Vault
+    participant E as EHR
+
+    DA->>T: Get facility (with vendor)
+    T-->>DA: Vendor signingKeySecretId (if set)
+    DA->>KV: Get PEM secret (vendor secret, or {facilityId}-pem)
+    KV-->>DA: Private key
+    DA->>DA: Create and sign JWT
+    DA->>E: POST /token (client assertion JWT)
+    E->>E: Verify signature with Link's registered public key
+    E-->>DA: Access token
 </pre>
 
         
@@ -1521,28 +2091,28 @@ withdrawn from. Omit to return both.</td></tr></tbody>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nTenantService_29AF3ECE["Service: Tenant Service"]
-  nTenantService_29AF3ECE -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
-  nTenantService_29AF3ECE -->|produces| nReportScheduled_4CB82B8["Event: ReportScheduled"]
-  nTenantService_29AF3ECE -->|sends| nGenerateReportRequested_5FF13A3F["Command: GenerateReportRequested"]
-  nTenantService_29AF3ECE -->|provides| nGetFacilitiesList_48F17BCD["Query: GetFacilitiesList"]
-  nTenantService_29AF3ECE -->|provides| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
-  nTenantService_29AF3ECE -->|provides| nGetServiceInfo_56528670["Query: GetServiceInfo"]
-  nTenantService_29AF3ECE -->|requests| nGetFacilitiesList_48F17BCD["Query: GetFacilitiesList"]
-  nTenantService_29AF3ECE -->|requests| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
-  nTenantService_29AF3ECE -->|requests| nGetServiceInfo_56528670["Query: GetServiceInfo"]
-  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
-    nAuditableEventOccurred_AF8D6F7
+nTenantService_26C077D6["Service: Tenant Service"]
+  nTenantService_26C077D6 -->|produces| nAuditableEventOccurred_68176780["Event: AuditableEventOccurred"]
+  nTenantService_26C077D6 -->|produces| nReportScheduled_2017DAE9["Event: ReportScheduled"]
+  nTenantService_26C077D6 -->|sends| nGenerateReportRequested_6C2B00E4["Command: GenerateReportRequested"]
+  nTenantService_26C077D6 -->|provides| nGetFacilitiesList_3F086CDA["Query: GetFacilitiesList"]
+  nTenantService_26C077D6 -->|provides| nGetFacilityConfig_427D2ED9["Query: GetFacilityConfig"]
+  nTenantService_26C077D6 -->|provides| nGetServiceInfo_169D6996["Query: GetServiceInfo"]
+  nTenantService_26C077D6 -->|requests| nGetFacilitiesList_3F086CDA["Query: GetFacilitiesList"]
+  nTenantService_26C077D6 -->|requests| nGetFacilityConfig_427D2ED9["Query: GetFacilityConfig"]
+  nTenantService_26C077D6 -->|requests| nGetServiceInfo_169D6996["Query: GetServiceInfo"]
+  subgraph nCompliance_7C830199_domain["Domain: Compliance"]
+    nAuditableEventOccurred_68176780
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nGenerateReportRequested_5FF13A3F
-    nReportScheduled_4CB82B8
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nGenerateReportRequested_6C2B00E4
+    nReportScheduled_2017DAE9
   end
-  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
-    nGetFacilitiesList_48F17BCD
-    nGetFacilityConfig_3026B4B5
-    nGetServiceInfo_56528670
-    nTenantService_29AF3ECE
+  subgraph nTenant_6236140_domain["Domain: Tenant"]
+    nGetFacilitiesList_3F086CDA
+    nGetFacilityConfig_427D2ED9
+    nGetServiceInfo_169D6996
+    nTenantService_26C077D6
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

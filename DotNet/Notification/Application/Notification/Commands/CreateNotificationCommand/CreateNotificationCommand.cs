@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 
                     //add id to current activity
                     var currentActivity = Activity.Current;
-                    currentActivity?.AddTag(DiagnosticNames.NotificationId, entity.Id);
+                    currentActivity?.AddTag(NotificationDiagnosticNames.NotificationId, entity.Id);
                     if (entity.FacilityId != null)
                     {
                         currentActivity?.AddTag(DiagnosticNames.FacilityId, entity.FacilityId);
@@ -104,7 +104,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     //update notification creation metric counter                    
                     _metrics.IncrementNotificationCreatedCounter([ 
                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, entity.FacilityId), 
-                        new KeyValuePair<string, object?>(DiagnosticNames.NotificationType, entity.NotificationType)
+                        new KeyValuePair<string, object?>(NotificationDiagnosticNames.NotificationType, entity.NotificationType)
                     ]);
 
                     //Log creation of new notification configuration

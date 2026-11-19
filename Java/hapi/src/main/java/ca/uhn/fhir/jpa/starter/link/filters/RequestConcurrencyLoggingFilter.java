@@ -32,7 +32,7 @@ public class RequestConcurrencyLoggingFilter extends OncePerRequestFilter {
         String address = HttpServletRequestUtils.getClientIpAddress(request);
         int count = increment(address);
         try {
-            logger.info("ADDRESS=[{}] COUNT=[{}]", address, count);
+            logger.debug("ADDRESS=[{}] COUNT=[{}]", HttpServletRequestUtils.sanitizeForLog(address), count);
             chain.doFilter(request, response);
         } finally {
             decrement(address);
@@ -45,7 +45,7 @@ public class RequestConcurrencyLoggingFilter extends OncePerRequestFilter {
                 return 1;
             }
             if (value < 0) {
-                logger.warn("Invalid pre-request count for {}: {}", address, value);
+                logger.warn("Invalid pre-request count for {}: {}", HttpServletRequestUtils.sanitizeForLog(address), value);
                 return 1;
             }
             return value + 1;
@@ -55,11 +55,11 @@ public class RequestConcurrencyLoggingFilter extends OncePerRequestFilter {
     private void decrement(String address) {
         countsByAddress.compute(address, (key, value) -> {
             if (value == null) {
-                logger.warn("Post-request count for {} not found", address);
+                logger.warn("Post-request count for {} not found", HttpServletRequestUtils.sanitizeForLog(address));
                 return null;
             }
             if (value < 1) {
-                logger.warn("Invalid post-request count for {}: {}", address, value);
+                logger.warn("Invalid post-request count for {}: {}", HttpServletRequestUtils.sanitizeForLog(address), value);
                 return null;
             }
             return value == 1 ? null : value - 1;
