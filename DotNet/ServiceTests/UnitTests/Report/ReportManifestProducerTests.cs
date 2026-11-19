@@ -361,6 +361,183 @@ public class ReportManifestProducerTests
 
     #endregion
 
+    #region Ad-hoc generation with patients in flight (LEGLINK-1864)
+
+    /// <summary>
+    /// Every way an entry can stall short of the terminal sets the completion gate uses. A patient
+    /// stalled before aggregation would otherwise look exactly like a NotReportable one, and one
+    /// stalled after it is already counted in the aggregates.
+    /// </summary>
+    [Theory]
+    [InlineData(ReportingStatus.PatientIdentified, null)]
+    [InlineData(ReportingStatus.PendingValidation, SubmissionStatus.PendingValidation)]
+    [InlineData(ReportingStatus.PassedValidation, SubmissionStatus.Submitting)]
+    [InlineData(ReportingStatus.PassedValidation, SubmissionStatus.FailedSubmission)]
+    [InlineData(ReportingStatus.PassedValidation, null)]
+    [InlineData(ReportingStatus.NotReportable, null)]
+    public async Task Generate_NonTerminalEntry_AddsOneIncompleteWarning(ReportingStatus reporting, SubmissionStatus? submission)
+    {
+        var harness = new Harness(entries:
+        [
+            (PatientId, ReportingStatus.PassedValidation, SubmissionStatus.Submitted),
+            ("patient-stalled", reporting, submission)
+        ]);
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
+        Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
+        Assert.Equal(OperationOutcome.IssueType.Incomplete, issue.Code);
+        Assert.Contains("patient-stalled", issue.Diagnostics);
+        Assert.Contains(reporting.ToString(), issue.Diagnostics);
+        Assert.Contains(submission?.ToString() ?? "None", issue.Diagnostics);
+    }
+
+    /// <summary>
+    /// What the scheduled path sees: Produce only runs once every entry is terminal, so the
+    /// stalled-patient warnings must never reach an uploaded manifest.
+    /// </summary>
+    [Fact]
+    public async Task Generate_AllEntriesTerminal_AddsNoIncompleteWarnings()
+    {
+        var harness = new Harness(entries:
+        [
+            ("p-submitted", ReportingStatus.PassedValidation, SubmissionStatus.Submitted),
+            ("p-not-reportable", ReportingStatus.NotReportable, SubmissionStatus.NotEligable),
+            ("p-bypassed", ReportingStatus.PassedValidation, SubmissionStatus.NotSubmitted),
+            ("p-failed", ReportingStatus.FailedValidation, SubmissionStatus.Submitted)
+        ]);
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
+        Assert.Equal(OperationOutcome.IssueSeverity.Error, issue.Severity);
+        Assert.Equal(OperationOutcome.IssueType.Invalid, issue.Code);
+        Assert.Contains("p-failed", issue.Diagnostics);
+    }
+
+    /// <summary>
+    /// A failed patient whose submission is also stuck gets both issues.
+    /// </summary>
+    [Fact]
+    public async Task Generate_FailedValidationAndStalledSubmission_GetsErrorAndWarning()
+    {
+        var harness = new Harness(entries: [(PatientId, ReportingStatus.FailedValidation, SubmissionStatus.Submitting)]);
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var issues = Assert.Single(resources.OfType<OperationOutcome>()).Issue;
+        Assert.Collection(issues,
+            i => Assert.Equal(OperationOutcome.IssueType.Invalid, i.Code),
+            i => Assert.Equal(OperationOutcome.IssueType.Incomplete, i.Code));
+    }
+
+    [Fact]
+    public async Task Generate_DuplicateEntriesForOnePatient_ListsPatientOnce()
+    {
+        var harness = new Harness(entries:
+        [
+            (PatientId, ReportingStatus.PassedValidation, SubmissionStatus.Submitted),
+            (PatientId, ReportingStatus.PassedValidation, SubmissionStatus.Submitted),
+            ("patient-2", ReportingStatus.NotReportable, SubmissionStatus.NotEligable)
+        ]);
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var census = Assert.Single(resources.OfType<List>());
+        Assert.Equal(
+            new[] { $"Patient/{PatientId}", "Patient/patient-2" },
+            census.Entry.Select(e => e.Item.Reference));
+    }
+
+    /// <summary>
+    /// Only a forced ad-hoc request reaches Generate before the period closes; Produce returns
+    /// first. The manifest has to say the census may still change.
+    /// </summary>
+    [Fact]
+    public async Task Generate_PeriodNotClosed_AddsPeriodWarning()
+    {
+        var harness = new Harness(endOfReportPeriodJobHasRun: false);
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
+        Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
+        Assert.Equal(OperationOutcome.IssueType.Informational, issue.Code);
+        Assert.Contains("reporting period has not closed", issue.Diagnostics);
+    }
+
+    [Fact]
+    public async Task Generate_TenantReportsFacilityMissing_ThrowsFacilityConfigNotFound()
+    {
+        var harness = new Harness();
+        harness.TenantApiService
+            .Setup(t => t.GetFacilityConfig(FacilityId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("No Facility Config found"));
+
+        await Assert.ThrowsAsync<LantanaGroup.Link.Report.Application.FacilityConfigNotFoundException>(
+            () => harness.Producer.Generate(harness.Schedule));
+    }
+
+    [Fact]
+    public async Task Generate_TenantReturnsNoConfig_ThrowsFacilityConfigNotFound()
+    {
+        var harness = new Harness();
+        harness.TenantApiService
+            .Setup(t => t.GetFacilityConfig(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FacilityModel)null!);
+
+        await Assert.ThrowsAsync<LantanaGroup.Link.Report.Application.FacilityConfigNotFoundException>(
+            () => harness.Producer.Generate(harness.Schedule));
+    }
+
+    [Fact]
+    public async Task Generate_TenantFails_ThrowsTenantUnavailable()
+    {
+        var harness = new Harness();
+        harness.TenantApiService
+            .Setup(t => t.GetFacilityConfig(FacilityId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("connection refused"));
+
+        await Assert.ThrowsAsync<LantanaGroup.Link.Report.Application.TenantUnavailableException>(
+            () => harness.Producer.Generate(harness.Schedule));
+    }
+
+    /// <summary>
+    /// The ad-hoc endpoint relies on Generate and GenerateAsBundle writing nothing anywhere.
+    /// </summary>
+    [Fact]
+    public async Task GenerateAndGenerateAsBundle_WithPatientsInFlight_HaveNoSideEffects()
+    {
+        var harness = new Harness(
+            endOfReportPeriodJobHasRun: false,
+            allEntriesComplete: false,
+            entries: [(PatientId, ReportingStatus.PendingValidation, SubmissionStatus.PendingValidation)]);
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+        var bundle = await harness.Producer.GenerateAsBundle(harness.Schedule);
+
+        Assert.Equal(Bundle.BundleType.Collection, bundle.Type);
+        Assert.Equal(
+            resources.Select(r => r.TypeName),
+            bundle.Entry.Select(e => e.Resource.TypeName));
+
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.SubmitPayloadKafkaProducer.VerifyNoOtherCalls();
+        harness.AuditKafkaProducer.VerifyNoOtherCalls();
+        harness.ScheduleManager.Verify(
+            m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.EntryManager.Verify(
+            m => m.AreAllEntriesCompleteAsync(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
+    }
+
+    #endregion
+
     private sealed class Harness
     {
         public ReportScheduleModel Schedule { get; }
@@ -369,6 +546,8 @@ public class ReportManifestProducerTests
         public Mock<IReportEntryManager> EntryManager { get; } = new();
         public Mock<BlobStorageService> BlobStorage { get; }
         public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducer { get; } = new();
+        public Mock<IProducer<string, AuditEventMessage>> AuditKafkaProducer { get; } = new();
+        public Mock<ITenantApiService> TenantApiService { get; } = new();
 
         /// <param name="enableSubmission">
         /// False models a report requested with bypassSubmission: true.
@@ -383,11 +562,16 @@ public class ReportManifestProducerTests
         /// What SetupServiceInformation registers at startup. Defaults to a CI-shaped one with all three
         /// version values present.
         /// </param>
+        /// <param name="entries">
+        /// The schedule's report entries, as (patient id, reporting status, submission status). Defaults
+        /// to one submitted patient.
+        /// </param>
         public Harness(
             bool enableSubmission = true,
             bool endOfReportPeriodJobHasRun = true,
             bool allEntriesComplete = true,
-            ServiceInformation? serviceInformation = null)
+            ServiceInformation? serviceInformation = null,
+            IEnumerable<(string PatientId, ReportingStatus Reporting, SubmissionStatus? Submission)>? entries = null)
         {
             Schedule = new ReportScheduleModel
             {
@@ -413,17 +597,17 @@ public class ReportManifestProducerTests
             reportEntryRepository
                 .Setup(r => r.FindAsync(It.IsAny<Expression<Func<ReportEntry, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(
-                [
-                    new ReportEntry
+                    (entries ?? [(PatientId, ReportingStatus.PassedValidation, SubmissionStatus.Submitted)])
+                    .Select(e => new ReportEntry
                     {
                         Id = Guid.NewGuid(),
                         FacilityId = FacilityId,
                         ReportScheduleId = Schedule.Id,
-                        PatientId = PatientId,
-                        ReportingStatus = ReportingStatus.PassedValidation,
-                        SubmissionStatus = SubmissionStatus.Submitted
-                    }
-                ]);
+                        PatientId = e.PatientId,
+                        ReportingStatus = e.Reporting,
+                        SubmissionStatus = e.Submission
+                    })
+                    .ToList());
 
             var database = new Mock<IDatabase>();
             database.SetupGet(d => d.ReportEntryRepository).Returns(reportEntryRepository.Object);
@@ -432,8 +616,7 @@ public class ReportManifestProducerTests
             services.AddScoped(_ => database.Object);
             var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
-            var tenantApiService = new Mock<ITenantApiService>();
-            tenantApiService
+            TenantApiService
                 .Setup(t => t.GetFacilityConfig(FacilityId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new FacilityModel { FacilityId = FacilityId, FacilityName = FacilityName });
 
@@ -491,14 +674,14 @@ public class ReportManifestProducerTests
 
             var auditableEventOccurredProducer = new AuditableEventOccurredProducer(
                 Mock.Of<ILogger<AuditableEventOccurredProducer>>(),
-                Mock.Of<IProducer<string, AuditEventMessage>>(),
+                AuditKafkaProducer.Object,
                 new ServiceInformation { ServiceConfigName = "Report" });
 
             Producer = new ReportManifestProducer(
                 Mock.Of<ILogger<ReportManifestProducer>>(),
                 scopeFactory,
                 aggregator,
-                tenantApiService.Object,
+                TenantApiService.Object,
                 BlobStorage.Object,
                 submitPayloadProducer,
                 auditableEventOccurredProducer,

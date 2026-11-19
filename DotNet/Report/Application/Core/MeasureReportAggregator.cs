@@ -25,9 +25,9 @@ public class MeasureReportAggregator
         _reportPopulationManager = reportPopulationManager;
     }
 
-    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId)
+    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId, CancellationToken cancellationToken = default)
     {
-        var reportPopulations = await _reportPopulationManager.FindAsync(rp => rp.ReportScheduleId == reportSchedule.Id);
+        var reportPopulations = await _reportPopulationManager.FindAsync(rp => rp.ReportScheduleId == reportSchedule.Id, cancellationToken);
 
         var aggregates = new List<MeasureReport>();
 
