@@ -21,8 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
+import com.google.re2j.Pattern;
+import com.google.re2j.PatternSyntaxException;
 
 
 @Service

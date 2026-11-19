@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.ShadowComparisonResult;
 import com.lantanagroup.link.validation.models.ShadowComparisonResultDto;
 import com.lantanagroup.link.validation.records.ShadowFindingDto;
@@ -64,7 +65,7 @@ public class ShadowComparisonQueryService {
             return objectMapper.readValue(json, new TypeReference<List<ShadowFindingDto>>() {
             });
         } catch (Exception e) {
-            log.warn("Failed to parse shadow finding json for comparison {}", comparisonId, e);
+            log.warn("Failed to parse shadow finding json for comparison {}", LogUtils.sanitize(comparisonId), e);
             return List.of();
         }
     }
@@ -77,7 +78,7 @@ public class ShadowComparisonQueryService {
             return objectMapper.readValue(json, new TypeReference<List<ShadowSeverityChangeDto>>() {
             });
         } catch (Exception e) {
-            log.warn("Failed to parse shadow severity-changed json for comparison {}", comparisonId, e);
+            log.warn("Failed to parse shadow severity-changed json for comparison {}", LogUtils.sanitize(comparisonId), e);
             return List.of();
         }
     }

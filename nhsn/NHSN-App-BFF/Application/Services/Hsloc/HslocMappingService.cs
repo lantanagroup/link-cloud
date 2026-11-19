@@ -5,6 +5,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Normalization;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Hsloc;
 
@@ -90,7 +91,7 @@ public sealed class HslocMappingService : IHslocMappingService
             {
                 _logger.LogWarning(
                     "Skipping HSLOC mapping for facility {FacilityId}: SourceCode and HslocCode are both required.",
-                    facilityId);
+                    facilityId.SanitizeForLog());
                 continue;
             }
 
@@ -98,7 +99,7 @@ public sealed class HslocMappingService : IHslocMappingService
             {
                 _logger.LogWarning(
                     "Skipping HSLOC mapping for facility {FacilityId}: HSLOC code {HslocCode} was not found in the reference vocabulary.",
-                    facilityId, mapping.HslocCode);
+                    facilityId.SanitizeForLog(), mapping.HslocCode.SanitizeForLog());
                 continue;
             }
 

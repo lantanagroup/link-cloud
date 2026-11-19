@@ -243,7 +243,7 @@ public class ScenariosController(
 
         var sanitizedFileName = request.File.FileName.SanitizeAndRemove();
 
-        logger.LogInformation("Received imported bundle upload '{FileName}' ({LengthBytes} bytes).", sanitizedFileName, request.File.Length);
+        logger.LogInformation("Received imported bundle upload '{FileName}' ({LengthBytes} bytes).", sanitizedFileName.SanitizeForLog(), request.File.Length);
 
         string json;
         using (var reader = new StreamReader(request.File.OpenReadStream(), Encoding.UTF8))
@@ -260,7 +260,7 @@ public class ScenariosController(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to parse uploaded bundle '{FileName}' as FHIR JSON.", sanitizedFileName);
+            logger.LogWarning(ex, "Failed to parse uploaded bundle '{FileName}' as FHIR JSON.", sanitizedFileName.SanitizeForLog());
             return BadRequest($"Bundle '{request.File.FileName}' could not be parsed as FHIR: {ex.Message}");
         }
 
@@ -341,9 +341,9 @@ public class ScenariosController(
 
         logger.LogInformation(
             "Stored imported bundle '{FileName}' for patient '{PatientId}' in ABS blob '{BlobName}' ({ByteCount} bytes).",
-            request.File.FileName,
-            patientResource.Id,
-            stored.BlobName,
+            request.File.FileName.SanitizeForLog(),
+            patientResource.Id.SanitizeForLog(),
+            stored.BlobName.SanitizeForLog(),
             stored.ByteCount);
 
         return Json(new
@@ -734,8 +734,8 @@ public class ScenariosController(
             logger.LogWarning(
                 ex,
                 "Failed checking if uploaded patient '{PatientId}' from file '{FileName}' exists on FHIR server.",
-                patientId,
-                sanitizedFileName);
+                patientId.SanitizeForLog(),
+                sanitizedFileName.SanitizeForLog());
 
             var warning =
                 $"Automation UI could not check whether patient '{patientId}' exists on the FHIR server. " +
