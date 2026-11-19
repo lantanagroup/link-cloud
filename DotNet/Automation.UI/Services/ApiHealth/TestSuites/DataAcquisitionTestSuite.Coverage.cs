@@ -245,7 +245,7 @@ public sealed partial class DataAcquisitionTestSuite
             await _client.TestSftpConnectionAsync(new SftpTestConnectionRequestApiModel(), cancellationToken: ct));
 
         await AddStepAsync(state, StepNames.SftpLogsGet200, 200, () =>
-            _client.SearchSftpLogsAsync(cancellationToken: ct));
+            _client.SearchSftpLogsAsync(facilityId, cancellationToken: ct));
 
         await AddStepAsync(state, StepNames.SftpLogGet400, 400, () =>
             _client.GetSftpLogAsync(InvalidGuidProbe, ct));

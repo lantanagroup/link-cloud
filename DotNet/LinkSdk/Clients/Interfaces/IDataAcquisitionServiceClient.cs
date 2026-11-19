@@ -218,10 +218,10 @@ public interface IDataAcquisitionServiceClient
     /// <summary>Reads query-configuration authentication: <c>GET /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>.</summary>
     Task<LinkApiResponse> GetAuthenticationConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
 
-    /// <summary>Creates query-configuration authentication: <c>POST /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>.</summary>
+    /// <summary>Creates query-configuration authentication: <c>POST /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>. The request body is not captured, because it carries credentials.</summary>
     Task<LinkApiResponse> CreateAuthenticationConfigurationAsync(string facilityId, object request, CancellationToken cancellationToken = default);
 
-    /// <summary>Replaces query-configuration authentication: <c>PUT /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>.</summary>
+    /// <summary>Replaces query-configuration authentication: <c>PUT /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>. The request body is not captured, because it carries credentials.</summary>
     Task<LinkApiResponse> UpdateAuthenticationConfigurationAsync(string facilityId, object request, CancellationToken cancellationToken = default);
 
     /// <summary>Clears query-configuration authentication: <c>DELETE /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>.</summary>

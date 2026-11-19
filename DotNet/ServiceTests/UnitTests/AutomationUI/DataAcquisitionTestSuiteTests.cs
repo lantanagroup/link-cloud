@@ -99,6 +99,14 @@ public class DataAcquisitionTestSuiteTests
         adHoc.HostName.Should().BeEmpty();
         adHoc.Password.Should().BeEmpty();
 
+        var facilityId = client.Calls(nameof(IDataAcquisitionServiceClient.SearchAcquisitionLogsByFacilityAsync))
+            .Should().ContainSingle().Subject.Args[0].Should().BeOfType<string>().Subject;
+        facilityId.Should().StartWith("ApiHealth-DA-");
+        client.Calls(nameof(IDataAcquisitionServiceClient.SearchSftpLogsAsync))
+            .Should().ContainSingle().Which.Args[0].Should().Be(facilityId);
+        client.Calls(nameof(IDataAcquisitionServiceClient.SearchAcquisitionLogsByPatientAsync))
+            .Should().ContainSingle().Which.Args[0].Should().Be(facilityId);
+
         foreach (var call in client.Calls(nameof(IDataAcquisitionServiceClient.UpdateOrganizationLocationConfigurationAsync))
                      .Concat(client.Calls(nameof(IDataAcquisitionServiceClient.UpdateOrganizationLocationConfigurationByIdAsync))))
         {

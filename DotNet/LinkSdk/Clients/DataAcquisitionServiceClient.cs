@@ -636,15 +636,19 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         object request,
         CancellationToken cancellationToken = default) =>
+        // The body carries passwords, client secrets, keys, or custom auth headers, so it must not be copied into LinkApiResponse.RequestBody
         SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration/authentication")
-            .PostJsonAsync(request, cancellationToken: cancellationToken));
+            .PostJsonAsync(request, cancellationToken: cancellationToken),
+            captureRequestBody: false);
 
     public Task<LinkApiResponse> UpdateAuthenticationConfigurationAsync(
         string facilityId,
         object request,
         CancellationToken cancellationToken = default) =>
+        // The body carries passwords, client secrets, keys, or custom auth headers, so it must not be copied into LinkApiResponse.RequestBody
         SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration/authentication")
-            .PutJsonAsync(request, cancellationToken: cancellationToken));
+            .PutJsonAsync(request, cancellationToken: cancellationToken),
+            captureRequestBody: false);
 
     public Task<LinkApiResponse> DeleteAuthenticationConfigurationAsync(
         string facilityId,
