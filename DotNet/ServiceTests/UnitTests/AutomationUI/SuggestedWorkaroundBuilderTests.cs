@@ -31,6 +31,9 @@ public class SuggestedWorkaroundBuilderTests
             condition.Priority == 1
             && condition.FhirPath == "identifier.where(system='urn:oid:1.2.840.114350').exists()");
         workaround.Steps.Should().HaveCount(2);
+        workaround.Steps[0].Should().Contain("clone this map");
+        workaround.Steps[1].Should().Contain("Select that clone");
+        workaround.Steps[1].Should().Contain("clone that template");
         workaround.Steps.Should().Contain(step => step.Contains("does not change the map or start a run"));
         workaround.OrganizationMapsUrl.Should().Be("/OrganizationResourceMaps");
     }

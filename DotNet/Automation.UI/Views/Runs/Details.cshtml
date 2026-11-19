@@ -1942,6 +1942,19 @@
         var suggestedWorkaroundRequest = null;
         var suggestedWorkaroundResolved = false;
         var suggestedWorkaroundAttempts = 0;
+        var suggestedWorkaroundRetryTimer = null;
+
+        function scheduleSuggestedWorkaroundRetry() {
+            if (suggestedWorkaroundResolved || suggestedWorkaroundRetryTimer) return;
+            if (suggestedWorkaroundAttempts >= 4) {
+                suggestedWorkaroundResolved = true;
+                return;
+            }
+            suggestedWorkaroundRetryTimer = setTimeout(function () {
+                suggestedWorkaroundRetryTimer = null;
+                refreshSuggestedWorkaround();
+            }, 2000);
+        }
 
         function renderSuggestedWorkaround(model) {
             var host = document.getElementById('suggestedWorkaround');
@@ -2072,11 +2085,18 @@
                     return response.json();
                 })
                 .then(function (model) {
-                    if (!model || !model.cause) return;
+                    if (!model || !model.cause) {
+                        scheduleSuggestedWorkaroundRetry();
+                        return;
+                    }
                     suggestedWorkaroundResolved = true;
+                    if (suggestedWorkaroundRetryTimer) {
+                        clearTimeout(suggestedWorkaroundRetryTimer);
+                        suggestedWorkaroundRetryTimer = null;
+                    }
                     renderSuggestedWorkaround(model);
                 })
-                .catch(function () { /* the next status update can try again */ })
+                .catch(function () { scheduleSuggestedWorkaroundRetry(); })
                 .finally(function () { suggestedWorkaroundRequest = null; });
         }
 

@@ -132,8 +132,8 @@ public static class SuggestedWorkaroundBuilder
             ConditionsNote = conditionsNote,
             Steps =
             [
-                "Open Organization Resource Maps and update the conditions so this facility's locations match an active organization mapping.",
-                "Rerun the scenario. This suggestion does not change the map or start a run."
+                "Open Organization Resource Maps, clone this map, and edit the clone so this facility's locations match an active organization mapping.",
+                "Select that clone for the next run. If the scenario uses a facility template, clone that template, point it at the cloned map, and select the template. This suggestion does not change the map or start a run."
             ],
             Counts =
             [
