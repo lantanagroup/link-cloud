@@ -8,6 +8,9 @@ using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Controllers;
+using LantanaGroup.Link.Tenant.Data.Entities;
+using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +33,7 @@ public class VendorVersionAuditTests : IDisposable
 
     private readonly IServiceScope _scope;
     private readonly IVendorManager _vendorManager;
+    private readonly TenantDbContext _dbContext;
     private readonly AuditedEndpoint<VendorVersionController> _endpoint;
     private readonly TenantIntegrationTestFixture.RecordingAuditProducer _auditProducer;
 
@@ -39,6 +43,7 @@ public class VendorVersionAuditTests : IDisposable
         var serviceProvider = _scope.ServiceProvider;
 
         _vendorManager = serviceProvider.GetRequiredService<IVendorManager>();
+        _dbContext = serviceProvider.GetRequiredService<TenantDbContext>();
         _auditProducer = serviceProvider.GetRequiredService<TenantIntegrationTestFixture.RecordingAuditProducer>();
         _auditProducer.Clear();
 
@@ -171,6 +176,53 @@ public class VendorVersionAuditTests : IDisposable
             () => _endpoint.Controller.Delete(Guid.NewGuid().ToString()));
 
         Assert.Empty(VersionEvents());
+    }
+
+    /// <summary>
+    /// LEGLINK-1808: a version a facility still uses cannot be deleted at all - Facilities holds a
+    /// restricted foreign key to it, and the DELETE statement is refused. The endpoint has to say so
+    /// as a 409 and publish nothing, rather than surface the database's refusal as a 500.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityStillUsesIt_ReturnsConflictAndPublishesNothing()
+    {
+        var (_, version) = await AVersion();
+        await AFacilityUsing(version.Id!.Value);
+
+        IActionResult? result = null;
+        await _endpoint.RunAsync(nameof(VendorVersionController.Delete),
+            "id", version.Id!.Value.ToString(),
+            async () => result = await _endpoint.Controller.Delete(version.Id!.Value.ToString()));
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+
+        //Problem Details, so a client reads the reason off `detail` and has a traceId to follow.
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Contains("facility configuration", details.Detail);
+
+        Assert.Empty(VersionEvents());
+    }
+
+    private async Task AFacilityUsing(Guid vendorVersionId)
+    {
+        await _dbContext.Facilities.AddAsync(new Facility
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = $"facility-{Guid.NewGuid():N}",
+            FacilityName = "Vendor Version Delete Test Facility",
+            TimeZone = "America/Chicago",
+            VendorVersionId = vendorVersionId,
+            ScheduledReports = new ScheduledReportModel
+            {
+                Daily = [],
+                Weekly = [],
+                Monthly = []
+            }
+        });
+
+        await _dbContext.SaveChangesAsync();
+        _auditProducer.Clear();
     }
 
     [Fact]

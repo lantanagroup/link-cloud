@@ -373,7 +373,7 @@ internal sealed class RunExecutor
                 if (honorFacilityPieces)
                 {
                     throw new InvalidOperationException(
-                        "No query plan is configured for this run. Choose one on the facility template or in ala carte mode.");
+                        "No query plan is configured for this run. Choose one on the facility template or in A La Carte mode.");
                 }
 
                 effectiveQueryPlan = QueryPlanDefaults.GetDefaultAsInput();

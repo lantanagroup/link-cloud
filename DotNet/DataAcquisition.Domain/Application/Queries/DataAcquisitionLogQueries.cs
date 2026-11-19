@@ -125,6 +125,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private readonly ILogger<DataAcquisitionLogQueries> _logger;
     private readonly IResourceCache _resourceCache;
 
+    // Logs whose resource ids are counted directly per statistics query batch; keeps each query a seek per log.
+    private const int UncountedLogBatchSize = 1000;
+
     public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext,
         ILogger<DataAcquisitionLogQueries> logger, IResourceCache resourceCache)
     {
@@ -786,25 +789,56 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total.
-        var resourceTypeCounts = await _dbContext.DataAcquisitionLogResourceIds
+        // Resource type counts + total. Logs saved by this version store their per-type counts, which are summed here:
+        // counting resource-id rows for every log instead reads every report's rows and times out on large tables.
+        var resourceTypeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        var storedCounts = await _dbContext.DataAcquisitionLogResourceTypeCounts
             .AsNoTracking()
-            .Where(r =>
-                r.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
-                && !r.DataAcquisitionLog.IsDeleted
-                && r.DataAcquisitionLog.Status == RequestStatus.Completed
-                && r.ResourceId != null
-                && r.ResourceId != "")
-            .GroupBy(r => r.ResourceId.IndexOf("/") > 0
-                ? r.ResourceId.Substring(0, r.ResourceId.IndexOf("/"))
-                : r.ResourceId)
-            .Select(g => new { ResourceType = g.Key, Count = g.Count() })
+            .Where(c =>
+                c.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
+                && !c.DataAcquisitionLog.IsDeleted
+                && c.DataAcquisitionLog.Status == RequestStatus.Completed)
+            .GroupBy(c => c.ResourceType)
+            .Select(g => new { ResourceType = g.Key, Count = g.Sum(c => c.Count) })
             .ToListAsync(cancellationToken);
 
-        foreach (var rt in resourceTypeCounts)
+        foreach (var rt in storedCounts)
         {
-            if (!string.IsNullOrEmpty(rt.ResourceType))
-                statistics.ResourceTypeCounts[rt.ResourceType] = rt.Count;
+            resourceTypeCounts[rt.ResourceType] = resourceTypeCounts.GetValueOrDefault(rt.ResourceType) + rt.Count;
+        }
+
+        // Logs saved before the counts were stored, or by the previous version during a deployment, have resource
+        // ids but no counts, so their resource ids are counted directly, one batch of logs at a time.
+        var uncountedLogIds = await baseQuery
+            .Where(l => l.Status == RequestStatus.Completed
+                        && !_dbContext.DataAcquisitionLogResourceTypeCounts.Any(c => c.DataAcquisitionLogId == l.Id)
+                        && _dbContext.DataAcquisitionLogResourceIds.Any(r => r.DataAcquisitionLogId == l.Id))
+            .Select(l => l.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var batch in uncountedLogIds.Chunk(UncountedLogBatchSize))
+        {
+            var batchCounts = await _dbContext.DataAcquisitionLogResourceIds
+                .AsNoTracking()
+                .Where(r => r.DataAcquisitionLogId != null
+                            && batch.Contains(r.DataAcquisitionLogId.Value)
+                            && r.ResourceId != "")
+                .GroupBy(r => r.ResourceId.IndexOf("/") > 0
+                    ? r.ResourceId.Substring(0, r.ResourceId.IndexOf("/"))
+                    : r.ResourceId)
+                .Select(g => new { ResourceType = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            foreach (var rt in batchCounts)
+            {
+                resourceTypeCounts[rt.ResourceType] = resourceTypeCounts.GetValueOrDefault(rt.ResourceType) + rt.Count;
+            }
+        }
+
+        foreach (var (resourceType, count) in resourceTypeCounts)
+        {
+            statistics.ResourceTypeCounts[resourceType] = count;
         }
 
         statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();

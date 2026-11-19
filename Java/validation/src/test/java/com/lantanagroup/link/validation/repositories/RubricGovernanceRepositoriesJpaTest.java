@@ -204,9 +204,9 @@ class RubricGovernanceRepositoriesJpaTest {
         OffsetDateTime publishedAt = OffsetDateTime.now();
 
         int firstAttempt = versionRepository.publishIfStatus(version.getRubricVersionId(),
-                RubricVersionStatus.DRAFT, RubricVersionStatus.PUBLISHED, publishedAt, "qa");
+                RubricVersionStatus.DRAFT, "checksum-1.0.0", RubricVersionStatus.PUBLISHED, publishedAt, "qa");
         int secondAttempt = versionRepository.publishIfStatus(version.getRubricVersionId(),
-                RubricVersionStatus.DRAFT, RubricVersionStatus.PUBLISHED, publishedAt, "qa");
+                RubricVersionStatus.DRAFT, "checksum-1.0.0", RubricVersionStatus.PUBLISHED, publishedAt, "qa");
 
         assertThat(firstAttempt).isEqualTo(1);
         assertThat(secondAttempt).as("a second publish attempt must be a no-op once already published").isEqualTo(0);
@@ -318,5 +318,61 @@ class RubricGovernanceRepositoriesJpaTest {
 
         assertThat(resultRepository.findByRequestId(requestId)).isPresent();
         assertThat(findingRepository.findByResultId(result.getResultId())).hasSize(1);
+    }
+
+    @Test
+    void publishIfStatus_refusesADraftWhoseDefinitionChanged() {
+        persistRubric("piqi.core");
+        RubricVersion version = persistVersion("piqi.core", "1.0.0", RubricVersionStatus.DRAFT);
+        entityManager.clear();
+
+        int updated = versionRepository.publishIfStatus(version.getRubricVersionId(), RubricVersionStatus.DRAFT,
+                "checksum-of-what-was-checked", RubricVersionStatus.PUBLISHED, OffsetDateTime.now(), "qa");
+
+        assertThat(updated).isZero();
+        assertThat(versionRepository.findById(version.getRubricVersionId()).orElseThrow().getStatus())
+                .isEqualTo(RubricVersionStatus.DRAFT);
+    }
+
+    @Test
+    void replaceDraftIfUnchanged_replacesADraftAndClearsItsDryRunOnlyWhenTheDefinitionChanges() {
+        persistRubric("piqi.core");
+        RubricVersion version = persistVersion("piqi.core", "1.0.0", RubricVersionStatus.DRAFT);
+        versionRepository.recordDryRun(version.getRubricVersionId(), RubricResultStatus.ACCEPTABLE, OffsetDateTime.now());
+        entityManager.clear();
+
+        // same definition: the dry run still counts
+        assertThat(versionRepository.replaceDraftIfUnchanged(version.getRubricVersionId(), RubricVersionStatus.DRAFT,
+                "checksum-1.0.0", "checksum-1.0.0", "{}", null, null, null, "author")).isEqualTo(1);
+        assertThat(versionRepository.findById(version.getRubricVersionId()).orElseThrow().getDryRunCompletedAt()).isNotNull();
+
+        // new definition: the dry run was against the old one
+        assertThat(versionRepository.replaceDraftIfUnchanged(version.getRubricVersionId(), RubricVersionStatus.DRAFT,
+                null, "checksum-new", "{\"new\":true}", null, null, null, "author")).isEqualTo(1);
+        RubricVersion reloaded = versionRepository.findById(version.getRubricVersionId()).orElseThrow();
+        assertThat(reloaded.getChecksum()).isEqualTo("checksum-new");
+        assertThat(reloaded.getDefinitionJson()).isEqualTo("{\"new\":true}");
+        assertThat(reloaded.getDryRunCompletedAt()).isNull();
+        assertThat(reloaded.getDryRunStatus()).isNull();
+    }
+
+    @Test
+    void replaceDraftIfUnchanged_touchesNothingOnAStaleChecksumOrAVersionNoLongerADraft() {
+        persistRubric("piqi.core");
+        RubricVersion draft = persistVersion("piqi.core", "1.0.0", RubricVersionStatus.DRAFT);
+        RubricVersion published = persistVersion("piqi.core", "2.0.0", RubricVersionStatus.PUBLISHED);
+        entityManager.clear();
+
+        // another save got there first: the checksum the caller read is gone
+        assertThat(versionRepository.replaceDraftIfUnchanged(draft.getRubricVersionId(), RubricVersionStatus.DRAFT,
+                "stale", "checksum-new", "{}", null, null, null, "author")).isZero();
+        // published in the meantime: even with no checksum expected, a published row is never written back to DRAFT
+        assertThat(versionRepository.replaceDraftIfUnchanged(published.getRubricVersionId(), RubricVersionStatus.DRAFT,
+                null, "checksum-new", "{}", null, null, null, "author")).isZero();
+
+        assertThat(versionRepository.findById(draft.getRubricVersionId()).orElseThrow().getChecksum()).isEqualTo("checksum-1.0.0");
+        RubricVersion stillPublished = versionRepository.findById(published.getRubricVersionId()).orElseThrow();
+        assertThat(stillPublished.getStatus()).isEqualTo(RubricVersionStatus.PUBLISHED);
+        assertThat(stillPublished.getChecksum()).isEqualTo("checksum-2.0.0");
     }
 }

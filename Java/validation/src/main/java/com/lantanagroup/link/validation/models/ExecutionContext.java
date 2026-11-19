@@ -40,6 +40,8 @@ public class ExecutionContext {
         return referenceIndex != null ? referenceIndex : Collections.emptyMap();
     }
 
+    // The payload as received over REST; null when the caller passed an already-parsed resource (the Kafka
+    // consumers). Nothing reads it today; use getResource() for the payload's content.
     private JsonNode rawPayload;
     private Map<String, Object> contextVars;
     private String requestor;

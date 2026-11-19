@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@azure/app-configuration-provider": "2.6.0",
-    "@azure/identity": "4.13.3",
+    "@azure/identity": "4.14.1",
     "express": "^4.21.2",
     "http-proxy-middleware": "^3.0.3"
   }

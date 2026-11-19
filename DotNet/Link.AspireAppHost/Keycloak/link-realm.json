@@ -1,0 +1,41 @@
+{
+  "realm": "link",
+  "displayName": "Link (local)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "clients": [
+    {
+      "clientId": "link-admin-bff",
+      "name": "Link Admin BFF",
+      "description": "The Admin BFF signs people in with this client. Created by the Aspire AppHost for local development.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${LINK_BFF_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:18063/api/signin-oidc",
+        "http://localhost:14200/api/signin-oidc"
+      ],
+      "webOrigins": [
+        "http://localhost:18063",
+        "http://localhost:14200"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:14200/*##http://localhost:18063/*",
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    }
+  ]
+}

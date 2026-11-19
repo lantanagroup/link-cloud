@@ -82,10 +82,28 @@ public class RubricExecutionService {
     }
 
 
+    /** Evaluates a payload received as JSON (the REST endpoints). */
     public ValidationResultEnvelope evaluate(
             String rubricId, String semver, EvaluateRequestDto request, boolean persist, String correlationId) {
         OffsetDateTime requestedAt = OffsetDateTime.now();
+        return evaluate(rubricId, semver, request.getSubject(), request.getContext(),
+                parseResource(request.getPayload()), request.getPayload(), persist, correlationId, requestedAt);
+    }
 
+    /**
+     * Evaluates a resource the caller has already parsed (the Kafka consumers), so it isn't encoded to JSON and
+     * parsed again. The resource is read, not changed.
+     */
+    public ValidationResultEnvelope evaluate(
+            String rubricId, String semver, SubjectDto subject, IBaseResource resource, boolean persist, String correlationId) {
+        OffsetDateTime requestedAt = OffsetDateTime.now();
+        return evaluate(rubricId, semver, subject, null, resource, null, persist, correlationId, requestedAt);
+    }
+
+    private ValidationResultEnvelope evaluate(
+            String rubricId, String semver, SubjectDto subject, Map<String, Object> requestContext,
+            IBaseResource resource, JsonNode rawPayload, boolean persist, String correlationId,
+            OffsetDateTime requestedAt) {
 
         // the resolver returns version + checks together (soft-deleted checks already excluded)
         RubricVersionResolver.ResolvedRubric resolved = versionResolver.resolve(rubricId, semver, persist);
@@ -93,12 +111,8 @@ public class RubricExecutionService {
         List<RubricCheck> checks = resolved.checks();
         log.debug("Resolved rubric {} v{} ({})", version.getRubricId(), version.getSemver(), version.getRubricVersionId());
 
-        SubjectDto subject = request.getSubject();
-
         Map<String, Object> contextVars = new HashMap<>();
-        if (request.getContext() != null) contextVars.putAll(request.getContext());
-
-        IBaseResource resource = parseResource(request.getPayload());
+        if (requestContext != null) contextVars.putAll(requestContext);
 
         List<IBaseResource> bundleEntries = Collections.emptyList();
         if (resource instanceof Bundle bundle) {
@@ -116,7 +130,7 @@ public class RubricExecutionService {
                 .resource(resource)
                 .bundleEntries(bundleEntries)
                 .referenceIndex(BundleReferenceResolver.buildIndex(bundleEntries))
-                .rawPayload(request.getPayload())
+                .rawPayload(rawPayload)
                 .contextVars(contextVars)
                 .requestedAt(requestedAt)
                 .build();
@@ -175,6 +189,15 @@ public class RubricExecutionService {
             for (int i = 0; i < findingDtos.size(); i++) {
                 findingDtos.get(i).setId(findingEntities.get(i).getFindingId());
             }
+            // the one INFO line per evaluation; each check's own summary is DEBUG, as there are about a
+            // hundred of them per patient
+            log.info("Rubric {} v{} evaluated for facility {} patient {} report {}: {}, {} check(s), {} finding(s), in {} ms",
+                    LogUtils.sanitize(version.getRubricId()), LogUtils.sanitize(version.getSemver()),
+                    LogUtils.sanitize(subject != null ? subject.getFacilityId() : null),
+                    LogUtils.sanitize(subject != null ? subject.getPatientId() : null),
+                    LogUtils.sanitize(subject != null ? subject.getReportId() : null),
+                    out.resultEntity().getStatus(), enabled.size(), evaluated.size(),
+                    java.time.Duration.between(requestedAt, completedAt).toMillis());
         } else {
             rubricVersionRepository.recordDryRun(
                     version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);

@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -230,7 +231,10 @@ public class ValidationController {
         return ResponseEntity.ok(ApiResponse.ok("Rubric validation completed", result));
     }
 
+    // Part of managing a rubric: it runs a version that may still be a draft, and its outcome is recorded on
+    // the version, where publishing can depend on it. For Link administrators, as the registry is.
     @Operation(summary = "Dry-run a rubric: no result is persisted, but the outcome is recorded on the version (v2)")
+    @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @PostMapping("/v2/rubrics/{rubricId}/versions/{semver}/$dry-run")
     public ResponseEntity<ApiResponse<ValidationResultEnvelope>> dryRun(
             @PathVariable String rubricId,

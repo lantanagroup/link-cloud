@@ -1,0 +1,292 @@
+@use '../../../../styles/validation-theme.scss' as vt;
+@use '../rubrics' as rubrics;
+
+.rubric-editor {
+  @include rubrics.rubric-page();
+
+  &-banner {
+    @include rubrics.rubric-banner();
+
+    .rubric-banner-meta {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .rubric-button--on-banner-primary:not(:disabled) {
+      background-color: vt.$vd-neutral-0;
+      color: vt.$vd-primary-900;
+    }
+  }
+
+  &-body {
+    @include rubrics.rubric-body();
+  }
+
+  .rubric-message {
+    @include rubrics.rubric-message();
+    margin-bottom: 1.25rem;
+  }
+
+  &-notice {
+    border-left: solid 6px vt.$vd-success-800;
+  }
+
+  &-issues {
+    margin: .5rem 0 0 0;
+    padding-left: 1.25rem;
+
+    li {
+      margin-bottom: .25rem;
+    }
+  }
+
+  // A button that reads as a link: it does something on this page rather than going to another.
+  &-issue {
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    font-weight: vt.$vd-font-weight-semibold;
+    color: vt.$vd-link-color;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      text-decoration: underline;
+    }
+
+    &:disabled {
+      color: vt.$vd-neutral-500;
+      cursor: default;
+    }
+  }
+
+  &-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-top: .75rem;
+  }
+
+  &-panel,
+  &-check {
+    margin-top: 1.25rem;
+  }
+
+  &-panel {
+    background-color: vt.$vd-neutral-0;
+    box-shadow: vt.$vd-box-shadow-sm;
+    padding: 1.5rem;
+    font-family: vt.$vd-font-family-sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    pre {
+      margin: 0;
+      max-height: 640px;
+      overflow: auto;
+      padding: 1rem;
+      background-color: vt.$vd-neutral-50;
+    }
+  }
+
+  &-grid {
+    @include rubrics.rubric-form-grid();
+  }
+
+  &-field {
+    @include rubrics.rubric-form-field();
+  }
+
+  &-help {
+    @include rubrics.rubric-form-help();
+    margin: 0;
+  }
+
+  &-error {
+    @include rubrics.rubric-form-error();
+  }
+
+  &-paste-errors {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
+  &-group {
+    border: solid 1px vt.$vd-neutral-400;
+    padding: 1rem 1.25rem 1.25rem;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+
+    legend {
+      padding: 0 .5rem;
+      font-weight: vt.$vd-font-weight-semibold;
+    }
+  }
+
+  &-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+  }
+
+  &-list {
+    display: flex;
+    flex-direction: column;
+    gap: .375rem;
+
+    > label {
+      font-weight: vt.$vd-font-weight-semibold;
+      font-size: .875rem;
+    }
+
+    &-add {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+
+      input {
+        padding: .375rem .5rem;
+        border: solid 1px vt.$vd-neutral-500;
+        font-size: 1rem;
+        width: 18rem;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+    }
+  }
+
+  &-chips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .375rem;
+
+    &:empty {
+      display: none;
+    }
+
+    li {
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      padding: .125rem .25rem .125rem .625rem;
+      border-radius: 999px;
+      background-color: vt.$vd-primary-150;
+      color: vt.$vd-primary-900;
+      font-size: .875rem;
+    }
+
+    button {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: .125rem .375rem;
+      color: inherit;
+      border-radius: 999px;
+
+      &:hover,
+      &:focus-visible {
+        background-color: rgba(vt.$vd-primary-900, .15);
+      }
+    }
+  }
+
+  &-add-check {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .75rem;
+
+    label {
+      font-weight: vt.$vd-font-weight-semibold;
+    }
+
+    select {
+      padding: .375rem .5rem;
+      border: solid 1px vt.$vd-neutral-500;
+      background-color: vt.$vd-neutral-0;
+      font-size: 1rem;
+    }
+  }
+
+  // The table scrolls sideways inside its panel on a narrow window rather than pushing the row actions out of it.
+  &-checks-scroll {
+    overflow-x: auto;
+  }
+
+  &-checks {
+    width: 100%;
+    border-collapse: collapse;
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: .5rem .75rem;
+      border-bottom: solid 1px vt.$vd-neutral-400;
+    }
+
+    th {
+      @include vt.vd-subheading-04();
+      font-size: .9375rem;
+      background-color: vt.$vd-primary-100;
+      border-bottom-width: 2px;
+      white-space: nowrap;
+    }
+
+    .rubric-chip {
+      margin-left: .375rem;
+    }
+
+    // A check id is read whole, so its column keeps room for one before the others take theirs.
+    th:nth-child(2),
+    td:nth-child(2) {
+      min-width: 12rem;
+    }
+  }
+
+  &-check-row--invalid td:first-child {
+    border-left: solid 4px vt.$vd-error-800;
+  }
+
+  &-summary {
+    display: block;
+    max-width: 16rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // The actions wrap onto a second line before they make the table wider than its panel.
+  &-row-actions {
+    min-width: 11rem;
+
+    button {
+      display: inline-block;
+      margin: 0 .75rem .25rem 0;
+    }
+  }
+
+  &-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}

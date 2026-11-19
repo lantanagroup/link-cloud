@@ -30,7 +30,7 @@ The harness sidebar has a **Harness Mode** selector.
 | **Mock (offline)** — default | Nothing | Step development. No BFF, no Docker, no database. |
 | **NHSN-App-BFF (:8079)** | The BFF running | Real JWT validation, real endpoints. |
 
-**Mock mode is fully offline.** `MockApiClient` serves the whole `ApiClient` port from in-memory fixtures and persists the draft to `localStorage`, and en-US strings are bundled into the artifact, so nothing is fetched. This is the mode to develop steps in — the BFF's onboarding endpoints do not exist yet.
+**Mock mode is fully offline.** `MockApiClient` serves the whole `ApiClient` port from in-memory fixtures and persists the draft to `localStorage`, and en-US strings are bundled into the artifact, so nothing is fetched. This is the mode to develop steps in: it needs nothing running, so a step never behaves differently because a backend is down or mid-deploy. (This line used to say the BFF's onboarding endpoints did not exist yet. They do — phase 1 landed in LEGPROG-515, and `OnboardingEndpoints` maps the draft read and write, import, export and completion under `/api/nhsn-app-bff/onboarding`.)
 
 Everything a fixture invents is marked `simulated: true` and uses obviously synthetic values, so a screenshot can never be mistaken for real facility data.
 

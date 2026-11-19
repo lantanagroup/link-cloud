@@ -24,24 +24,19 @@ docker compose down -v --remove-orphans       # tear everything down (resets vol
 
 Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, admin-bff 8063, kafka 9092, kafka-ui 9095, loki 3100, grafana 3000, azurite 10000, mssql 1433, mongo 17017). Compose and locally run services read credentials from a root `.env`, which is not committed: copy `.env.example` to `.env` and set its two `CHANGE_ME` passwords (the template says what each needs).
 
-### Azure Artifacts (Thetis)
-
-Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source with no credentials, so `dotnet restore` / `dotnet build link-cloud.sln` and `docker compose build` 401 until the machine is authenticated. `packageSourceMapping` keeps every other package on nuget.org.
-
-You can also add `Shared_BOTW_Feed` as a NuGet source in Visual Studio (Tools > Options > NuGet Package Manager > Package Sources) using `https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json`, then sign into the `lantanagroup` Azure DevOps org. Repo `nuget.config` already lists that source, so opening this branch in VS usually shows it without adding it by hand. VS restore then uses your Azure DevOps login instead of a PAT, if the account has Read on the feed.
-
-Otherwise create a PAT and put it in the environment:
-
-1. In Azure DevOps, open User settings (avatar) > Personal access tokens > New Token.
-2. Organization: `lantanagroup`. Scope: **Packaging > Read**. Create and copy the token.
-3. In PowerShell:
+### Aspire AppHost (optional alternative to compose)
 
 ```powershell
-$env:AZURE_ARTIFACTS_PAT = "<token>"
-dotnet nuget update source Shared_BOTW_Feed --username az --password $env:AZURE_ARTIFACTS_PAT --store-password-in-clear-text --configfile nuget.config
+dotnet run --project DotNet/Link.AspireAppHost --launch-profile http   # dashboard at http://localhost:15190
 ```
 
-`docker compose` reads the same `AZURE_ARTIFACTS_PAT` environment variable as the `feed_accesstoken` secret (see `docker-compose.yml`). Set it in the shell before `docker compose build` / `up`, or in a local `.env` next to the compose file (do not commit the token). CI uses the `AZURE_ARTIFACTS_PAT` GitHub/Azure secret.
+Or choose `Link.AspireAppHost` as the startup project in the IDE. It starts the infrastructure in containers and every service with the settings compose would give it, on ports of its own (each service is its compose port plus 10000), so it can run beside the compose stack. Nothing else references it: compose, the Dockerfiles and CI are unaffected. It is in `link-cloud.sln`, though, so restoring the solution downloads Aspire's dashboard and orchestration packages (about 85 MB, cached once per machine) even if you never run it; restore and build only the projects you work on to avoid that. It needs Docker, Maven, a JDK 21 and Node. Set the Terminology data folder and, if `JAVA_HOME` is not a JDK 21, the JDK in its user secrets. See [DotNet/Link.AspireAppHost/README.md](DotNet/Link.AspireAppHost/README.md).
+
+### Thetis packages
+
+`LantanaGroup.Thetis.Generation.Abstractions` and `LantanaGroup.Thetis.Generation.Engine` come from nuget.org. Both are PolyForm Noncommercial 1.0.0; the license file ships inside each package. Restore and `docker compose build` need no extra NuGet source, token, or sign-in.
+
+If a developer machine still has the old private feed in its own NuGet config, remove that source and any password stored with it (`dotnet nuget list source`, then `dotnet nuget remove source <name>`).
 
 ### .NET
 

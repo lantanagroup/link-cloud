@@ -1,5 +1,5 @@
 import { test, expect } from '../support/test';
-import { HEALTH_SERVICE_KEYS, healthByService, serviceInfos } from '../fixtures/health';
+import { DISPLAY_NAMES, HEALTH_SERVICE_KEYS, healthByService, serviceInfos } from '../fixtures/health';
 
 test('health monitor renders service status and metadata tables', async ({ page, api }) => {
   // One request per service rather than a single list — see the fixture.
@@ -17,6 +17,10 @@ test('health monitor renders service status and metadata tables', async ({ page,
   const healthTable = page.getByRole('table', { name: 'Service health checks' });
   const serviceRows = healthTable.locator('> tbody > tr:not(.detail-row)');
   await expect(serviceRows).toHaveCount(HEALTH_SERVICE_KEYS.length);
+  // Alphabetical by the name each row shows, NHSN App BFF included.
+  await expect(serviceRows.locator('> th[scope="row"]')).toHaveText(
+    HEALTH_SERVICE_KEYS.map((key) => DISPLAY_NAMES[key]),
+  );
   await expect(
     serviceRows.filter({ hasText: 'Validation' }).locator('.health-status[data-status="Unhealthy"]'),
   ).toBeVisible();
