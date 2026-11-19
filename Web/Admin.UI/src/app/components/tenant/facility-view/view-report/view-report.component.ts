@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Subscription, finalize } from 'rxjs';
 import { CommonModule, Location } from '@angular/common';
 
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from "@angular/router";
@@ -35,6 +36,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { LoadingService } from 'src/app/services/loading.service';
 import { ChartColorService } from 'src/app/services/chart-color.service';
+import { ErrorHandlingService } from 'src/app/services/error-handling.service';
 import { DonutChartComponent } from 'src/app/components/core/donut-chart/donut-chart.component';
 import { ViewReportTableCommandComponent } from './table-command/view-report-table-command.component';
 import { AcquisitionLogService } from '../../acquisition-log/acquisition-log.service';
@@ -97,6 +99,9 @@ export class ViewReportComponent implements OnInit {
 
   reportSummary: IReportSchedule | undefined;
   dataAcquisitionLogStatistics: IDataAcquisitionLogStatistics | undefined;
+  queryAnalysisLoadFailed = false;
+  queryAnalysisErrorDetail = '';
+  private queryAnalysisSubscription?: Subscription;
 
   // Add summary data for donut charts
   reportEntrySummary: IReportEntrySummary | undefined;
@@ -173,7 +178,8 @@ export class ViewReportComponent implements OnInit {
     private acquisitionLogService: AcquisitionLogService,
     private loadingService: LoadingService,
     private reportService: ReportService,
-    private chartColorService: ChartColorService) { }
+    private chartColorService: ChartColorService,
+    private errorHandlingService: ErrorHandlingService) { }
 
   ngOnInit(): void {
     const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
@@ -190,7 +196,7 @@ export class ViewReportComponent implements OnInit {
   }
 
   ngOnDestroy(): void {
-
+    this.queryAnalysisSubscription?.unsubscribe();
   }
 
   loadReportSchedule(): void {
@@ -383,18 +389,26 @@ export class ViewReportComponent implements OnInit {
     this.loadReportEntries();
   }
 
-  onViewQueryAnalysis() {
+  onViewQueryAnalysis(): void {
+    // Only the latest request may update the tab, so an earlier one still running is canceled.
+    this.queryAnalysisSubscription?.unsubscribe();
+    this.queryAnalysisLoadFailed = false;
+    this.queryAnalysisErrorDetail = '';
     this.loadingService.show();
-    this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId).subscribe({
-      next: (response: IDataAcquisitionLogStatistics) => {
-        this.dataAcquisitionLogStatistics = response;
-        this.loadingService.hide();
-      },
-      error: (error) => {
-        console.error('Error loading acquisition log statistics:', error);
-        this.loadingService.hide();
-      }
-    });
+    this.queryAnalysisSubscription = this.acquisitionLogService.getAcquisitionLogStatistics(this.reportId)
+      .pipe(finalize(() => this.loadingService.hide()))
+      .subscribe({
+        next: (response: IDataAcquisitionLogStatistics) => {
+          this.dataAcquisitionLogStatistics = response;
+        },
+        error: (error: unknown) => {
+          console.error('Error loading acquisition log statistics:', error);
+          // Drop any earlier result so the tab never shows numbers the server did not just return.
+          this.dataAcquisitionLogStatistics = undefined;
+          this.queryAnalysisErrorDetail = this.errorHandlingService.formatError(error, 'An unknown error occurred');
+          this.queryAnalysisLoadFailed = true;
+        }
+      });
   }
 
   onTabSelected(event: any): void {

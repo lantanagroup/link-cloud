@@ -1,0 +1,90 @@
+@use '../../../../styles/validation-theme.scss' as vt;
+@use '../rubrics' as rubrics;
+
+.rubric-compare {
+  @include rubrics.rubric-page();
+
+  &-banner {
+    @include rubrics.rubric-banner();
+  }
+
+  &-body {
+    @include rubrics.rubric-body();
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .rubric-message {
+    @include rubrics.rubric-message();
+  }
+
+  &-panel {
+    background-color: vt.$vd-neutral-0;
+    box-shadow: vt.$vd-box-shadow-sm;
+    padding: 1.5rem;
+    font-family: vt.$vd-font-family-sans-serif;
+    overflow-x: auto;
+
+    h4 {
+      @include vt.vd-subheading-02();
+      margin: 0 0 1rem 0;
+    }
+
+    p {
+      margin: 0 0 .5rem 0;
+    }
+  }
+
+  &-choice {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+  }
+
+  &-field {
+    @include rubrics.rubric-form-field();
+    min-width: 16rem;
+  }
+
+  &-table {
+    border-collapse: collapse;
+    width: 100%;
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: .5rem 1.5rem .5rem 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    thead th {
+      font-size: .8125rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: vt.$vd-neutral-700;
+      border-bottom: solid 1px vt.$vd-neutral-500;
+    }
+
+    tbody th {
+      font-weight: vt.$vd-font-weight-semibold;
+      min-width: 12rem;
+    }
+
+    tbody tr {
+      border-bottom: solid 1px vt.$vd-neutral-400;
+    }
+  }
+
+  // Colour is not the only sign: the column says which side each value is on.
+  &-before {
+    color: vt.$vd-error-800;
+  }
+
+  &-after {
+    color: vt.$vd-success-800;
+  }
+}
