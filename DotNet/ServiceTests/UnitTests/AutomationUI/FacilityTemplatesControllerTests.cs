@@ -336,6 +336,46 @@ public class FacilityTemplatesControllerTests
                 .Take(take)
                 .ToList());
 
+        public Task<long> CountFilteredAsync(
+            string? search,
+            string? vendor,
+            string? kind,
+            CancellationToken ct = default) =>
+            Task.FromResult((long)FilterTemplates(search, vendor, kind).Count());
+
+        public Task<List<FacilityTemplate>> GetFilteredPageAsync(
+            int skip,
+            int take,
+            string? search,
+            string? vendor,
+            string? kind,
+            CancellationToken ct = default) =>
+            Task.FromResult(FilterTemplates(search, vendor, kind)
+                .OrderBy(t => t.Name)
+                .ThenBy(t => t.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToList());
+
+        private IEnumerable<FacilityTemplate> FilterTemplates(
+            string? search,
+            string? vendor,
+            string? kind)
+        {
+            return _templates.Values.Where(t =>
+                (string.IsNullOrWhiteSpace(search) ||
+                 t.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+
+                (string.IsNullOrWhiteSpace(vendor) ||
+                 string.Equals(t.VendorName, vendor.Trim(), StringComparison.Ordinal)) &&
+
+                (string.IsNullOrWhiteSpace(kind) ||
+                 (kind.Equals("System", StringComparison.OrdinalIgnoreCase) && t.IsSystem) ||
+                 (kind.Equals("Custom", StringComparison.OrdinalIgnoreCase) && !t.IsSystem) ||
+                 (!kind.Equals("System", StringComparison.OrdinalIgnoreCase) &&
+                  !kind.Equals("Custom", StringComparison.OrdinalIgnoreCase))));
+        }
+
         public Task<FacilityTemplate?> GetByIdAsync(
             Guid id,
             CancellationToken ct = default) =>

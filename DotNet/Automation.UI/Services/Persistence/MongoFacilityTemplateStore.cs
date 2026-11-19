@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -45,6 +46,78 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
             .ToListAsync(ct);
 
         return docs.Select(ToModel).ToList();
+    }
+
+    public async Task<long> CountFilteredAsync(
+    string? search,
+    string? vendor,
+    string? kind,
+    CancellationToken ct = default)
+    {
+        var filter = BuildFilter(search, vendor, kind);
+
+        return await _collection.CountDocumentsAsync(
+            filter,
+            cancellationToken: ct);
+    }
+
+    public async Task<List<FacilityTemplate>> GetFilteredPageAsync(
+        int skip,
+        int take,
+        string? search,
+        string? vendor,
+        string? kind,
+        CancellationToken ct = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
+
+        var filter = BuildFilter(search, vendor, kind);
+
+        var docs = await _collection
+            .Find(filter)
+            .SortBy(d => d.Name)
+            .ThenBy(d => d.Id)
+            .Skip(skip)
+            .Limit(take)
+            .ToListAsync(ct);
+
+        return docs.Select(ToModel).ToList();
+    }
+
+    private static FilterDefinition<FacilityTemplateDocument> BuildFilter(
+        string? search,
+        string? vendor,
+        string? kind)
+    {
+        var builder = Builders<FacilityTemplateDocument>.Filter;
+        var filters = new List<FilterDefinition<FacilityTemplateDocument>>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filters.Add(builder.Regex(
+                d => d.Name,
+                new MongoDB.Bson.BsonRegularExpression(
+                    Regex.Escape(search.Trim()), "i")));
+        }
+
+        if (!string.IsNullOrWhiteSpace(vendor))
+        {
+            filters.Add(builder.Eq(d => d.VendorName, vendor.Trim()));
+        }
+
+        if (string.Equals(kind, "System", StringComparison.OrdinalIgnoreCase))
+        {
+            filters.Add(builder.Eq(d => d.IsSystem, true));
+        }
+        else if (string.Equals(kind, "Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            filters.Add(builder.Eq(d => d.IsSystem, false));
+        }
+
+        return filters.Count == 0
+            ? builder.Empty
+            : builder.And(filters);
     }
 
     public async Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default)

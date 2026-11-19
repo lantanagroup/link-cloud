@@ -9,6 +9,9 @@
     var pageSize = (int)ViewBag.PageSize;
     var totalCount = (long)ViewBag.TotalCount;
     var totalPages = (int)ViewBag.TotalPages;
+    var search = (string?)ViewBag.Search ?? "";
+    var vendor = (string?)ViewBag.Vendor ?? "";
+    var kind = (string?)ViewBag.Kind ?? "";
     var firstRecord = totalCount == 0 ? 0 : (currentPage - 1) * pageSize + 1;
     var lastRecord = Math.Min((long)currentPage * pageSize, totalCount);
     string PieceName<T>(IEnumerable<T> items, Guid? id, Func<T, Guid> idOf, Func<T, string> nameOf) where T : class
@@ -44,6 +47,63 @@
             </div>
         </div>
 
+        <form method="get"
+              asp-controller="FacilityTemplates"
+              asp-action="Index"
+              class="d-flex flex-wrap align-items-end gap-2 p-3 border-bottom">
+
+            <div>
+                <label for="facilitySearch" class="form-label small mb-1">
+                    Search by name
+                </label>
+                <input type="search"
+                       id="facilitySearch"
+                       name="search"
+                       value="@search"
+                       class="form-control form-control-sm"
+                       placeholder="Search facility templates..." />
+            </div>
+
+            <div>
+                <label for="facilityVendorFilter" class="form-label small mb-1">
+                    Vendor
+                </label>
+                <input type="text"
+                       id="facilityVendorFilter"
+                       name="vendor"
+                       value="@vendor"
+                       class="form-control form-control-sm"
+                       placeholder="All vendors" />
+            </div>
+
+            <div>
+                <label for="facilityKindFilter" class="form-label small mb-1">
+                    Kind
+                </label>
+                <select id="facilityKindFilter"
+                        name="kind"
+                        class="form-select form-select-sm">
+                    <option value="">All kinds</option>
+                    <option value="System" selected="@(kind == "System")">System</option>
+                    <option value="Custom" selected="@(kind == "Custom")">Custom</option>
+                </select>
+            </div>
+
+            <input type="hidden" name="pageSize" value="@pageSize" />
+            <input type="hidden" name="page" value="1" />
+
+            <button type="submit" class="btn btn-sm btn-primary">
+                Apply Filters
+            </button>
+
+            <a asp-controller="FacilityTemplates"
+               asp-action="Index"
+               asp-route-pageSize="@pageSize"
+               class="btn btn-sm btn-outline-secondary">
+                Clear
+            </a>
+        </form>
+
         <div id="facilityBulkResult"
              class="alert mx-3 mt-3 mb-0"
              role="status"
@@ -69,6 +129,15 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No facility templates match the current filters.
+                            </td>
+                        </tr>
+                    }
+
                     @foreach (var t in Model)
                     {
                         <tr data-name="@t.Name"
@@ -168,6 +237,9 @@
                     </select>
 
                     <input type="hidden" name="page" value="1" />
+                    <input type="hidden" name="search" value="@search" />
+                    <input type="hidden" name="vendor" value="@vendor" />
+                    <input type="hidden" name="kind" value="@kind" />
                 </form>
 
                 <nav aria-label="Facility template pagination">
@@ -179,6 +251,9 @@
                                asp-action="Index"
                                asp-route-page="@(currentPage - 1)"
                                asp-route-pageSize="@pageSize"
+                               asp-route-search="@search"
+                               asp-route-vendor="@vendor"
+                               asp-route-kind="@kind"
                                aria-label="Previous">
                                 Previous
                             </a>
@@ -196,6 +271,9 @@
                                asp-action="Index"
                                asp-route-page="@(currentPage + 1)"
                                asp-route-pageSize="@pageSize"
+                               asp-route-search="@search"
+                               asp-route-vendor="@vendor"
+                               asp-route-kind="@kind"
                                aria-label="Next">
                                 Next
                             </a>

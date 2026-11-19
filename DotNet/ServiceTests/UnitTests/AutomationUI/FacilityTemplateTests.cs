@@ -145,6 +145,53 @@ public class FacilityTemplateTests
                     .Take(take)
                     .ToList());
 
+        public System.Threading.Tasks.Task<long> CountFilteredAsync(
+            string? search,
+            string? vendor,
+            string? kind,
+            CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult(
+                MatchesFilters(search, vendor, kind) ? 1L : 0L);
+
+        public System.Threading.Tasks.Task<List<FacilityTemplate>> GetFilteredPageAsync(
+            int skip,
+            int take,
+            string? search,
+            string? vendor,
+            string? kind,
+            CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult(
+                MatchesFilters(search, vendor, kind)
+                    ? new List<FacilityTemplate> { template }
+                        .Skip(skip)
+                        .Take(take)
+                        .ToList()
+                    : new List<FacilityTemplate>());
+
+        private bool MatchesFilters(
+            string? search,
+            string? vendor,
+            string? kind)
+        {
+            return
+                (string.IsNullOrWhiteSpace(search) ||
+                 template.Name.Contains(
+                     search.Trim(),
+                     StringComparison.OrdinalIgnoreCase)) &&
+
+                (string.IsNullOrWhiteSpace(vendor) ||
+                 string.Equals(
+                     template.VendorName,
+                     vendor.Trim(),
+                     StringComparison.Ordinal)) &&
+
+                (string.IsNullOrWhiteSpace(kind) ||
+                 (kind.Equals("System", StringComparison.OrdinalIgnoreCase) && template.IsSystem) ||
+                 (kind.Equals("Custom", StringComparison.OrdinalIgnoreCase) && !template.IsSystem) ||
+                 (!kind.Equals("System", StringComparison.OrdinalIgnoreCase) &&
+                  !kind.Equals("Custom", StringComparison.OrdinalIgnoreCase)));
+        }
+
         public System.Threading.Tasks.Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
             System.Threading.Tasks.Task.FromResult(id == template.Id ? template : null);
 
