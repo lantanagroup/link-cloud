@@ -214,7 +214,7 @@ public class RetentionCleanupManager : IRetentionCleanupManager
             "results changed, {Unchanged} unchanged, {Missing} missing and recorded Failed, {Unknown} unknown " +
             "reports ignored. Status {PreviousStatus} -> {Status}; {ScrubbedCount} reports now Scrubbed.",
             participant.ServiceName.SanitizeForLog(),
-            cleanup.Id,
+            cleanup.Id.SanitizeForLog(),
             tally.Changed,
             tally.Unchanged,
             tally.Missing,
@@ -522,7 +522,7 @@ public class RetentionCleanupManager : IRetentionCleanupManager
                 "reports that are not in the cleanup, are not valid ids, or appear more than once; they were " +
                 "ignored.",
                 participant.ServiceName.SanitizeForLog(),
-                cleanup.Id,
+                cleanup.Id.SanitizeForLog(),
                 unknown);
         }
 

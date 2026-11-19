@@ -86,11 +86,11 @@ public class StringSecurityExtensionsTest
     }
 
     [Fact]
-    public void SanitizeForLog_WithExtendedAsciiCharacter_PreservesCharacter()
+    public void SanitizeForLog_WithC1Controls_ReplacesWithSpaces()
     {
-        // Arrange - Extended ASCII (character 128)
-        var input = "Test" + (char)128 + "String";
-        var expected = "Test" + (char)128 + "String";
+        // C1 includes NEXT LINE and CSI; these are controls in a .NET Unicode string.
+        var input = "Test" + new string(Enumerable.Range(128, 32).Select(value => (char)value).ToArray()) + "String";
+        var expected = "Test" + new string(' ', 32) + "String";
 
         // Act
         var result = input.SanitizeForLog();

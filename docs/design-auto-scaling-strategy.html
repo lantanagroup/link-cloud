@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -502,7 +503,7 @@
         <h1 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>This design defines how Link dynamically scales application processing and Kubernetes infrastructure in response to workload demand.</p>
 <p>Capacity targets and burst requirements are defined by <a href="design-performance-model.html">Performance Model</a>. This design describes how the platform supplies the application, Kafka, and Kubernetes capacity necessary to meet those requirements.</p>
-<p>This design assumes the Workload Mode capability defined by <a href="proposal-workload-mode.html">Service Workload Mode</a> has been implemented so REST/API processing and asynchronous worker processing can be deployed and scaled independently.</p>
+<p>This design assumes the Workload Mode capability defined by <a href="proposal-workload-mode.html">Service Workload Mode and Configurable Topics</a> has been implemented so REST/API processing and asynchronous worker processing can be deployed and scaled independently.</p>
 <h2 id="terminology" class="content-heading">Terminology <a href="#terminology" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Terminology"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p><strong>KEDA (Kubernetes Event-Driven Autoscaling)</strong> is a Kubernetes autoscaling component that can scale workloads based on external workload signals such as Kafka consumer lag. In this design, KEDA is the preferred mechanism for translating Kafka backlog into desired Worker replica counts, while Kubernetes HPA performs the underlying pod scaling behavior.</p>
 <h1 id="high-level-guidance" class="content-heading">High-Level Guidance <a href="#high-level-guidance" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: High-Level Guidance"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
@@ -615,7 +616,7 @@
 </pre>
 <h1 id="scaling-layers" class="content-heading">Scaling Layers <a href="#scaling-layers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scaling Layers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Link autoscaling operates at three related layers.</p>
-<h2 id="1-kafka-capacity" class="content-heading">1. Kafka Capacity <a href="#1-kafka-capacity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. Kafka Capacity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="kafka-capacity" class="content-heading">Kafka Capacity <a href="#kafka-capacity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Capacity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Kafka partitions define how much consumer parallelism is available.</p>
 <p>Increasing the number of worker pods does not guarantee increased throughput if Kafka cannot assign useful partition work to those replicas.</p>
 <p>Partition counts should therefore be derived from anticipated burst throughput in <a href="design-performance-model.html">Performance Model</a> and revised through explicit capacity-planning activities as production load grows.</p>
@@ -735,6 +736,15 @@
 </ol>
 <p>Node scale-up should therefore be driven by Kubernetes scheduling demand rather than a direct rule such as &quot;node CPU exceeds X percent.&quot;</p>
 <p>Accurate pod resource requests are critical. If a workload substantially under-requests CPU or memory, Kubernetes may continue scheduling pods onto saturated nodes instead of creating the unschedulable-pod pressure needed to add capacity.</p>
+<h2 id="example-triggers-for-node-and-workload-scaling" class="content-heading">Example Triggers for Node and Workload Scaling <a href="#example-triggers-for-node-and-workload-scaling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Triggers for Node and Workload Scaling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The platform should use workload-specific signals for scaling decisions. Examples include:</p>
+<ul>
+<li>When the consumer lag on a specifically configured topic increases beyond X, increase the related service's replica count.</li>
+<li>When the consumer lag is 0 for X amount of time, decrease the release service's replica count.</li>
+<li>When a POD/replica cannot be deployed due to limitations in available resources, increase the Kubernetes node count in the node pool.</li>
+<li>When more than X CPUs and Y RAM is available for Z amount of time, reduce the Kubernetes node count.</li>
+</ul>
+<p>These examples illustrate the preferred pattern: scale workloads from workload signals, and scale nodes from scheduling and sustained capacity signals.</p>
 <h1 id="resource-requests-and-limits" class="content-heading">Resource Requests and Limits <a href="#resource-requests-and-limits" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Requests and Limits"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Each scalable workload should define resource requests and limits based on measured production or performance-test behavior.</p>
 <p>API and Worker deployments from the same service may use different resource profiles.</p>
@@ -859,7 +869,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nauto_scaling_strategy_594E871C["Design: Auto-Scaling Strategy"]</pre>
+nauto_scaling_strategy_A1468D3["Design: Auto-Scaling Strategy"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

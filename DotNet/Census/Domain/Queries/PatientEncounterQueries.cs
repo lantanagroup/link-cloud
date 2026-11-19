@@ -9,6 +9,7 @@ using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using System.Collections.Concurrent;
@@ -55,7 +56,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(correlationId));
         }
 
-        _logger.LogInformation("Retrieving patient encounters for Correlation ID: {correlationId}", correlationId);
+        _logger.LogDebug("Retrieving patient encounters for Correlation ID: {correlationId}", correlationId.SanitizeForLog());
 
         var encounter = await _context
             .PatientEncounters
