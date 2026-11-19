@@ -633,7 +633,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__GroupPop__3214EC0792FCF5E1");
 
-                    b.HasIndex("ReportPopulationId");
+                    b.HasIndex(new[] { "ReportPopulationId", "PopulationId" }, "IX_GroupPopulation_Population_PopulationId")
+                        .IsUnique();
 
                     b.ToTable("GroupPopulation");
                 });
@@ -660,7 +661,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__MeasureR__3214EC07051D5E54");
 
-                    b.HasIndex("GroupPopulationId");
+                    b.HasIndex(new[] { "GroupPopulationId", "MeasureReportId" }, "IX_MeasureReportPopulation_Group_MeasureReport")
+                        .IsUnique();
 
                     b.ToTable("MeasureReportPopulation");
                 });
@@ -821,7 +823,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__ReportPo__3214EC07B5921BDB");
 
-                    b.HasIndex("ReportScheduleId");
+                    b.HasIndex(new[] { "ReportScheduleId", "ReportType" }, "IX_ReportPopulation_Schedule_ReportType")
+                        .IsUnique();
 
                     b.HasIndex(new[] { "FacilityId" }, "IX_ReportPopulations_FacilityId");
 
