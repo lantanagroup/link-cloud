@@ -2,8 +2,10 @@
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -18,6 +20,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<ReportPopulationModel> AddAsyncWithAggregateResult(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Applies one measure report to the population for (reportScheduleId, report type).
+        /// Safe when several pods do this at once, and a second apply of the same measure report does not change the total.
+        /// </summary>
+        Task<ReportPopulationModel> ApplyAggregateResultAsync(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken);
+
         Task AddRangeAsync(IEnumerable<ReportPopulationModel> models, CancellationToken cancellationToken);
 
         Task<List<ReportPopulationModel>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default);
@@ -29,6 +37,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
     public class ReportPopulationManager : IReportPopulationManager
     {
+        private const string MeasureReportPopulationDuplicateIndex = "IX_MeasureReportPopulation_Group_MeasureReport";
+
+        private const string SqliteMeasureReportPopulationDuplicate =
+            "UNIQUE constraint failed: MeasureReportPopulation.GroupPopulationId, MeasureReportPopulation.MeasureReportId";
+
         private readonly ReportDbContext _context;
         private readonly ILogger<ReportPopulationManager> _logger;
 
@@ -206,88 +219,273 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await FindAsync(rp => rp.ReportScheduleId == reportSchedule.Id, cancellationToken);
         }
 
-        public async Task<ReportPopulationModel> AddAsyncWithAggregateResult(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
+        public Task<ReportPopulationModel> AddAsyncWithAggregateResult(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
-            var model = new ReportPopulationModel
-            {
-                Id = Guid.NewGuid(),
-                Measure = aggregateResult.Measure,
-                ReportType = aggregateResult.ReportType,
-                CreateDate = DateTime.UtcNow,
-                FacilityId = facilityId,
-                ReportScheduleId = reportScheduleId
-            };
+            return ApplyAggregateResultAsync(facilityId, reportScheduleId, aggregateResult, cancellationToken);
+        }
 
-            foreach (var aggregate in aggregateResult.PopulationList)
-            {
-                if (string.IsNullOrWhiteSpace(aggregate.PopulationId))
-                    continue;
-
-                var populationCode = JsonSerializer.Serialize(aggregate.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-
-                model.GroupPopulations.Add(new GroupPopulationModel
-                {
-                    PopulationId = aggregate.PopulationId,
-                    PopulationCodeJson = populationCode,
-                    TotalPopulationCount = aggregate.PopulationCount,
-                    MeasureReportPopulations = new List<MeasureReportPopulationModel>
-                    {
-                        new MeasureReportPopulationModel
-                        {
-                            MeasureReportId = aggregateResult.MeasureReportId,
-                            PopulationCount = aggregate.PopulationCount
-                        }
-                    }
-                });
-            }
-
-            await AddAsync(model, cancellationToken);
-            return model;
+        public async Task<ReportPopulationModel> ApplyAggregateResultAsync(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
+        {
+            var populationId = await GetOrCreateReportPopulationAsync(facilityId, reportScheduleId, aggregateResult, cancellationToken);
+            await ApplyAggregateAsync(populationId, aggregateResult, cancellationToken);
+            return await RequireAsync(populationId, cancellationToken);
         }
 
         public async Task<ReportPopulationModel> UpdateAsyncWithAggregateResult(ReportPopulationModel model, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
         {
-            model.ModifyDate = DateTime.UtcNow;
-            model.Measure = aggregateResult.Measure;
+            await ApplyAggregateAsync(model.Id, aggregateResult, cancellationToken);
+            return await RequireAsync(model.Id, cancellationToken);
+        }
+
+        // The total is a running sum shared by every patient of the report. Adding it in memory and
+        // saving the entity loses increments across pods, and adding it again on redelivery double counts.
+        // The child insert is the idempotency gate: the total moves only in the same transaction as a
+        // new MeasureReportPopulation row.
+        private async Task ApplyAggregateAsync(Guid populationId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
+        {
+            await TouchMeasureAsync(populationId, aggregateResult.Measure, cancellationToken);
 
             foreach (var aggregate in aggregateResult.PopulationList)
             {
-                if (string.IsNullOrWhiteSpace(aggregate.PopulationId))
+                if (string.IsNullOrWhiteSpace(aggregate.PopulationId) || string.IsNullOrWhiteSpace(aggregateResult.MeasureReportId))
                     continue;
 
-                var group = model.GroupPopulations.FirstOrDefault(x => x.PopulationId == aggregate.PopulationId);
-
                 var populationCode = JsonSerializer.Serialize(aggregate.PopulationCode, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                var groupId = await GetOrCreateGroupAsync(populationId, aggregate.PopulationId, populationCode, cancellationToken);
 
-                if (group == null)
+                await _context.GroupPopulation
+                    .Where(g => g.Id == groupId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(g => g.PopulationCodeJson, populationCode), cancellationToken);
+
+                await TryInsertChildAndIncrementAsync(groupId, aggregateResult.MeasureReportId, aggregate.PopulationCount, cancellationToken);
+            }
+        }
+
+        private async Task<Guid> GetOrCreateReportPopulationAsync(string facilityId, Guid reportScheduleId, AggregateMeasureReportResult aggregateResult, CancellationToken cancellationToken)
+        {
+            var existingId = await _context.ReportPopulation
+                .AsNoTracking()
+                .Where(r => r.ReportScheduleId == reportScheduleId && r.ReportType == aggregateResult.ReportType)
+                .Select(r => (Guid?)r.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existingId.HasValue)
+                return existingId.Value;
+
+            var entity = new ReportPopulation
+            {
+                Id = Guid.NewGuid(),
+                CreateDate = DateTime.UtcNow,
+                FacilityId = facilityId,
+                ReportType = aggregateResult.ReportType,
+                ReportScheduleId = reportScheduleId,
+                Measure = aggregateResult.Measure
+            };
+
+            _context.ReportPopulation.Add(entity);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                return entity.Id;
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                _context.Entry(entity).State = EntityState.Detached;
+                _logger.LogDebug(ex, "Report population insert lost a race for schedule {ReportScheduleId}.", reportScheduleId);
+
+                var winnerId = await _context.ReportPopulation
+                    .AsNoTracking()
+                    .Where(r => r.ReportScheduleId == reportScheduleId && r.ReportType == aggregateResult.ReportType)
+                    .Select(r => (Guid?)r.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (!winnerId.HasValue)
+                    throw;
+
+                return winnerId.Value;
+            }
+        }
+
+        private async Task<int> GetOrCreateGroupAsync(Guid populationId, string populationKey, string populationCode, CancellationToken cancellationToken)
+        {
+            var existingId = await _context.GroupPopulation
+                .AsNoTracking()
+                .Where(g => g.ReportPopulationId == populationId && g.PopulationId == populationKey)
+                .Select(g => (int?)g.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existingId.HasValue)
+                return existingId.Value;
+
+            var entity = new GroupPopulation
+            {
+                ReportPopulationId = populationId,
+                PopulationId = populationKey,
+                PopulationCodeJson = populationCode,
+                TotalPopulationCount = 0
+            };
+
+            _context.GroupPopulation.Add(entity);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                return entity.Id;
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                _context.Entry(entity).State = EntityState.Detached;
+
+                var winnerId = await _context.GroupPopulation
+                    .AsNoTracking()
+                    .Where(g => g.ReportPopulationId == populationId && g.PopulationId == populationKey)
+                    .Select(g => (int?)g.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (!winnerId.HasValue)
+                    throw;
+
+                return winnerId.Value;
+            }
+        }
+
+        private async Task TryInsertChildAndIncrementAsync(int groupId, string measureReportId, int populationCount, CancellationToken cancellationToken)
+        {
+            var child = new MeasureReportPopulation
+            {
+                GroupPopulationId = groupId,
+                MeasureReportId = measureReportId,
+                PopulationCount = populationCount
+            };
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            _context.MeasureReportPopulation.Add(child);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+
+                var updated = await _context.GroupPopulation
+                    .Where(g => g.Id == groupId)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(
+                            g => g.TotalPopulationCount,
+                            g => g.TotalPopulationCount + populationCount),
+                        cancellationToken);
+
+                if (updated != 1)
+                    throw new InvalidOperationException($"GroupPopulation {groupId} was not updated.");
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                _context.Entry(child).State = EntityState.Detached;
+                await RollbackQuietlyAsync(transaction, cancellationToken);
+
+                // A duplicate delivery is only this unique index, and only when that row is already stored.
+                // Any other failure during this save, including another unique index, must surface.
+                if (!IsDuplicateMeasureReportPopulation(ex))
+                    throw;
+
+                var alreadyDelivered = await _context.MeasureReportPopulation
+                    .AsNoTracking()
+                    .AnyAsync(
+                        m => m.GroupPopulationId == groupId && m.MeasureReportId == measureReportId,
+                        cancellationToken);
+
+                if (!alreadyDelivered)
+                    throw;
+            }
+        }
+
+        private async Task RollbackQuietlyAsync(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Population insert conflict was already rolled back.");
+            }
+        }
+
+        private async Task TouchMeasureAsync(Guid populationId, string? measure, CancellationToken cancellationToken)
+        {
+            var updated = await _context.ReportPopulation
+                .Where(r => r.Id == populationId)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(r => r.Measure, measure)
+                        .SetProperty(r => r.ModifyDate, DateTime.UtcNow),
+                    cancellationToken);
+
+            if (updated != 1)
+                throw new InvalidOperationException($"ReportPopulation with Id {populationId} not found");
+        }
+
+        private async Task<ReportPopulationModel> RequireAsync(Guid populationId, CancellationToken cancellationToken)
+        {
+            return await SingleOrDefaultAsync(r => r.Id == populationId, cancellationToken)
+                ?? throw new InvalidOperationException($"ReportPopulation with Id {populationId} not found");
+        }
+
+        private static bool IsUniqueViolation(Exception exception)
+        {
+            // 2601 is a unique index and 2627 is a unique constraint or primary key. The number does
+            // not change with the SQL Server language. A message that merely contains those digits is
+            // not a duplicate. SQLite result code 19 is every constraint, so only extended code 2067
+            // (unique) or 1555 (primary key) counts. Null is 1299 and a foreign key is 787.
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (current is SqlException { Number: 2601 or 2627 })
+                    return true;
+
+                if (TryGetSqliteExtendedCode(current, out var extended) && extended is 2067 or 1555)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsDuplicateMeasureReportPopulation(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (current is SqlException { Number: 2601 or 2627 } sql
+                    && sql.Message.Contains(
+                        "'" + MeasureReportPopulationDuplicateIndex + "'",
+                        StringComparison.Ordinal))
                 {
-                    group = new GroupPopulationModel
-                    {
-                        PopulationId = aggregate.PopulationId,
-                        PopulationCodeJson = populationCode,
-                        TotalPopulationCount = aggregate.PopulationCount,
-                        MeasureReportPopulations = new List<MeasureReportPopulationModel>()
-                    };
-                    model.GroupPopulations.Add(group);
-                }
-                else
-                {
-                    group.PopulationCodeJson = populationCode;
-                    group.TotalPopulationCount += aggregate.PopulationCount;
+                    return true;
                 }
 
-                if (!group.MeasureReportPopulations.Any(mrp => mrp.MeasureReportId == aggregateResult.MeasureReportId))
+                if (TryGetSqliteExtendedCode(current, out var extended)
+                    && extended == 2067
+                    && current.Message.Contains(SqliteMeasureReportPopulationDuplicate, StringComparison.Ordinal))
                 {
-                    group.MeasureReportPopulations.Add(new MeasureReportPopulationModel
-                    {
-                        MeasureReportId = aggregateResult.MeasureReportId,
-                        PopulationCount = aggregate.PopulationCount
-                    });
+                    return true;
                 }
             }
 
-            await UpdateAsync(model, cancellationToken);
-            return model;
+            return false;
+        }
+
+        // The Report service does not reference SQLite. Tests do, and they throw SqliteException.
+        private static bool TryGetSqliteExtendedCode(Exception exception, out int extendedErrorCode)
+        {
+            extendedErrorCode = 0;
+            var type = exception.GetType();
+            if (type.FullName != "Microsoft.Data.Sqlite.SqliteException")
+                return false;
+
+            if (type.GetProperty("SqliteErrorCode")?.GetValue(exception) is not 19)
+                return false;
+
+            if (type.GetProperty("SqliteExtendedErrorCode")?.GetValue(exception) is not int extended)
+                return false;
+
+            extendedErrorCode = extended;
+            return true;
         }
 
         public async Task<List<ReportPopulationModel>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default)
