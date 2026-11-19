@@ -84,6 +84,10 @@ Neither half makes sense alone — Report builds the rows that the downstream pi
 
 Quartz storage is SQL-backed and clustered for every service that uses it (`UsePersistentStore` / `UseSqlServer` / `UseClustering` in shared `RegisterQuartzDatabase`), so triggers survive container restarts via the `quartz.QRTZ_*` tables. Each process gets its own scheduler instance id (`SchedulerId = "AUTO"`, host name + start ticks) under the shared scheduler name, so replicas show up as separate rows in `QRTZ_SCHEDULER_STATE` and a restarting pod only recovers its own in-flight firings, not a live peer's. `QueryDispatch.ScheduleService.StartAsync` *also* walks the `patientDispatches` SQL table on boot and reconciles Quartz state to it (adds missing triggers, removes orphans) — belt-and-braces, not the only thing preventing dispatch loss.
 
+#### Census sources
+
+`Census` learns who is admitted from one of three sources per facility: FHIR Lists (`PatientListsAcquired`), a Cerner SFTP extract (`CernerPatientsAcquired`), or an HL7 v2 ADT feed over SFTP (`ADTAcquired`). The first two are snapshots, so `Census` infers admits and discharges by comparing them to the open encounters. An ADT feed is a stream of changes applied in order, so the Admit or Discharge comes from the message itself. See **[dev-docs/adt-census.md](dev-docs/adt-census.md)**.
+
 #### Two-phase MeasureEval — the only backward arrow
 
 `MeasureEval` (Java) gates the EHR's full fetch on whether a patient qualifies:

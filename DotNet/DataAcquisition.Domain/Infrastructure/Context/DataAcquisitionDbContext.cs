@@ -49,6 +49,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<DataAcquisitionLogReferenceResource> DataAcquisitionLogReferenceResources { get; set; }
     public DbSet<DataAcquisitionLogNote> DataAcquisitionLogNotes { get; set; }
     public DbSet<DataAcquisitionLogResourceId> DataAcquisitionLogResourceIds { get; set; }
+    public DbSet<DataAcquisitionLogResourceTypeCount> DataAcquisitionLogResourceTypeCounts { get; set; }
     public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
     public DbSet<PendingReferenceId> PendingReferenceIds { get; set; }
 
@@ -265,7 +266,9 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.PatientId),
                     nameof(DataAcquisitionLog.Status),
                     nameof(DataAcquisitionLog.RetryAttempts),
-                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
+                    nameof(DataAcquisitionLog.QueryType),
+                    nameof(DataAcquisitionLog.QueryPhase)
                 );
 
             // Covers GetTailingMessages Phase-1 query (filters !TailSent, checks Status, groups by facility/tracking/correlation/phase).
@@ -318,6 +321,23 @@ public class DataAcquisitionDbContext : DbContext
 
                 entity.HasIndex(e => e.DataAcquisitionLogId)
                     .HasDatabaseName("IX_DataAcquisitionLogResourceIds_DataAcquisitionLogId");
+            });
+
+            //-------------------DataAcquisitionLogResourceTypeCount-------------------
+            // Report statistics sum these per-log counts instead of counting millions of resource-id rows.
+            modelBuilder.Entity<DataAcquisitionLogResourceTypeCount>(entity =>
+            {
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+                entity.HasOne(e => e.DataAcquisitionLog)
+                    .WithMany()
+                    .HasForeignKey(e => e.DataAcquisitionLogId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.DataAcquisitionLogId, e.ResourceType })
+                    .IsUnique()
+                    .HasDatabaseName("UX_DataAcquisitionLogResourceTypeCounts_Log_ResourceType")
+                    .IncludeProperties(e => e.Count);
             });
 
             //-------------------ResourceReferenceType-------------------
@@ -490,11 +510,11 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(e => e.PartOfId, "IX_LocationMapping_PartOfId").HasFilter("([PartOfId] IS NOT NULL)");
 
-            // Supports the orphan-adoption backfill (SetPartOfIdForChildrenAsync), which filters on
-            // (FacilityId, PartOfValue) for rows whose PartOfId is not yet resolved. Filtered to the
-            // unresolved rows so the index stays small and the update is a seek rather than a scan.
-            entity.HasIndex(e => new { e.FacilityId, e.PartOfValue }, "IX_LocationMapping_FacilityId_PartOfValue")
-                .HasFilter("([PartOfId] IS NULL)");
+            // SetParentForChildrenAsync runs for every acquired Location and matches children whose PartOfId is
+            // already set as well as unresolved ones, so this index is unfiltered. See
+            // DataAcquisition.Domain/Docs/OrgLocationMapping-AsBuilt.md.
+            entity.HasIndex(e => new { e.FacilityId, e.PartOfValue }, "IX_LocationMapping_FacilityId_PartOfValue_All")
+                .IncludeProperties(e => new { e.PartOfId, e.IsOrgLocation });
 
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);

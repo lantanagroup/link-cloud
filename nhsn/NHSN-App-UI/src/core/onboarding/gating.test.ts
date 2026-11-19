@@ -55,6 +55,34 @@ const cernerProfile: VendorProfile = {
   hslocSourceLabel: 'Cerner Location'
 };
 
+/** Every step before report-results is complete for an Epic facility. */
+function completeDraftAt(unlocked: StepId[]): FacilityDraft {
+  return draftAt(unlocked, {
+    facilityInfo: {timeZone: 'America/Chicago', vendor: 'Epic'},
+    manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
+    fhir: {
+      fhirServerBaseUrl: 'https://example.invalid/fhir',
+      maxConcurrentRequests: 4,
+      lagDuration: 'P0DT1H0M',
+      connectionTested: true
+    },
+    census: {
+      patientListIds: {
+        'admit-lt-24': 'list-1',
+        'admit-24-to-48': 'list-2',
+        'admit-gt-48': 'list-3',
+        'discharge-lt-24': 'list-4',
+        'discharge-24-to-48': 'list-5',
+        'discharge-gt-48': 'list-6'
+      },
+      acquisitionFrequency: 'PT0H15M',
+      accuracyAcknowledged: true
+    },
+    hsloc: {mappings: [{sourceCode: 'ICU', sourceDisplay: 'ICU', hslocCode: '1024-9'}]},
+    report: {lastRequestedReportId: 'R1'}
+  });
+}
+
 describe('resolveStep', () => {
   it('falls back to the furthest legal step when the target was never unlocked', () => {
     const draft = draftAt(['welcome']);
@@ -81,33 +109,9 @@ describe('resolveStep', () => {
   });
 
   it('keeps a declared sub-view', () => {
-    const draft = draftAt(
+    const draft = completeDraftAt(
       ['welcome', 'reporting-plan', 'facility-info', 'manual-upload', 'fhir', 'census',
-        'location-org', 'hsloc', 'encounter', 'report', 'report-results'],
-      {
-        facilityInfo: {timeZone: 'America/Chicago', vendor: 'Epic'},
-        manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
-        fhir: {
-          fhirServerBaseUrl: 'https://example.invalid/fhir',
-          maxConcurrentRequests: 4,
-          lagDuration: 'P0DT1H0M',
-          connectionTested: true
-        },
-        census: {
-          patientListIds: {
-            'admit-lt-24': 'list-1',
-            'admit-24-to-48': 'list-2',
-            'admit-gt-48': 'list-3',
-            'discharge-lt-24': 'list-4',
-            'discharge-24-to-48': 'list-5',
-            'discharge-gt-48': 'list-6'
-          },
-          acquisitionFrequency: 'PT0H15M',
-          accuracyAcknowledged: true
-        },
-        hsloc: {mappings: [{sourceCode: 'ICU', sourceDisplay: 'ICU', hslocCode: '1024-9'}]},
-        report: {lastRequestedReportId: 'R1'}
-      }
+        'location-org', 'hsloc', 'encounter', 'report', 'report-results']
     );
     const target = {
       stepId: 'report-results' as StepId,
@@ -149,7 +153,7 @@ describe('isUnlocked', () => {
     expect(isUnlocked('welcome', createEmptyDraft(), user)).toBe(true);
   });
 
-  it('unlocks every step once onboarded, when the OnboardingRevisit capability is on', () => {
+  it('waives the unlock record once onboarded, when the OnboardingRevisit capability is on', () => {
     const onboardedUser: UserInfoResponse = {
       ...user,
       isOnboarded: true,
@@ -161,16 +165,31 @@ describe('isUnlocked', () => {
         hslocLocationDisplayUpdate: false
       }
     };
-    // Never unlocked, never observed as complete -- still reachable in revisit mode.
-    expect(isUnlocked('report-results', createEmptyDraft(), onboardedUser)).toBe(true);
+    // Never unlocked, but complete -- reachable in revisit mode.
+    expect(isUnlocked('report-results', completeDraftAt([]), onboardedUser, epicProfile)).toBe(true);
   });
 
-  it('does not unlock every step just from being onboarded, without the capability', () => {
+  it('still requires preceding steps to be complete in revisit mode', () => {
+    const onboardedUser: UserInfoResponse = {
+      ...user,
+      isOnboarded: true,
+      capabilities: {
+        patientListWithNames: false,
+        fhirConnectionProbe: false,
+        sftpFileListing: false,
+        onboardingRevisit: true,
+        hslocLocationDisplayUpdate: false
+      }
+    };
+    expect(isUnlocked('report-results', createEmptyDraft(), onboardedUser, epicProfile)).toBe(false);
+  });
+
+  it('does not waive the unlock record just from being onboarded, without the capability', () => {
     const onboardedUser: UserInfoResponse = {...user, isOnboarded: true};
-    expect(isUnlocked('report-results', createEmptyDraft(), onboardedUser)).toBe(false);
+    expect(isUnlocked('report-results', completeDraftAt([]), onboardedUser, epicProfile)).toBe(false);
   });
 
-  it('does not unlock every step from the capability alone, before onboarding completes', () => {
+  it('does not waive the unlock record from the capability alone, before onboarding completes', () => {
     const flaggedUser: UserInfoResponse = {
       ...user,
       isOnboarded: false,
@@ -182,7 +201,7 @@ describe('isUnlocked', () => {
         hslocLocationDisplayUpdate: false
       }
     };
-    expect(isUnlocked('report-results', createEmptyDraft(), flaggedUser)).toBe(false);
+    expect(isUnlocked('report-results', completeDraftAt([]), flaggedUser, epicProfile)).toBe(false);
   });
 
   it('does not let a previous vendor\'s leftover census fields block the current vendor\'s step', () => {
@@ -191,7 +210,12 @@ describe('isUnlocked', () => {
       {
         facilityInfo: {timeZone: 'America/Chicago', vendor: 'Epic'},
         manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
-        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true},
+        fhir: {
+          fhirServerBaseUrl: 'https://example.invalid/fhir',
+          maxConcurrentRequests: 4,
+          lagDuration: 'P0DT1H0M',
+          connectionTested: true
+        },
         census: {
           patientListIds: {
             'admit-lt-24': 'list-1',
@@ -219,7 +243,12 @@ describe('isUnlocked', () => {
       {
         facilityInfo: {timeZone: 'America/Chicago', vendor: 'Cerner'},
         manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
-        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true},
+        fhir: {
+          fhirServerBaseUrl: 'https://example.invalid/fhir',
+          maxConcurrentRequests: 4,
+          lagDuration: 'P0DT1H0M',
+          connectionTested: true
+        },
         census: {
           sftpHost: 'sftp.example.invalid',
           sftpPort: 22,
@@ -230,6 +259,10 @@ describe('isUnlocked', () => {
       }
     );
     expect(isUnlocked('location-org', draft, user, cernerProfile)).toBe(false);
+
+    // Proves the missing test is what blocks it, not some other incomplete step.
+    draft.census.sftpConnectionTested = true;
+    expect(isUnlocked('location-org', draft, user, cernerProfile)).toBe(true);
   });
 });
 

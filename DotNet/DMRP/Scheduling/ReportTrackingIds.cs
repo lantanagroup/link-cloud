@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.DMRP.Scheduling
 {
@@ -19,38 +18,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
             ArgumentException.ThrowIfNullOrWhiteSpace(frequency);
 
-            return CreateVersion5(Namespace, $"{facilityId}|{frequency}|{periodStartUtc:O}");
+            return NameBasedGuid.CreateVersion5(Namespace, $"{facilityId}|{frequency}|{periodStartUtc:O}");
         }
-
-        /// <summary>RFC 4122 section 4.3 name-based UUID with SHA-1.</summary>
-        private static Guid CreateVersion5(Guid namespaceId, string name)
-        {
-            var namespaceBytes = namespaceId.ToByteArray();
-            SwapByteOrder(namespaceBytes);
-
-            var nameBytes = Encoding.UTF8.GetBytes(name);
-            var hash = SHA1.HashData([.. namespaceBytes, .. nameBytes]);
-
-            var guid = new byte[16];
-            Array.Copy(hash, guid, 16);
-
-            guid[6] = (byte)((guid[6] & 0x0F) | 0x50); // version 5
-            guid[8] = (byte)((guid[8] & 0x3F) | 0x80); // RFC 4122 variant
-
-            SwapByteOrder(guid);
-            return new Guid(guid);
-        }
-
-        // Guid.ToByteArray is little-endian in the first three groups; RFC 4122 hashes big-endian.
-        private static void SwapByteOrder(byte[] guid)
-        {
-            Swap(guid, 0, 3);
-            Swap(guid, 1, 2);
-            Swap(guid, 4, 5);
-            Swap(guid, 6, 7);
-        }
-
-        private static void Swap(byte[] bytes, int left, int right) =>
-            (bytes[left], bytes[right]) = (bytes[right], bytes[left]);
     }
 }

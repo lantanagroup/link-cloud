@@ -130,7 +130,16 @@
         </div>
     }
 </div>
-
+<style>
+    /* Keep Per-Type Prediction Pipeline headers visible while scrolling */
+    .prediction-pipeline-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background-color: #111;
+        color: #fff;
+    }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 (function () {
@@ -779,7 +788,7 @@
 
         // ── Type-by-type pipeline table ──
         html += `<div class="au-card mb-3"><div class="card-header"><i class="bi bi-funnel me-2"></i>Per-Type Prediction Pipeline</div><div class="card-body p-0">
-        <div style="max-height:500px;overflow-y:auto;">
+        <div class="prediction-pipeline-scroll" style="max-height:500px;overflow-y:auto;">
         <table class="au-table table table-sm small mb-0"><thead><tr>
             <th>Resource Type</th>
             <th class="text-end" data-bs-toggle="tooltip" title="Count generated and uploaded to FHIR">Generated</th>`;

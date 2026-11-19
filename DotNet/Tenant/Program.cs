@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -23,7 +24,6 @@ using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
-using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
@@ -109,7 +109,10 @@ namespace Tenant
             builder.Services.AddLinkSdk();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-            builder.Services.AddSingleton<CreateAuditEventCommand>();
+
+            //LEGLINK-1306: the shared audit mechanism. The interceptor it registers is attached
+            //below, inside this service's own AddDbContext call.
+            builder.Services.AddLinkAuditing<TenantDbContext>();
 
             var dbProvider = builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider);
             string? databaseConnectionString = null;
@@ -129,12 +132,13 @@ namespace Tenant
             builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+                var auditPropertyChangeInterceptor = sp.GetRequiredService<AuditPropertyChangeInterceptor>();
 
                 switch (dbProvider)
                 {
                     case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
                         options.UseSqlServer(databaseConnectionString)
-                           .AddInterceptors(updateBaseEntityInterceptor);
+                           .AddInterceptors(updateBaseEntityInterceptor, auditPropertyChangeInterceptor);
                         break;
                     default:
                         throw new InvalidOperationException("Database provider not supported.");
@@ -143,9 +147,6 @@ namespace Tenant
 
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
             builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-            var producer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(new ProducerConfig());
-            builder.Services.AddSingleton(producer);
-
             builder.Services.AddHttpClient();
 
             var mvcBuilder = builder.Services.AddControllers();

@@ -124,5 +124,45 @@ namespace UnitTests.Audit
             Assert.Equal(message.UserId, model.UserId);
             Assert.Equal("SoftDelete", model.Action);
         }
+
+        [Fact]
+        public void MessageToDomain_RoundTripsTheRowIdentityOfEachPropertyChange()
+        {
+            //one update that touched two rows. Without Entity and RowKey these are two Name changes
+            //with nothing saying which row either of them belongs to.
+            var message = MessageWithNewFields();
+            message.PropertyChanges =
+            [
+                new PropertyChangeModel("Name", "old", "new", "Operation", "row-1"),
+                new PropertyChangeModel("Name", "older", "newer", "Operation", "row-2")
+            ];
+
+            var log = AuditModel.ToDomain(AuditModel.FromMessage(message));
+            var model = AuditModel.FromDomain(log);
+
+            Assert.Equal(2, log.PropertyChanges!.Count);
+            Assert.Equal("row-1", log.PropertyChanges[0].RowKey);
+            Assert.Equal("row-2", log.PropertyChanges[1].RowKey);
+            Assert.Equal("Operation", log.PropertyChanges[0].Entity);
+
+            Assert.Equal("row-1", model.PropertyChanges![0].RowKey);
+            Assert.Equal("row-2", model.PropertyChanges[1].RowKey);
+            Assert.Equal("Operation", model.PropertyChanges[0].Entity);
+        }
+
+        [Fact]
+        public void ToDomain_APropertyChangeWithoutTheRowIdentity_LeavesItNull()
+        {
+            //a handler added this change itself, or the producer predates the fields - which is
+            //every row already in the table.
+            var message = MessageWithNewFields();
+            message.PropertyChanges = [new PropertyChangeModel("Name", "old", "new")];
+
+            var log = AuditModel.ToDomain(AuditModel.FromMessage(message));
+
+            var change = Assert.Single(log.PropertyChanges!);
+            Assert.Null(change.Entity);
+            Assert.Null(change.RowKey);
+        }
     }
 }

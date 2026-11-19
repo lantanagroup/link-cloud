@@ -78,6 +78,10 @@ export interface IValidationIssueCategory {
   requireMatch?: boolean;
 }
 
+export type IValidationIssueCategoryMetadata = Omit<IValidationIssueCategory, 'acceptable'> & {
+  acceptable: boolean | null;
+};
+
 export interface IValidationIssue {
   id: number,
   facilityId: string;
@@ -115,4 +119,37 @@ export interface IValidationRuleMatcher {
 export interface IValidationRuleSet {
   ruleSetNumber: number;
   rules: IValidationRule[];
+}
+
+export interface IReportCategoryCount {
+  categoryId: string;
+  title: string;
+  acceptable: boolean;
+  submit: boolean;
+  issues: number;
+  guidance?: string | null;
+  severity?: string | null;
+}
+
+export interface IReportCategoryCounts {
+  facilityId: string;
+  reportScheduleId: string;
+  reportStatus: ScheduleStatus | null;
+  inProgress: boolean;
+  lastUpdated: string;
+  categories: IReportCategoryCount[];
+}
+
+export interface ICategoryIssue {
+  message: string;
+  expression: string;
+  location: string;
+  code: string;
+  patientId: string;
+  profile?: string;
+}
+
+export interface ICategoryIssuePage {
+  records: ICategoryIssue[];
+  metadata: {pageSize: number; pageNumber: number; totalCount: number; totalPages: number};
 }

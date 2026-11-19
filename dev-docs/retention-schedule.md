@@ -2,8 +2,8 @@
 
 Report runs the retention check from a daily Quartz job, `RetentionCheckJob`, in its existing
 SQL-clustered Quartz store. The job only schedules the work. It hands each firing to
-`IRetentionCheckWorker`, and what that worker does is
-[LEGLINK-1211](https://lantana.atlassian.net/browse/LEGLINK-1211)'s. The ticket for the job is
+`IRetentionCheckWorker`, whose implementation, the retention check, is described in
+[retention-check.md](retention-check.md). The ticket for the job is
 [LEGLINK-1565](https://lantana.atlassian.net/browse/LEGLINK-1565), the Dev sub-task of
 [LEGLINK-1564](https://lantana.atlassian.net/browse/LEGLINK-1564). The events the check publishes
 are covered in [retention-events.md](retention-events.md), and the dates it ages reports from in
@@ -47,7 +47,9 @@ The reconciling itself is the shared `CronJobReconciler` in
 `DotNet/Shared/Application/Extensions/Quartz/`, which DMRP's nightly zone jobs also use. The
 retention reconciler adds the `Enabled` check, the invalid-cron error and its own log lines.
 
-Every startup logs the cron and the next fire time. An invalid cron is logged at `Error` and the
+Before reconciling, the hosted service logs the retention participants and the retention check's
+window and cap (see [retention-check.md](retention-check.md)), or their errors if they are invalid.
+Every startup then logs the cron and the next fire time. An invalid cron is logged at `Error` and the
 default is used. Any other failure, such as SQL Server being unreachable or a lock timeout while
 several instances start together, is logged at `Error` and Report starts anyway: retention is not
 worth stopping Report's other work for. A trigger stored on an earlier start keeps firing, and with
@@ -74,9 +76,8 @@ container, so it is not registered in DI itself.
 ## The worker interface
 
 `IRetentionCheckWorker.RunAsync(RetentionCheckRun run, CancellationToken cancellationToken)` is the
-hand-off to LEGLINK-1211. The default registration is `LoggingRetentionCheck`, which logs one
-`Information` line saying no retention check is implemented and does nothing else. LEGLINK-1211
-replaces that registration in `Program.cs`.
+hand-off from the job to the retention check. `AddRetentionSchedule` registers `RetentionCheck` as
+the worker; [retention-check.md](retention-check.md) describes what it does.
 
 `RetentionCheckRun` carries:
 
@@ -86,7 +87,7 @@ replaces that registration in `Program.cs`.
 | `IsRecovery` | True when this run replaces one interrupted by a Report instance that died. |
 | `FireInstanceId` | Quartz's id for this firing. A recovery run gets a new one. |
 
-It is a record rather than loose parameters, so LEGLINK-1211 can add a field without changing the
+It is a record rather than loose parameters, so a field can be added without changing the
 interface.
 
 ## Fire time
@@ -110,8 +111,9 @@ reports that instant as its scheduled time, and `Recovering` is false. Nothing r
 cron time. `DmrpNightlyJob` has the same behavior and describes it in its remarks.
 
 For retention this is acceptable, because the check ages reports against the date it runs, not
-against 02:00. LEGLINK-1211 must not treat `ScheduledFireTimeUtc` as an exact cron-time anchor,
-for example to compute a cutoff.
+against 02:00. The check therefore takes its cutoff from the clock, not from
+`ScheduledFireTimeUtc`, and uses the fire time only for the run id, where a recovered run must match
+the run it replaces.
 
 ## Failures
 

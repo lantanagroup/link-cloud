@@ -287,8 +287,8 @@ export class AcquisitionLogService {
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
-          var err = this.errorHandler.handleError(error);
-          return err;
+          // The Query Analysis tab shows this failure inline, so a toast would only repeat it.
+          return this.errorHandler.handleError(error, false);
         })
       );
   }

@@ -107,18 +107,18 @@ public static class SpringServiceHealth
                 {
                     var details = component.Value?.Details;
 
+                    var status = component.Value?.Status?.ToUpperInvariant() == HealthUp
+                        ? HealthStatus.Healthy
+                        : HealthStatus.Unhealthy;
+
                     report.Entries[component.Key] = new LinkServiceHealthReportEntry
                     {
-                        Status = component.Value?.Status?.ToUpperInvariant() == HealthUp
-                            ? HealthStatus.Healthy
-                            : HealthStatus.Unhealthy,
+                        Status = status,
                         // Spring times nothing itself, so the indicators report their own elapsed
                         // time as a detail and it is moved here. Zero means an indicator that does
                         // not report one -- anything Spring contributes rather than this codebase.
                         Duration = TakeDuration(details),
-                        Description = details is { Count: > 0 }
-                            ? JsonSerializer.Serialize(details)
-                            : null
+                        Description = Describe(status, details)
                     };
                 }
             }
@@ -149,6 +149,26 @@ public static class SpringServiceHealth
             return Unread(service, stopwatch.Elapsed, "The service's health could not be read.");
         }
     }
+
+    /// <summary>
+    /// The description a component's <paramref name="details"/> earn at <paramref name="status"/>.
+    /// </summary>
+    /// <remarks>
+    /// A healthy indicator's details only restate the status the row already shows: the dashboard
+    /// read <c>{"Cache":"Available"}</c> beside a green Healthy where every .NET row read "-", because
+    /// Spring is configured <c>show-details: always</c> and every indicator reports one whether or not
+    /// it has anything to say. They are dropped at Healthy so both runtimes' Description columns stay
+    /// empty while there is nothing wrong (LEGLINK-1545).
+    /// <para>
+    /// Every other status keeps its details in full -- that is where the failing backend and its
+    /// reason are named, and it is the one case the column exists for. The status is read rather than
+    /// the detail values, so an indicator added later is covered without being listed here.
+    /// </para>
+    /// </remarks>
+    private static string? Describe(HealthStatus status, Dictionary<string, object>? details) =>
+        status != HealthStatus.Healthy && details is { Count: > 0 }
+            ? JsonSerializer.Serialize(details)
+            : null;
 
     /// <summary>
     /// Removes the indicator's own timing from <paramref name="details"/> and returns it, so the

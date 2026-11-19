@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using LantanaGroup.Link.Automation.Link.Models;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -58,6 +59,7 @@ public sealed class AutomationRunDocument
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+    public List<TestRailRunReference> TestRailRuns { get; set; } = [];
 }
 
 /// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>

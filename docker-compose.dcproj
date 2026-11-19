@@ -3,7 +3,7 @@
   <PropertyGroup Label="Globals">
     <ProjectVersion>2.1</ProjectVersion>
     <DockerTargetOS>Linux</DockerTargetOS>
-    <ProjectGuid>0fe36d9c-71d5-440f-b676-2a158e9d596d</ProjectGuid>
+    <ProjectGuid>0fe36d9c-71d5-440f-b676-2a158e9d596d</ProjectGuid> <!-- trufflehog:ignore -->
     <DockerLaunchAction>LaunchBrowser</DockerLaunchAction>
     <DockerServiceUrl>{Scheme}://localhost:{ServicePort}/swagger</DockerServiceUrl>
     <DockerServiceName>api</DockerServiceName>
@@ -80,7 +80,6 @@
     <Content Include="Azure_Pipelines\_build_and_push_all_services.yaml" />
     <Content Include="Azure_Pipelines\_deploy_all_services.yml" />
     <Content Include="Azure_Pipelines\_summarize_delta.yaml" />
-    <Content Include="Dockerfile.aspnet8-run" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Tests\AutomationUI.Pipeline\" />

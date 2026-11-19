@@ -6,6 +6,10 @@
   <ItemGroup>
     <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.5.2" />
     <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.5.2" />
+    <!-- Aspire packages are used only by DotNet/Link.AspireAppHost, the optional local orchestrator. -->
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.Kafka" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.6.5" />
     <PackageVersion Include="AspNetCore.HealthChecks.Kafka" Version="8.0.1" />
     <PackageVersion Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
     <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
@@ -38,8 +42,8 @@
     <PackageVersion Include="HtmlSanitizer" Version="9.0.892" />
     <PackageVersion Include="jose-jwt" Version="4.1.0" />
     <PackageVersion Include="JWT" Version="10.1.1" />
-    <PackageVersion Include="LantanaGroup.Thetis.Generation.Abstractions" Version="1.0.0" />
-    <PackageVersion Include="LantanaGroup.Thetis.Generation.Engine" Version="1.0.0" />
+    <PackageVersion Include="LantanaGroup.Thetis.Generation.Abstractions" Version="1.1.0" />
+    <PackageVersion Include="LantanaGroup.Thetis.Generation.Engine" Version="1.1.0" />
     <PackageVersion Include="LinqKit" Version="1.3.11" />
     <PackageVersion Include="LinqKit.Core" Version="1.2.11" />
     <PackageVersion Include="MailKit" Version="4.16.0" />

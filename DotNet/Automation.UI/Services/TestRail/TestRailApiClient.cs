@@ -147,6 +147,11 @@ public sealed class TestRailApiClient : ITestRailApiClient
             var fileContent = new ByteArrayContent(content);
             fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             form.Add(fileContent, "attachment", fileName);
+            // The site's front end answers HTTP 400 (an HTML "could not understand" page, not a
+            // TestRail JSON error) when the part includes the RFC 5987 filename* parameter, and
+            // nothing is stored. The plain filename is accepted.
+            if (fileContent.Headers.ContentDisposition is not null)
+                fileContent.Headers.ContentDisposition.FileNameStar = null;
             request.Content = form;
             return request;
         }, cancellationToken);
@@ -156,6 +161,18 @@ public sealed class TestRailApiClient : ITestRailApiClient
             throw new InvalidOperationException(
                 FormatFailure($"add_attachment_to_result/{resultId}", response.StatusCode, body));
         }
+    }
+
+    public Task EditResultCommentAsync(
+        int resultId,
+        string comment,
+        CancellationToken cancellationToken = default)
+    {
+        return SendJsonAsync<EditResultResponse>(
+            HttpMethod.Post,
+            $"edit_result/{resultId}",
+            new EditResultCommentRequest { Comment = comment },
+            cancellationToken);
     }
 
     internal const int MaxProjectPages = 40;
@@ -555,5 +572,17 @@ public sealed class TestRailApiClient : ITestRailApiClient
 
         [JsonPropertyName("case_id")]
         public int? CaseId { get; set; }
+    }
+
+    private sealed class EditResultCommentRequest
+    {
+        [JsonPropertyName("comment")]
+        public string Comment { get; set; } = string.Empty;
+    }
+
+    private sealed class EditResultResponse
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
     }
 }

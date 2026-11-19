@@ -694,7 +694,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("ReportTrackingId", "IsDeleted")
                         .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "IsDeleted"), new[] { "PatientId", "Status", "RetryAttempts", "CompletionTimeMilliseconds" });
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ReportTrackingId", "IsDeleted"), new[] { "PatientId", "Status", "RetryAttempts", "CompletionTimeMilliseconds", "QueryType", "QueryPhase" });
 
                     b.HasIndex("Status", "ExecutionDate")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Status_ExecutionDate");
@@ -781,6 +781,36 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogResourceIds_DataAcquisitionLogId");
 
                     b.ToTable("DataAcquisitionLogResourceIds");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogResourceTypeCount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Count")
+                        .HasColumnType("int");
+
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataAcquisitionLogId", "ResourceType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DataAcquisitionLogResourceTypeCounts_Log_ResourceType");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("DataAcquisitionLogId", "ResourceType"), new[] { "Count" });
+
+                    b.ToTable("DataAcquisitionLogResourceTypeCounts");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.EncounterLocation", b =>
@@ -1150,8 +1180,9 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasIndex(new[] { "FacilityId", "LocationId", "IsOrgLocation" }, "IX_LocationMapping_FacilityId_LocationId_IsOrgLocation");
 
-                    b.HasIndex(new[] { "FacilityId", "PartOfValue" }, "IX_LocationMapping_FacilityId_PartOfValue")
-                        .HasFilter("([PartOfId] IS NULL)");
+                    b.HasIndex(new[] { "FacilityId", "PartOfValue" }, "IX_LocationMapping_FacilityId_PartOfValue_All");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "FacilityId", "PartOfValue" }, "IX_LocationMapping_FacilityId_PartOfValue_All"), new[] { "PartOfId", "IsOrgLocation" });
 
                     b.HasIndex(new[] { "PartOfId" }, "IX_LocationMapping_PartOfId")
                         .HasFilter("([PartOfId] IS NOT NULL)");
@@ -1569,6 +1600,17 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
                         .WithMany("ResourceIds")
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DataAcquisitionLog");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLogResourceTypeCount", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
+                        .WithMany()
                         .HasForeignKey("DataAcquisitionLogId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

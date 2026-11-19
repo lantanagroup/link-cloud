@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Census.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.3")
+                .HasAnnotation("ProductVersion", "8.0.27")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -517,6 +517,10 @@ namespace LantanaGroup.Link.Census.Migrations
                     b.Property<short?>("MisfireInstruction")
                         .HasColumnType("smallint")
                         .HasColumnName("MISFIRE_INSTR");
+
+                    b.Property<long?>("MisfireOriginalFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("MISFIRE_ORIG_FIRE_TIME");
 
                     b.Property<long?>("NextFireTime")
                         .HasColumnType("bigint")

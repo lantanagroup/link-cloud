@@ -29,6 +29,14 @@ public interface ITestRailApiClient
         byte[] content,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Replaces the comment on an existing result (edit_result). Status and attachments stay.
+    /// </summary>
+    Task EditResultCommentAsync(
+        int resultId,
+        string comment,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Lists the projects the configured user can see (get_projects, all pages).</summary>
     Task<IReadOnlyList<TestRailNamedItem>> GetProjectsAsync(CancellationToken cancellationToken = default);
 

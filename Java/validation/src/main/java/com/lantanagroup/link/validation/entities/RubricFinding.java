@@ -75,6 +75,12 @@ public class RubricFinding {
     @Column(nullable = false, length = 16)
     private Severity severity;
 
+    // The severity the check emitted, before any category override; severity above is after it. Null on rows
+    // written before this column existed.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "original_severity", length = 16)
+    private Severity originalSeverity;
+
     @Column(nullable = false, length = 128)
     private String code;
 

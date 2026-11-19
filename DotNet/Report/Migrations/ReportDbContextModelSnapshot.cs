@@ -518,6 +518,10 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("MISFIRE_INSTR");
 
+                    b.Property<long?>("MisfireOriginalFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("MISFIRE_ORIG_FIRE_TIME");
+
                     b.Property<long?>("NextFireTime")
                         .HasColumnType("bigint")
                         .HasColumnName("NEXT_FIRE_TIME");
@@ -629,7 +633,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__GroupPop__3214EC0792FCF5E1");
 
-                    b.HasIndex("ReportPopulationId");
+                    b.HasIndex(new[] { "ReportPopulationId", "PopulationId" }, "IX_GroupPopulation_Population_PopulationId")
+                        .IsUnique();
 
                     b.ToTable("GroupPopulation");
                 });
@@ -656,7 +661,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__MeasureR__3214EC07051D5E54");
 
-                    b.HasIndex("GroupPopulationId");
+                    b.HasIndex(new[] { "GroupPopulationId", "MeasureReportId" }, "IX_MeasureReportPopulation_Group_MeasureReport")
+                        .IsUnique();
 
                     b.ToTable("MeasureReportPopulation");
                 });
@@ -734,6 +740,7 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AcquisitionDetails")
+                        .HasMaxLength(2147483647)
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("AcquisitionEvaluatedAt")
@@ -760,6 +767,7 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("NormalizationDetails")
+                        .HasMaxLength(2147483647)
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("NormalizationEvaluatedAt")
@@ -815,7 +823,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__ReportPo__3214EC07B5921BDB");
 
-                    b.HasIndex("ReportScheduleId");
+                    b.HasIndex(new[] { "ReportScheduleId", "ReportType" }, "IX_ReportPopulation_Schedule_ReportType")
+                        .IsUnique();
 
                     b.HasIndex(new[] { "FacilityId" }, "IX_ReportPopulations_FacilityId");
 
@@ -932,6 +941,13 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.Property<DateTimeOffset>("ReportStartDate")
                         .HasColumnType("datetimeoffset(7)");
 
+                    b.Property<string>("RetentionStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("None");
+
                     b.Property<DateTimeOffset?>("SoftDeletedDate")
                         .HasColumnType("datetimeoffset(7)");
 
@@ -975,6 +991,172 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("MeasureReportId", "ResourceType");
 
                     b.ToTable("ResourceCount");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedDateTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CutoffDateTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("InitiatedBy")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("InitiatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("InitiatedByUserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("InitiatedDateTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "InitiatedDateTime" }, "IX_RetentionCleanup_InitiatedDateTime")
+                        .IsDescending();
+
+                    b.HasIndex(new[] { "RunId" }, "IX_RetentionCleanup_RunId");
+
+                    b.HasIndex(new[] { "Status" }, "IX_RetentionCleanup_Status");
+
+                    b.ToTable("RetentionCleanup");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RetentionCleanupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "RetentionCleanupId", "ServiceName" }, "IX_RetentionCleanupParticipant_Cleanup_Service")
+                        .IsUnique();
+
+                    b.ToTable("RetentionCleanupParticipant");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CutoffDateTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ReportScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RetentionCleanupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("RetentionWindowCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RetentionWindowUnit")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "RetentionCleanupId", "ReportScheduleId" }, "IX_RetentionCleanupReport_Cleanup_Report")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "ReportScheduleId" }, "IX_RetentionCleanupReport_ReportScheduleId");
+
+                    b.ToTable("RetentionCleanupReport");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedDateTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("LastSentDateTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("RecordsAffected")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RetentionCleanupParticipantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RetentionCleanupReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SendCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "RetentionCleanupParticipantId", "RetentionCleanupReportId" }, "IX_RetentionCleanupResult_Participant_Report")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "RetentionCleanupReportId" }, "IX_RetentionCleanupResult_RetentionCleanupReportId");
+
+                    b.ToTable("RetentionCleanupResult");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.ScheduleReportType", b =>
@@ -1138,6 +1320,50 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.Navigation("MeasureReport");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupParticipant", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Report.Data.Entities.RetentionCleanup", "RetentionCleanup")
+                        .WithMany("Participants")
+                        .HasForeignKey("RetentionCleanupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_RetentionCleanupParticipant_RetentionCleanup");
+
+                    b.Navigation("RetentionCleanup");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupReport", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Report.Data.Entities.RetentionCleanup", "RetentionCleanup")
+                        .WithMany("Reports")
+                        .HasForeignKey("RetentionCleanupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_RetentionCleanupReport_RetentionCleanup");
+
+                    b.Navigation("RetentionCleanup");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupResult", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupParticipant", "RetentionCleanupParticipant")
+                        .WithMany("Results")
+                        .HasForeignKey("RetentionCleanupParticipantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_RetentionCleanupResult_RetentionCleanupParticipant");
+
+                    b.HasOne("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupReport", "RetentionCleanupReport")
+                        .WithMany("Results")
+                        .HasForeignKey("RetentionCleanupReportId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_RetentionCleanupResult_RetentionCleanupReport");
+
+                    b.Navigation("RetentionCleanupParticipant");
+
+                    b.Navigation("RetentionCleanupReport");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.ScheduleReportType", b =>
                 {
                     b.HasOne("LantanaGroup.Link.Report.Data.Entities.ReportSchedule", "ReportSchedule")
@@ -1195,6 +1421,23 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.Navigation("ReportResources");
 
                     b.Navigation("ReportTypes");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanup", b =>
+                {
+                    b.Navigation("Participants");
+
+                    b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupParticipant", b =>
+                {
+                    b.Navigation("Results");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.RetentionCleanupReport", b =>
+                {
+                    b.Navigation("Results");
                 });
 #pragma warning restore 612, 618
         }
