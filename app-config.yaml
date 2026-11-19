@@ -1083,6 +1083,10 @@ services:
       description: "Six-field Spring cron expression, evaluated in UTC, for generating the previous day's shadow-comparison report. Defaults to 00:15 UTC daily."
       required: false
       defaultValue: "0 15 0 * * *"
+    - key: "vaas.bridge.shadow-compare.blob-prefix"
+      description: "Prefix, in the internal blob container, under which Validation stores each patient's primary-engine findings for the shadow comparison (a claim check: the findings can exceed the Kafka message size limit, so ShadowCompareEvent carries only the blob name). The shadow consumer deletes each blob once it has compared; a storage lifecycle rule on this prefix removes any left behind."
+      required: false
+      defaultValue: "shadow-compare/"
     - key: "validation.categoryOverride.enabled"
       description: "Whether category overrides change findings' effective severity and acceptability before scoring. Shipped as true; the code fallback is false."
       required: false

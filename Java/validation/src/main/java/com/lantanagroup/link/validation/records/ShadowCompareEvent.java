@@ -29,7 +29,18 @@ public class ShadowCompareEvent {
      */
     private UUID requestId;
 
+    /**
+     * The primary engine's findings, sent on the event only when no blob storage is configured, or when the event
+     * was published before {@link #authoritativeResultBlobName} existed. Otherwise null.
+     */
     private List<ShadowFindingDto> authoritativeResult;
+
+    /**
+     * The internal-container blob holding the primary engine's findings (see {@code ShadowFindingsStore}). They are
+     * stored there because one patient's findings can exceed the Kafka message size limit. Null when the findings
+     * are in {@link #authoritativeResult} instead.
+     */
+    private String authoritativeResultBlobName;
     /**
      * Whether the primary engine passed the patient (the {@code ValidationComplete.valid} it produced), so the shadow
      * comparison can set it against the other engine's verdict. Null on events published before it was added.

@@ -212,6 +212,10 @@ vaas:
        daily-blob-path: shadow-reports/shadow-comparison-daily-report.csv
       # Cron (Spring format, evaluated in UTC) for ShadowComparisonDailyReportJob; defaults to 00:15 UTC daily.
        daily-cron: "0 15 0 * * *"
+    # Where the primary engine's findings are stored for the shadow consumer (ShadowFindingsStore), in the
+    # internal blob container. Each blob is deleted after its comparison.
+    shadow-compare:
+      blob-prefix: shadow-compare/
 
 validation:
   categoryOverride:
