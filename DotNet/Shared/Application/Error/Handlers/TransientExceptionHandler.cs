@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -16,7 +17,13 @@ public class TransientExceptionHandler<T, K, V> : ITransientExceptionHandler<T, 
     protected readonly ServiceInformation ServiceInformation;
     private readonly IExceptionLogger<T> _exceptionHandler;
 
-    public string Topic { get; set; } = string.Empty;
+    private string _topic = string.Empty;
+
+    public string Topic
+    {
+        get => _topic;
+        set => _topic = ToServiceRetryTopic(value);
+    }
 
     protected string ServiceName { get; set; } = string.Empty;
 
@@ -30,6 +37,25 @@ public class TransientExceptionHandler<T, K, V> : ITransientExceptionHandler<T, 
         _exceptionHandler = exceptionHandler ?? throw new ArgumentNullException(nameof(exceptionHandler));
 
         ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
+    }
+
+    private string ToServiceRetryTopic(string? topic)
+    {
+        if (string.IsNullOrWhiteSpace(topic))
+        {
+            return string.Empty;
+        }
+
+        if (KafkaTopicNames.TryMainFromRetry(topic, out _, out _))
+        {
+            return topic;
+        }
+
+        const string sharedSuffix = "-Retry";
+        var main = topic.EndsWith(sharedSuffix, StringComparison.Ordinal)
+            ? topic[..^sharedSuffix.Length]
+            : topic;
+        return KafkaTopicNames.Retry(main, ServiceName);
     }
 
     public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)

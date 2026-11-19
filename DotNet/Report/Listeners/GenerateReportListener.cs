@@ -104,10 +104,11 @@ namespace LantanaGroup.Link.Report.Listeners
                 MaxPollIntervalMs = 300000
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
+                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.GenerateReportRequested), "Report"));
                 _logger.LogInformation("{Name}: Started consumer for topic '{Topic}' at {Timestamp}", Name, nameof(KafkaTopic.GenerateReportRequested), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -117,8 +118,27 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            await ProcessMessageAsync(result, consumeCancellationToken);
-                            consumer.SafeCommit(result, _logger);
+                            var accounted = false;
+                            try
+                            {
+                                accounted = await ProcessMessageAsync(result, consumeCancellationToken);
+                                if (!accounted)
+                                {
+                                    await DeadLetterCommit.RewindAsync(consumer, result, _logger, consumeCancellationToken);
+                                }
+                            }
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            finally
+                            {
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                    consumer.SafeCommit(result, _logger);
+                                }
+                            }
                         }, cancellationToken);
 
                     }
@@ -152,14 +172,14 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, GenerateReportValue> result, CancellationToken cancellationToken)
+        public async Task<bool> ProcessMessageAsync(ConsumeResult<string, GenerateReportValue> result, CancellationToken cancellationToken)
         {
             string facilityId = string.Empty;
             try
             {
                 if (result == null)
                 {
-                    return;
+                    return true;
                 }
 
                 using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
@@ -169,15 +189,13 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
                 var mappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
-                var key = result.Message.Key;
+                facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
                 var value = result.Message.Value;
                 var inboundMetricsMode = KafkaHeaderHelper.GetMetricsMode(result.Message.Headers);
                 var startDate = value.StartDate;
                 var endDate = value.EndDate;
                 var reportTypes = value.ReportTypes;
                 var reportId = value.ReportId;
-
-                facilityId = key;
 
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
@@ -186,7 +204,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(
                         scope.ServiceProvider, _logger, Name, facilityId, value.AdhocReportId.ToString(), cancellationToken))
-                    return;
+                    return true;
 
                 if (value is { Regenerate: true, ReportId: not null })
                 {
@@ -350,9 +368,10 @@ namespace LantanaGroup.Link.Report.Listeners
                             _evaluationProducer.Produce(nameof(KafkaTopic.EvaluationRequested),
                                 new Message<string, EvaluationRequestedValue>
                                 {
-                                    Key = facilityId,
+                                    Key = KafkaKeys.ForPatient(facilityId, entry.PatientId),
                                     Value = new EvaluationRequestedValue
                                     {
+                                        FacilityId = facilityId,
                                         PreviousReportId = value.ReportId?.ToString(),
                                         PatientId = entry.PatientId,
                                         ReportTrackingId = reportSchedule.Id.ToString(),
@@ -393,20 +412,24 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken, inboundMetricsMode);
                 }
+
+                return true;
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                return _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
             }
             catch (TransientException ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
             catch (TimeoutException ex)
             {
                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [GenerateReportRequested] at offset: {result.TopicPartitionOffset}";
                 var transientException = new TransientException(exceptionMessage, ex);
                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                return true;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -415,6 +438,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (Exception ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
         }
 

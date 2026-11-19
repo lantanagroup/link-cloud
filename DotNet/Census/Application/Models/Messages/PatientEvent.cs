@@ -4,6 +4,8 @@ namespace LantanaGroup.Link.Census.Application.Models.Messages;
 
 public class PatientEvent : IBaseMessage
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FacilityId { get; set; }
     public string PatientId { get; set; }
     public string EventType { get; set; }
 

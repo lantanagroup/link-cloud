@@ -1,5 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
 
+using System.Text.Json.Serialization;
+
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
     public class PatientEvent : IPatientEvent
@@ -25,6 +27,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class PatientEventMessage
     {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? FacilityId { get; set; }
         public string PatientId { get; set; } = string.Empty;
         public string EventType { get; set; } = string.Empty;
     }

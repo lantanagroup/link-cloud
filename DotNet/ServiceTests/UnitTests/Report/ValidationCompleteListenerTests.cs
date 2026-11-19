@@ -63,10 +63,14 @@ public class ValidationCompleteListenerTests
             Times.Once);
 
         harness.Producer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 nameof(KafkaTopic.SubmitPayload),
-                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForPatient(FacilityId, PatientId) &&
+                    m.Value.FacilityId == FacilityId &&
+                    m.Value.PatientId == PatientId &&
+                    m.Value.ReportScheduleId == harness.ReportId),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -110,7 +114,7 @@ public class ValidationCompleteListenerTests
         public Guid ReportId { get; } = Guid.NewGuid();
         public Mock<PatientAggregator> PatientAggregator { get; }
         public Mock<IReportEntryManager> ReportEntryManager { get; } = new();
-        public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> Producer { get; } = new();
+        public Mock<IProducer<string, SubmitPayloadValue>> Producer { get; } = new();
         public ValidationCompleteListener Listener { get; }
 
         public Harness()
@@ -167,6 +171,13 @@ public class ValidationCompleteListenerTests
 
             var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
+            Producer
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>());
+
             var submitPayloadProducer = new SubmitPayloadProducer(
                 scopeFactory,
                 Producer.Object,
@@ -178,6 +189,7 @@ public class ValidationCompleteListenerTests
                 Mock.Of<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(),
                 Mock.Of<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(),
                 submitPayloadProducer,
+                new PayloadSubmittedSignalProducer(Mock.Of<IProducer<string, PayloadSubmittedValue>>()),
                 scopeFactory,
                 new ServiceInformation { ServiceConfigName = "Report" },
                 new BlobStorageService(blobSettings),

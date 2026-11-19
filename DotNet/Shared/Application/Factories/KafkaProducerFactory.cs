@@ -47,6 +47,8 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
 
+            KafkaClientDefaults.ApplyProducer(config, _kafkaConnection.ClientId);
+
             var producerBuilder = new ProducerBuilder<TProducerKey, TProducerValue>(config);
 
             if (typeof(TProducerKey) != typeof(string))

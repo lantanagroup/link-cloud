@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+﻿using System.Text.Json.Serialization;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
@@ -30,6 +31,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class DataAcquisitionRequestedMessage
     {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? FacilityId { get; set; }
         public string PatientId { get; set; } = string.Empty;
         public string QueryType { get; set; } = string.Empty;
         public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();

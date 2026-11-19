@@ -56,14 +56,14 @@ namespace IntegrationTests.DataAcquisition
         private string? _serverConnectionString;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
-        public Mock<IProducer<ResourceKey, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
+        public Mock<IProducer<string, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
         public Mock<IResourceCache> ResourceCacheMock { get; } = new Mock<IResourceCache>();
         public Mock<IPatientDataService> PatientDataServiceMock { get; } = new Mock<IPatientDataService>();
 
         public DataAcquisitionIntegrationTestFixture()
         {
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
-            ResourcesAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
+            ResourcesAcquiredProducerMock = new Mock<IProducer<string, ResourcesAcquired>>();
 
             if (string.IsNullOrWhiteSpace(ExternalConnectionString))
             {
@@ -202,7 +202,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Mock Kafka producers for integration tests
             builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
-            builder.Services.AddSingleton<IProducer<ResourceKey, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
+            builder.Services.AddSingleton<IProducer<string, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
             ResourceCacheMock
                 .Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>()))
                 .Returns(ResourceCacheMock.Object);

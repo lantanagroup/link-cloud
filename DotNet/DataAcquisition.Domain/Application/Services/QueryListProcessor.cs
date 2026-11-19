@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
@@ -55,9 +54,7 @@ public class QueryListProcessor : IQueryListProcessor
 {
     private readonly ILogger<QueryListProcessor> _logger;
     private readonly IFhirApiService _fhirRepo;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
     private readonly IReferenceResourceService _referenceResourceService;
-    private readonly ProducerConfig _producerConfig;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
     private readonly IParameterQueryFactory _parameterQueryFactory;
@@ -65,7 +62,6 @@ public class QueryListProcessor : IQueryListProcessor
     public QueryListProcessor(
         ILogger<QueryListProcessor> logger,
         IFhirApiService fhirRepo,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
         IReferenceResourceService referenceResourceService,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
@@ -73,14 +69,10 @@ public class QueryListProcessor : IQueryListProcessor
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _parameterQueryFactory = parameterQueryFactory ?? throw new ArgumentNullException(nameof(parameterQueryFactory));
-
-        _producerConfig = new ProducerConfig();
-        _producerConfig.CompressionType = CompressionType.Zstd;
     }
 
     public async Task<List<Resource>> ExecuteFacilityValidationRequest(

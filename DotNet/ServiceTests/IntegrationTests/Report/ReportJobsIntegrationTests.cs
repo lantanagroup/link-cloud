@@ -68,9 +68,9 @@ public class EndOfReportPeriodJobTests
         _fixture.SubmitPayloadKafkaProducerMock
             .Setup(p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new DeliveryResult<SubmitPayloadKey, SubmitPayloadValue>
+            .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>
             {
                 Status = PersistenceStatus.Persisted
             });

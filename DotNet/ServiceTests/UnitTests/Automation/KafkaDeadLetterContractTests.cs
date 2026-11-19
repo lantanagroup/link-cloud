@@ -12,12 +12,31 @@ public class KafkaDeadLetterContractTests
     [Theory]
     [InlineData("ResourcesNormalized-Error", true)]
     [InlineData("ResourcesNormalized-Retry", true)]
+    [InlineData("ResourcesNormalized-Retry-Normalization", true)]
     [InlineData("ResourceNormalized-Error", true)]
     [InlineData("ReadyForValidation-Error", false)]
+    [InlineData("ReadyForValidation-Retry-Validation", false)]
     [InlineData("ResourcesNormalized", false)]
     public void IsResourcesNormalizedFailureTopic_matches_current_and_legacy_names(string topic, bool expected)
     {
         KafkaDeadLetterContract.IsResourcesNormalizedFailureTopic(topic).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("SubmitPayload-Retry", true)]
+    [InlineData("SubmitPayload-Retry-Submission", true)]
+    [InlineData("submitpayload-retry-submission", true)]
+    [InlineData("ResourcesNormalized-Retry", true)]
+    [InlineData("ReadyForValidation-Retry", true)]
+    [InlineData("MeasureReportGenerated-Retry-Report", true)]
+    [InlineData("SubmitPayload-Redrive-Submission", false)]
+    [InlineData("SubmitPayload-Error", false)]
+    [InlineData("SubmitPayload", false)]
+    [InlineData("SubmitPayload-RetryTopic", false)]
+    [InlineData("Retry-Submission", false)]
+    public void IsRetryTopic_matches_unsuffixed_and_per_service_names(string topic, bool expected)
+    {
+        KafkaDeadLetterContract.IsRetryTopic(topic).Should().Be(expected);
     }
 
     [Fact]

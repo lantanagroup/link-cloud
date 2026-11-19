@@ -142,6 +142,7 @@ public class ReportApiHelper
 
         var value = new ReportScheduledValue
         {
+            FacilityId = facilityId,
             ReportTypes = reportTypes.ToList(),
             Frequency = frequency,
             StartDate = startDateUtc,

@@ -8,6 +8,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 
 public class ResourcesAcquired
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FacilityId { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PatientId { get; set; }
     public string QueryType { get; set; } = string.Empty;
     public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();
     public ReportableEvent ReportableEvent { get; set; }

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Newtonsoft.Json.Linq;
@@ -9,11 +10,14 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 /// Canonical Kafka dead-letter / retry header and payload shapes used by Link services.
 /// .NET listeners write <see cref="KafkaConstants.HeaderConstants"/> via
 /// DeadLetterExceptionHandler / TransientExceptionHandler. Java Spring Kafka DLT recoverers
-/// write the kafka_dlt-* / kafka_exception-* headers. ResourceNormalized (and ReadyForValidation)
-/// keys are JSON objects, not the raw facility id string used on most other topics.
+/// write the kafka_dlt-* / kafka_exception-* headers. Patient topics such as
+/// ResourcesNormalized and ReadyForValidation use the composite patient key
+/// (<c>facilityId</c> and <c>patientId</c>). Other topics may still use a plain facility id.
 /// </summary>
-public static class KafkaDeadLetterContract
+public static partial class KafkaDeadLetterContract
 {
+    [GeneratedRegex(@"-Retry(-.+)?$", RegexOptions.IgnoreCase, "en-US")]
+    private static partial Regex RetrySuffix();
     public const int DefaultValuePreviewLength = 500;
     public const int DefaultHeaderPreviewLength = 100;
     public const int ExceptionHeaderPreviewLength = 12000;
@@ -53,8 +57,12 @@ public static class KafkaDeadLetterContract
     public static bool IsErrorTopic(string topic) =>
         topic.EndsWith("-Error", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// True for an unsuffixed <c>{topic}-Retry</c> topic and for a per-service
+    /// <c>{topic}-Retry-{service}</c> topic. Same pattern as <c>RetryModelFactory</c>.
+    /// </summary>
     public static bool IsRetryTopic(string topic) =>
-        topic.EndsWith("-Retry", StringComparison.OrdinalIgnoreCase);
+        !string.IsNullOrEmpty(topic) && RetrySuffix().IsMatch(topic);
 
     /// <summary>
     /// True for ResourcesNormalized-Error/Retry. Also accepts the historical misspelling
@@ -162,9 +170,9 @@ public static class KafkaDeadLetterContract
     }
 
     /// <summary>
-    /// Same scoping rules as the previous key-equality filter, plus JSON ResourceKey /
-    /// ReadyForValidation.Key and X-Exception-Facility-Id. Unknown (empty) keys still count
-    /// so a missing key cannot hide a dead-letter.
+    /// Facility match uses X-Exception-Facility-Id when that header is set, otherwise
+    /// <c>facilityId</c> inside a composite patient key, otherwise the raw key.
+    /// Unknown (empty) keys still count so a missing key cannot hide a dead-letter.
     /// </summary>
     public static bool MatchesFacility(string? messageKey, IReadOnlyDictionary<string, string> headers, string? facilityId)
     {

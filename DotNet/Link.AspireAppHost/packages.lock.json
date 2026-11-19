@@ -1012,7 +1012,7 @@
       },
       "Confluent.Kafka": {
         "type": "CentralTransitive",
-        "requested": "[2.14.2, )",
+        "requested": "[2.16.0, )",
         "resolved": "2.15.0",
         "contentHash": "/BOEnIKAq1AHq6vPl+0RBDiKwI6L6tJaYBo1qH+OAUP5MFy0i0MhSfgtqKW9/M8J9dQPfb/izWU+R0Uc6DyW2w==",
         "dependencies": {

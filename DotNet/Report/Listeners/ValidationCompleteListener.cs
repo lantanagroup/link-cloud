@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
@@ -30,6 +31,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> _deadLetterExceptionHandler;
         private readonly SubmitPayloadProducer _submitPayloadProducer;
+        private readonly PayloadSubmittedSignalProducer _payloadSubmittedSignalProducer;
 
         private readonly IExceptionLogger<ValidationCompleteListener> _exceptionLogger;
 
@@ -39,6 +41,7 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitPayloadProducer submitPayloadProducer,
+            PayloadSubmittedSignalProducer payloadSubmittedSignalProducer,
             IServiceScopeFactory serviceScopeFactory,
             ServiceInformation serviceInformation,
             BlobStorageService blobStorageService,
@@ -49,6 +52,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _serviceScopeFactory = serviceScopeFactory;
             _serviceInformation = serviceInformation;
             _submitPayloadProducer = submitPayloadProducer;
+            _payloadSubmittedSignalProducer = payloadSubmittedSignalProducer ?? throw new ArgumentNullException(nameof(payloadSubmittedSignalProducer));
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
@@ -70,10 +74,11 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
+                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.ValidationComplete), "Report"));
                 _logger.LogInformation("{Name}: Started validation complete consumer for topic '{Topic}' at {StartTime}", nameof(ValidationCompleteListener), nameof(KafkaTopic.ValidationComplete), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -83,33 +88,38 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
-                            {
-                                throw new DeadLetterException($"Received null message from topic '{nameof(KafkaTopic.ValidationComplete)}'.");
-                            }
-
-                            facilityId = result.Message.Key;
+                            var accounted = false;
                             try
                             {
+                                if (result == null)
+                                {
+                                    throw new DeadLetterException($"Received null message from topic '{nameof(KafkaTopic.ValidationComplete)}'.");
+                                }
+
+                                facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key) ?? string.Empty;
                                 await ProcessMessageAsync(result, consumeCancellationToken);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = result != null && await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (TimeoutException ex)
                             {
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -118,7 +128,15 @@ namespace LantanaGroup.Link.Report.Listeners
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
+                            }
+                            finally
+                            {
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                    consumer.SafeCommit(result, _logger);
+                                }
                             }
                         }, cancellationToken);
                     }
@@ -156,8 +174,14 @@ namespace LantanaGroup.Link.Report.Listeners
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
-            var facilityId = result.Message.Key;
             var value = result.Message.Value;
+            var facilityId = KafkaIdentity.Facility(value?.FacilityId, result.Message.Key) ?? string.Empty;
+            var patientId = KafkaIdentity.Patient(value?.PatientId, result.Message.Key);
+            if (value != null && !string.IsNullOrWhiteSpace(patientId))
+            {
+                value.PatientId = patientId;
+            }
+
             var reportId = Guid.Parse(value.ReportTrackingId);
 
             if (await PipelineAbortSkip.ShouldSkipAsync(
@@ -197,27 +221,26 @@ namespace LantanaGroup.Link.Report.Listeners
                 await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
                 
                 await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry,
-                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers));
+                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers), cancellationToken);
             }
             else
             {
                 reportEntry.SubmissionStatus = SubmissionStatus.NotSubmitted;
                 await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-                // The per-patient SubmitPayload we just skipped is normally what drives report
-                // completion: it comes back as PayloadSubmitted, and PayloadSubmittedListener
-                // calls ReportManifestProducer.Produce after each patient. With submission
-                // bypassed that event never exists, and the other callers cannot stand in for
-                // it -- MeasureReportGeneratedListener runs before validation, and an ad-hoc
-                // report never schedules EndOfReportPeriodJob. Without this call the manifest
-                // is never written to internal/ and the schedule sits at its pre-report status
-                // forever.
-                //
-                // Produce is gated on EndOfReportPeriodJobHasRun and AreAllEntriesCompleteAsync,
-                // so it is a no-op on every patient but the last, exactly as on the submitting
-                // path.
-                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
-                await reportManifestProducer.Produce(schedule, correlationIdStr, cancellationToken);
+                // Submission normally produces PayloadSubmitted after the patient blob is copied.
+                // That topic is keyed by facility and report schedule, so one consumer decides
+                // whether this patient was the last. With submission off, that event never
+                // exists. Produce the same event here instead of building the manifest on this
+                // per-patient consumer. Two patients of one report must not both pass the
+                // "all entries complete" check.
+                await _payloadSubmittedSignalProducer.ProduceAsync(
+                    correlationIdStr,
+                    schedule.FacilityId,
+                    schedule.Id,
+                    value.PatientId,
+                    KafkaHeaderHelper.GetMetricsMode(result.Message.Headers),
+                    cancellationToken);
             }
         }
 

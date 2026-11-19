@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -28,7 +29,7 @@ public static class KafkaProducerRegistration
         {
             ClientId = "Report_ReadyForValidation"
         };
-        var readyForValidationProducer = new KafkaProducerFactory<ReadyForValidationKey, ReadyForValidationValue>(kafkaConnection).CreateProducer(readyForValidationConfig);
+        var readyForValidationProducer = new KafkaProducerFactory<string, ReadyForValidationValue>(kafkaConnection).CreateProducer(readyForValidationConfig);
         services.AddSingleton(readyForValidationProducer);
 
         var evaluationRequestedConfig = new ProducerConfig()
@@ -42,8 +43,16 @@ public static class KafkaProducerRegistration
         {
             ClientId = "Report_SubmitPayload"
         };
-        var submitPayloadProducer = new KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayloadConfig);
+        var submitPayloadProducer = new KafkaProducerFactory<string, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayloadConfig);
         services.AddSingleton(submitPayloadProducer);
+
+        var payloadSubmittedConfig = new ProducerConfig()
+        {
+            ClientId = "Report_PayloadSubmitted"
+        };
+        var payloadSubmittedProducer = new KafkaProducerFactory<string, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
+        services.AddSingleton(payloadSubmittedProducer);
+        services.AddTransient<PayloadSubmittedSignalProducer>();
 
         var auditableEventOccurredConfig = new ProducerConfig()
         {

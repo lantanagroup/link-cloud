@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
@@ -396,6 +396,7 @@ public class PatientCensusServiceTests
             It.Is<string>(topic => topic == "PatientListsAcquired"),
             It.Is<Message<string, PatientListMessage>>(m =>
                 m.Key == facilityId &&
+                m.Value.FacilityId == facilityId &&
                 m.Value.PatientLists.Count == 6),
             It.IsAny<CancellationToken>()), Times.Once);
     }

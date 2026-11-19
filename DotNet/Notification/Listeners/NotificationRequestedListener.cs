@@ -7,8 +7,14 @@ using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
+using ServiceActivitySource = LantanaGroup.Link.Notification.Infrastructure.ServiceActivitySource;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Notification.Listeners
@@ -19,14 +25,19 @@ namespace LantanaGroup.Link.Notification.Listeners
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly INotificationFactory _notificationFactory;
         private readonly IKafkaConsumerFactory _kafkaConsumerFactory;
+        private readonly IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage> _deadLetterExceptionHandler;
+        private static readonly TimeSpan ConsumeLoopBackoff = TimeSpan.FromSeconds(1);
 
         public NotificationRequestedListener(ILogger<NotificationRequestedListener> logger, INotificationFactory notificationFactory, 
-            IKafkaConsumerFactory kafkaConsumerFactory, IServiceScopeFactory scopeFactory)
+            IKafkaConsumerFactory kafkaConsumerFactory, IServiceScopeFactory scopeFactory,
+            IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));           
             _notificationFactory = notificationFactory ?? throw new ArgumentNullException(nameof(notificationFactory));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
+            _deadLetterExceptionHandler.Topic = KafkaTopicNames.Error(nameof(KafkaTopic.NotificationRequested));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -36,11 +47,12 @@ namespace LantanaGroup.Link.Notification.Listeners
 
         private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false))
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false, assignmentTracker))
             {
                 try
                 {
-                    _consumer.Subscribe(nameof(KafkaTopic.NotificationRequested));
+                    _consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.NotificationRequested), NotificationConstants.ServiceName));
                     _logger.LogConsumerStarted(nameof(KafkaTopic.NotificationRequested), DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
@@ -49,8 +61,11 @@ namespace LantanaGroup.Link.Notification.Listeners
                         {                            
                             await _consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                             {
+                                var accounted = false;
+                                try
+                                {
                                 if (result != null && result.Message.Value != null)
-                                {                                    
+                                {
                                     var currentActivity = Activity.Current;
                                     if (currentActivity != null)
                                     {
@@ -59,6 +74,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     }
 
                                     NotificationMessage messageValue = result.Message.Value;
+                                    var facilityId = KafkaIdentity.Facility(messageValue.FacilityId, result.Message.Key);
 
                                     if (result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                     {
@@ -118,7 +134,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         }
 
                                         //create notification
-                                        CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, result.Message.Key, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                                                                                       
+                                        CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, facilityId, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                                                                                       
                                                                           
                                         string notificationId = await _createNotificationCommand.Execute(notificationModel, consumeCancellationToken);
                                         _logger.LogNotificationCreation(notificationId, notificationModel);
@@ -128,9 +144,9 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         SendNotificationModel sendModel = _notificationFactory.CreateSendNotificationModel(notification.Id, notification.Recipients, notification.Bcc, notification.Subject, notification.Body);
 
                                         //if a facility based notification, get their configuration and add it to the send model
-                                        if (!string.IsNullOrEmpty(result.Message.Key))
+                                        if (!string.IsNullOrEmpty(facilityId))
                                         {
-                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(result.Message.Key, consumeCancellationToken);
+                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId, consumeCancellationToken);
                                             sendModel.FacilityConfig = config;
                                         }
 
@@ -138,8 +154,62 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         await _sendNotificationCommand.Execute(sendModel, consumeCancellationToken);
                                     }                                    
 
-                                    //consume the result and offset
-                                    _consumer.Commit(result);
+                                    accounted = true;
+                                }
+                                }
+                                catch (DeadLetterException ex) when (result != null)
+                                {
+                                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                    var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key);
+                                    accounted = await PublishErrorOrRewindAsync(result, ex, facilityId ?? string.Empty);
+                                }
+                                catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    throw;
+                                }
+                                catch (Exception ex)
+                                {
+                                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                    _logger.LogConsumerException(nameof(KafkaTopic.NotificationRequested), ex.Message);
+                                    if (result == null)
+                                    {
+                                        throw;
+                                    }
+
+                                    var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key);
+                                    accounted = await PublishErrorOrRewindAsync(
+                                        result,
+                                        new DeadLetterException("Notification Exception thrown: " + ex.Message, ex),
+                                        facilityId ?? string.Empty);
+                                }
+                                finally
+                                {
+                                    if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                                    {
+                                        assignmentTracker.MarkProcessed(result);
+                                        _consumer.SafeCommit(result, _logger);
+                                    }
+                                }
+
+                                async Task<bool> PublishErrorOrRewindAsync(ConsumeResult<string, NotificationMessage> failed, DeadLetterException error, string facility)
+                                {
+                                    if (_deadLetterExceptionHandler.HandleException(failed, error, facility))
+                                    {
+                                        return true;
+                                    }
+
+                                    // A later commit on this partition would cover this offset.
+                                    try
+                                    {
+                                        _consumer.Seek(failed.TopicPartitionOffset);
+                                    }
+                                    catch (KafkaException seekEx)
+                                    {
+                                        _logger.LogError(seekEx, "Failed to rewind notification {TopicPartitionOffset}.", failed.TopicPartitionOffset);
+                                    }
+
+                                    await Task.Delay(TimeSpan.FromSeconds(1), consumeCancellationToken);
+                                    return false;
                                 }
 
                             }, cancellationToken);
@@ -149,16 +219,26 @@ namespace LantanaGroup.Link.Notification.Listeners
                         {
                             Activity.Current?.SetStatus(ActivityStatusCode.Error);
                             _logger.LogConsumerException(nameof(KafkaTopic.NotificationRequested), ex.Message);
-                            if (ex.Error.IsFatal)
+                            if (ex.Error.IsFatal || ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                             {
                                 break;
                             }
+
+                            var rawKey = ex.ConsumerRecord?.Message?.Key != null
+                                ? System.Text.Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                                : null;
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, KafkaIdentity.Facility(null, rawKey) ?? string.Empty);
+                            await PauseBeforeNextConsumeAsync(cancellationToken);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
                         }
                         catch (Exception ex)
                         {
                             Activity.Current?.SetStatus(ActivityStatusCode.Error);
                             _logger.LogConsumerException(nameof(KafkaTopic.NotificationRequested), ex.Message);
-                            break;
+                            await PauseBeforeNextConsumeAsync(cancellationToken);
                         }
                     }
 
@@ -174,6 +254,11 @@ namespace LantanaGroup.Link.Notification.Listeners
                     _consumer.Dispose();
                 }
             }
+        }
+
+        private static Task PauseBeforeNextConsumeAsync(CancellationToken cancellationToken)
+        {
+            return Task.Delay(ConsumeLoopBackoff, cancellationToken);
         }
 
     }

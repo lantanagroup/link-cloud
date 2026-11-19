@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Retention;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -121,7 +122,9 @@ public class RetentionCheckCompleteListener : BackgroundService
             EnableAutoCommit = false
         });
 
-        kafkaConsumer.Subscribe(nameof(KafkaTopic.RetentionCheckComplete));
+        kafkaConsumer.Subscribe(KafkaTopicNames.Subscription(
+            nameof(KafkaTopic.RetentionCheckComplete),
+            "Report"));
         var missingTopicReported = false;
 
         while (!cancellationToken.IsCancellationRequested)
