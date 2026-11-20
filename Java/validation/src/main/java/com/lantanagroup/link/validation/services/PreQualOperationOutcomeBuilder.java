@@ -10,6 +10,7 @@ import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.IntegerType;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.OperationOutcome;
+import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,50 +32,31 @@ import java.util.UUID;
 public class PreQualOperationOutcomeBuilder {
     private final Logger _logger = LoggerFactory.getLogger(PreQualOperationOutcomeBuilder.class);
 
-    /** Extension URL carrying the category id on each issue. */
     static final String PQ_ISSUE_CAT_URL = "http://hl7.org/fhir/us/core/StructureDefinition/pq-issue-cat";
-    /** Extension URL carrying the source profile canonical on each issue; omitted for findings with no profile. */
     static final String PQ_ISSUE_PROFILE_URL = "http://nhsnlink.org/pq-issue-profile";
-    /** Extension URL carrying the total issue count on the OperationOutcome. */
     static final String OO_TOTAL_URL = "http://nhsnlink.org/oo-total";
-    /**
-     * Locator expression anchoring each issue to the patient's MeasureReport
-     * ({@code %d} = its Bundle entry index, {@code %s} = its id). The index must be the MeasureReport's
-     * actual position in the bundle: the aggregator happens to write it first today, but a hard-coded
-     * {@code entry[0]} silently resolves to nothing as soon as that ordering changes.
-     */
+    /** R4 OperationOutcome declares only {@code issue}, so an extension is the only place for the patient. */
+    static final String PQ_QUALIFYING_PATIENT_URL = "http://nhsnlink.org/pq-qualifying-patient";
+    /** Entry position and id, the shape every expression here takes. {@link InstanceAnchoredExpression}. */
     static final String MEASURE_REPORT_LOCATOR =
             "Bundle.entry[%d].resource.ofType(MeasureReport).where(id = '%s').extension[0]";
 
-    /**
-     * A MeasureReport located in the submission bundle: its entry index and its id.
-     */
     public record MeasureReportRef(int index, String id) {
     }
 
-    /**
-     * Groups findings into issues. {@code profile} is null for findings that belong to no profile; records
-     * compare components with {@code Objects.equals}, so those still group together.
-     */
     private record IssueKey(String categoryId, String profile) {
     }
 
     /**
-     * Builds the OperationOutcome for a patient's categorized findings.
-     *
-     * @param results          the patient's categorized validation results
-     * @param measureReport    the patient's MeasureReport in the submission bundle (may be null)
-     * @param writeExpressions when false, {@code expression[]} is omitted from every issue
-         * @return the OperationOutcome, or {@link Optional#empty()} when no submitted-category findings exist
+     * @return empty when no finding maps to a submitted category. {@code measureReport} and
+     * {@code patientId} may be null.
      */
-    public Optional<OperationOutcome> build(List<Result> results, MeasureReportRef measureReport, boolean writeExpressions) {
-                // Group findings by submitted category (submit == true) and source profile; a Result may map to
-        // several categories. Keyed by category id, not by the Category entity: Category defines no
-        // equals/hashCode, so two instances of the same logical category (loaded in different
-        // persistence contexts, say) would otherwise land in separate groups and emit a duplicate issue
-        // for that category, inflating oo-total. The profile is part of the key so that findings from,
-        // say, a lab and a vitals Observation in the same category stay distinguishable. LinkedHashMap
-        // keeps issue order deterministic (first-seen order).
+    public Optional<OperationOutcome> build(
+            List<Result> results, MeasureReportRef measureReport, String patientId,
+            boolean writeExpressions) {
+        // Keyed by category id, not the Category entity: Category defines no equals/hashCode, so two
+        // instances of one logical category would group separately and duplicate its issue, inflating
+        // oo-total. LinkedHashMap keeps issue order deterministic.
         Map<IssueKey, List<Result>> byIssueKey = new LinkedHashMap<>();
         for (Result result : results) {
             List<Category> categories = result.getCategories();
@@ -109,14 +91,12 @@ public class PreQualOperationOutcomeBuilder {
             if (key.profile() != null) {
                 issue.addExtension(new Extension(PQ_ISSUE_PROFILE_URL, new CanonicalType(key.profile())));
             }
-
             if (writeExpressions) {
-                // The id is checked as well as the ref: a MeasureReport carrying no id yields a non-null
-                // ref with a null id, and formatting that produces where(id = 'null') — valid FHIRPath
-                // that silently resolves to nothing. Omitting the locator is the honest outcome.
+                // The id is checked as well as the ref: a null id formats to where(id = 'null'), valid
+                // FHIRPath that silently selects nothing. Omitting the locator is the honest outcome.
                 if (measureReport != null && measureReport.id() != null) {
-                    issue.addExpression(
-                            String.format(MEASURE_REPORT_LOCATOR, measureReport.index(), measureReport.id()));
+                    issue.addExpression(String.format(
+                            MEASURE_REPORT_LOCATOR, measureReport.index(), measureReport.id()));
                 } else {
                     _logger.warn("No identifiable MeasureReport in the bundle; omitting the MeasureReport locator expression");
                 }
@@ -124,17 +104,18 @@ public class PreQualOperationOutcomeBuilder {
             }
         }
 
+        if (patientId != null) {
+            operationOutcome.addExtension(
+                    new Extension(PQ_QUALIFYING_PATIENT_URL, new Reference("Patient/" + patientId)));
+        } else {
+            _logger.warn("No patient id available; omitting the pq-qualifying-patient extension");
+        }
         operationOutcome.addExtension(new Extension(OO_TOTAL_URL, new IntegerType(operationOutcome.getIssue().size())));
 
         return Optional.of(operationOutcome);
     }
 
-    /**
-     * Locates the first MeasureReport anywhere in the submission bundle, returning both its entry index
-     * and its id, or null if the bundle contains none. The index is carried alongside the id because the
-     * locator expression addresses the MeasureReport by position; scanning for the id while assuming
-     * position 0 would emit an expression that resolves to nothing.
-     */
+    /** The first MeasureReport's entry position and id, or null when the bundle holds none. */
     public MeasureReportRef resolveMeasureReport(Bundle bundle) {
         if (bundle == null) {
             return null;

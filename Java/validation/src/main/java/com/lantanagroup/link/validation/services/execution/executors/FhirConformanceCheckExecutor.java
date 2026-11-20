@@ -11,10 +11,12 @@ import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
+import com.lantanagroup.link.validation.services.InstanceAnchoredExpression;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.UnresolvedBindingClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -64,8 +66,15 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
             }
         }
 
+        Bundle validatedBundle = context.getResource() instanceof Bundle bundle ? bundle : null;
+
         List<RawFinding> findings = new ArrayList<>();
         for (SingleValidationMessage msg : messages) {
+            // location keeps HAPI's raw string: isCoLocatedWithUnresolved compares these to one another,
+            // and unresolvedLocations above was built from the same raw values. Only the expression - the
+            // pointer that reaches the submitted NDJSON - is re-anchored on the resource id.
+            String location = msg.getLocationString();
+            String expression = InstanceAnchoredExpression.anchor(location, validatedBundle);
             if (isNotEvaluated(msg, unresolvedLocations)) {
                 findings.add(RawFinding.builder()
                         .checkLocalId(check.getCheckLocalId())
@@ -74,8 +83,8 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
                         .notEvaluated(true)
                         .code("binding-not-evaluated")
                         .message(msg.getMessage())
-                        .location(msg.getLocationString())
-                        .expression(msg.getLocationString())
+                        .location(location)
+                        .expression(expression)
                         .build());
                 continue;
             }
@@ -85,8 +94,8 @@ public class FhirConformanceCheckExecutor implements CheckExecutor {
                     .severity(mapSeverity(msg))
                     .code("fhir-conformance")
                     .message(msg.getMessage())
-                    .location(msg.getLocationString())
-                    .expression(msg.getLocationString())
+                    .location(location)
+                    .expression(expression)
                     .build());
         }
         return findings;
