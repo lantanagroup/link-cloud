@@ -54,7 +54,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.8.27" />
     <PackageVersion Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.0.27" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.27" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.28" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.27" />
     <PackageVersion Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.1.0" />
