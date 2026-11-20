@@ -7,6 +7,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
+using System.Text.Json;
 
 namespace Automation.UI.Controllers;
 
@@ -248,6 +249,7 @@ public class RunsController(
         ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
         if (run.IsMetricsRun)
             ViewBag.Performance = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
+        ViewData["SuggestedWorkaroundJson"] = SerializeWorkaround(await LoadSuggestedWorkaroundAsync(run, cancellationToken));
         return View(run);
     }
 
@@ -628,6 +630,20 @@ public class RunsController(
     }
 
     [HttpGet]
+    public async Task<IActionResult> SuggestedWorkaround(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        var workaround = await LoadSuggestedWorkaroundAsync(run, cancellationToken);
+        if (workaround == null)
+            return NoContent();
+
+        return Json(workaround);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> PipelineSnapshot(Guid id, CancellationToken cancellationToken)
     {
         var snapshot = await runManager.GetPipelineSnapshotAsync(id, cancellationToken);
@@ -876,6 +892,83 @@ public class RunsController(
         {
             logger.LogWarning(ex, "Failed to load DA log detail for run {RunId}, log {LogId}", id, logId);
             return StatusCode(StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static readonly JsonSerializerOptions WorkaroundJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private static string SerializeWorkaround(SuggestedWorkaround? workaround)
+    {
+        var json = JsonSerializer.Serialize(workaround, WorkaroundJson);
+        return json.Replace("<", "\\u003c", StringComparison.Ordinal);
+    }
+
+    private async Task<SuggestedWorkaround?> LoadSuggestedWorkaroundAsync(
+        AutomationRunSummary run,
+        CancellationToken cancellationToken)
+    {
+        if (run.Status != AutomationRunStatus.Failed)
+            return null;
+
+        var stored = await ReadDomainAsync<OrgLocationSummary>(run.RunId, "orgLocation", cancellationToken);
+        StoreBackedServicePoller.OrgLocationSnapshot? legacy = null;
+        if (stored == null || stored.ConfigurationCount + stored.LocationMappingCount + stored.EncounterMappingCount == 0)
+            legacy = await ReadDomainAsync<StoreBackedServicePoller.OrgLocationSnapshot>(run.RunId, "orgLocation", cancellationToken);
+
+        var summary = SuggestedWorkaroundBuilder.ResolveOrgLocation(stored, legacy);
+
+        var manifest = await runManager.GetGenerationManifestAsync(run.RunId, cancellationToken);
+        var mapId = manifest?.AppliedOrganizationResourceMapTemplateId
+            ?? RunConfigurationReader.Read(run.RunConfigurationJson).OrganizationMapId;
+        OrganizationResourceMapTemplate? map = null;
+        if (mapId.HasValue)
+        {
+            try
+            {
+                map = await organizationResourceMapTemplateStore.GetByIdAsync(mapId.Value, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Could not read organization resource map {MapId} for suggested workaround on run {RunId}.",
+                    mapId,
+                    run.RunId);
+            }
+        }
+
+        return SuggestedWorkaroundBuilder.Match(new SuggestedWorkaroundInput
+        {
+            Status = run.Status,
+            Summary = summary,
+            AppliedMapName = manifest?.AppliedOrganizationResourceMapName,
+            Map = map,
+            OrganizationMapsUrl = Url.Action("Index", "OrganizationResourceMaps")
+        });
+    }
+
+    private async Task<T?> ReadDomainAsync<T>(Guid runId, string domain, CancellationToken cancellationToken)
+        where T : class
+    {
+        try
+        {
+            return (await snapshotStore.GetDomainAsync<T>(runId, domain, cancellationToken))?.Data;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not read {Domain} for suggested workaround on run {RunId}.", domain, runId);
+            return null;
         }
     }
 
