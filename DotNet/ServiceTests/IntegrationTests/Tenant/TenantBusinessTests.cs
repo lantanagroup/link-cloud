@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+﻿using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
@@ -21,7 +20,6 @@ namespace IntegrationTests.Tenant
         private readonly IFacilityManager _manager;
         private readonly IFacilityQueries _queries;
         private readonly IEntityRepository<Facility> _repo;
-        private readonly IMapper _mapper;
 
         public TenantBusinessTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
         {
@@ -36,7 +34,6 @@ namespace IntegrationTests.Tenant
             _manager = sp.GetRequiredService<IFacilityManager>();
             _queries = sp.GetRequiredService<IFacilityQueries>();
             _repo = sp.GetRequiredService<IEntityRepository<Facility>>();
-            _mapper = sp.GetRequiredService<IMapper>();
         }
 
         public void Dispose() => _scope.Dispose();

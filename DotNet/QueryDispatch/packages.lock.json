@@ -1995,7 +1995,6 @@
           "AppAny.Quartz.EntityFrameworkCore.Migrations": "[0.5.2, )",
           "AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer": "[0.5.2, )",
           "AspNetCore.HealthChecks.Kafka": "[8.0.1, )",
-          "AutoMapper": "[13.0.1, )",
           "Azure.Data.AppConfiguration": "[1.9.0, )",
           "Azure.Identity": "[1.21.0, )",
           "Azure.Monitor.OpenTelemetry.AspNetCore": "[1.4.0, )",
@@ -2068,15 +2067,6 @@
         "dependencies": {
           "Confluent.Kafka": "2.3.0",
           "Microsoft.Extensions.Diagnostics.HealthChecks": "8.0.0"
-        }
-      },
-      "AutoMapper": {
-        "type": "CentralTransitive",
-        "requested": "[13.0.1, )",
-        "resolved": "13.0.1",
-        "contentHash": "/Fx1SbJ16qS7dU4i604Sle+U9VLX+WSNVJggk6MupKVkYvvBm4XqYaeFuf67diHefHKHs50uQIS2YEDFhPCakQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Options": "6.0.0"
         }
       },
       "Azure.Data.AppConfiguration": {

@@ -31,15 +31,6 @@
           "Microsoft.Extensions.Diagnostics.HealthChecks": "8.0.0"
         }
       },
-      "AutoMapper": {
-        "type": "Direct",
-        "requested": "[13.0.1, )",
-        "resolved": "13.0.1",
-        "contentHash": "/Fx1SbJ16qS7dU4i604Sle+U9VLX+WSNVJggk6MupKVkYvvBm4XqYaeFuf67diHefHKHs50uQIS2YEDFhPCakQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Options": "6.0.0"
-        }
-      },
       "Azure.Data.AppConfiguration": {
         "type": "Direct",
         "requested": "[1.9.0, )",

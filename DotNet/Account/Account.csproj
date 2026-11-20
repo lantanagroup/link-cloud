@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
-    <PackageReference Include="AutoMapper" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Confluent.Kafka" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
