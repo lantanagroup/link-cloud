@@ -186,7 +186,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
      * <p>
      * The findings go to blob storage and the event carries the blob name (a claim check), because one patient's
      * findings can exceed the Kafka message size limit. Without blob storage they go on the event as before. If the
-     * send fails, the blob is deleted, since no event will ever point at it.
+     * send fails, the blob is deleted, since no event will ever point at it; off the calling thread when the
+     * failure arrives on the producer's callback.
      */
     private void publishShadowCompareEvent(
             UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
@@ -219,7 +220,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                         if (ex != null) {
                             _logger.warn("Failed to send ShadowCompareEvent for report {}",
                                     LogUtils.sanitize(reportId), ex);
-                            shadowFindingsStore.delete(findingsBlobName);
+                            // This runs on the producer's sender thread, which the ValidationComplete
+                            // send shares, so the blob call must not happen here.
+                            shadowFindingsStore.deleteAsync(findingsBlobName);
                         }
                     });
         } catch (RuntimeException e) {

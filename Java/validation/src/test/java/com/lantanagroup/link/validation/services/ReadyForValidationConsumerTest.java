@@ -1145,6 +1145,8 @@ public class ReadyForValidationConsumerTest {
 
         assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
 
-        verify(shadowFindingsStore).delete(FINDINGS_BLOB);
+        // Off the callback's thread: on a real producer that is the sender thread ValidationComplete shares.
+        verify(shadowFindingsStore).deleteAsync(FINDINGS_BLOB);
+        verify(shadowFindingsStore, never()).delete(any());
     }
 }

@@ -6,6 +6,8 @@ import com.lantanagroup.link.validation.records.ShadowFindingDto;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +24,9 @@ import static org.mockito.Mockito.*;
 class ShadowFindingsStoreTest {
 
     @Mock private BlobStorageService blobStorageService;
+
+    private static final String OWN_BLOB =
+            "shadow-compare/facility-1/report-1/patient-1/3f2b8c1e-9a4d-4e6f-8b7a-0c1d2e3f4a5b.json";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -87,15 +92,16 @@ class ShadowFindingsStoreTest {
         ShadowFindingsStore store = new ShadowFindingsStore(Optional.empty(), objectMapper, "shadow-compare/");
 
         assertNull(store.store("f", "r", "p", List.of(finding())));
-        assertThrows(IllegalStateException.class, () -> store.load("shadow-compare/x.json"));
-        assertDoesNotThrow(() -> store.delete("shadow-compare/x.json"));
+        assertThrows(IllegalStateException.class, () -> store.load(OWN_BLOB));
+        assertDoesNotThrow(() -> store.delete(OWN_BLOB));
+        assertDoesNotThrow(() -> store.deleteAsync(OWN_BLOB));
     }
 
     @Test
     void delete_deletesTheBlob() {
-        store("shadow-compare/").delete("shadow-compare/x.json");
+        store("shadow-compare/").delete(OWN_BLOB);
 
-        verify(blobStorageService).deleteIfExists("shadow-compare/x.json");
+        verify(blobStorageService).deleteIfExists(OWN_BLOB);
     }
 
     @Test
@@ -109,6 +115,54 @@ class ShadowFindingsStoreTest {
     void delete_failure_isSwallowed() {
         when(blobStorageService.deleteIfExists(any())).thenThrow(new RuntimeException("ABS down"));
 
-        assertDoesNotThrow(() -> store("shadow-compare/").delete("shadow-compare/x.json"));
+        assertDoesNotThrow(() -> store("shadow-compare/").delete(OWN_BLOB));
+    }
+
+    @Test
+    void deleteAsync_deletesTheBlobOffTheCallingThread() {
+        store("shadow-compare/").deleteAsync(OWN_BLOB);
+
+        verify(blobStorageService, timeout(5000)).deleteIfExists(OWN_BLOB);
+    }
+
+    @Test
+    void store_replacesIdCharactersThatWouldChangeThePath() {
+        ShadowFindingsStore store = store("shadow-compare/");
+
+        String blobName = store.store("../..", "Report/1", null, List.of());
+
+        assertTrue(blobName.matches("shadow-compare/_____/Report_1/_/[0-9a-f-]{36}\\.json"), blobName);
+        // and the name it produced is still one it will load and delete
+        store.delete(blobName);
+        verify(blobStorageService).deleteIfExists(blobName);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            // a patient payload in the same container
+            "facility-1/report-1/patient-1.ndjson",
+            "facility-1/report-1/patient-1/3f2b8c1e-9a4d-4e6f-8b7a-0c1d2e3f4a5b.json",
+            // under the prefix, but not the shape store() writes
+            "shadow-compare/x.json",
+            "shadow-compare/../facility-1/report-1/3f2b8c1e-9a4d-4e6f-8b7a-0c1d2e3f4a5b.json",
+            "shadow-compare/f/r/p/../../../../payload/3f2b8c1e-9a4d-4e6f-8b7a-0c1d2e3f4a5b.json",
+            "shadow-compare/f/r/p/3f2b8c1e-9a4d-4e6f-8b7a-0c1d2e3f4a5b.ndjson",
+            "shadow-reports/f/r/p/3f2b8c1e-9a4d-4e6f-8b7a-0c1d2e3f4a5b.json",
+            ""
+    })
+    void aNameStoreDidNotProduce_isNeitherLoadedNorDeleted(String blobName) {
+        ShadowFindingsStore store = store("shadow-compare/");
+
+        assertThrows(IllegalArgumentException.class, () -> store.load(blobName));
+        assertDoesNotThrow(() -> store.delete(blobName));
+
+        verifyNoInteractions(blobStorageService);
+    }
+
+    @Test
+    void anEmptyPrefix_fallsBackToTheDefault() {
+        String blobName = store("").store("f", "r", "p", List.of());
+
+        assertTrue(blobName.startsWith("shadow-compare/f/r/p/"), blobName);
     }
 }
