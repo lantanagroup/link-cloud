@@ -67,15 +67,15 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             }                                
 
                             //add id to current activity                            
-                            currentActivity?.AddTag(DiagnosticNames.NotificationId, model.Id);
+                            currentActivity?.AddTag(NotificationDiagnosticNames.NotificationId, model.Id);
                             currentActivity?.AddTag(DiagnosticNames.FacilityId, model.FacilityConfig?.FacilityId);
 
                             //update notification creation metric counter                            
                             _metrics.IncrementNotificationSentCounter([
-                                new KeyValuePair<string, object?>(DiagnosticNames.NotificationId, model.Id),
+                                new KeyValuePair<string, object?>(NotificationDiagnosticNames.NotificationId, model.Id),
                                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, model.FacilityConfig?.FacilityId),
-                                new KeyValuePair<string, object?>(DiagnosticNames.RecipientCount, model.Recipients.Count),
-                                new KeyValuePair<string, object?>(DiagnosticNames.NotificationChannel, nameof(ChannelType.Email))
+                                new KeyValuePair<string, object?>(NotificationDiagnosticNames.RecipientCount, model.Recipients.Count),
+                                new KeyValuePair<string, object?>(NotificationDiagnosticNames.NotificationChannel, nameof(ChannelType.Email))
                             ]);
                         }
                         

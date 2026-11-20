@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
             SafeCharacters = new Dictionary<char, char>();
             for (char ch = (char)32; ch <= 255; ch++)
             {
-                if (ch == 127)
+                if (char.IsControl(ch))
                 {
                     continue;
                 }
@@ -25,10 +25,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         /// newlines (CR/LF) that could be used to forge log entries.
         /// </summary>
         /// <param name="obj">The object whose string representation will be sanitized</param>
-        /// <returns>A cleaned string with printable ASCII (32-255) preserved. 
-        /// Control characters (0-31) and DEL (127) are replaced with spaces.</returns>
+        /// <returns>A cleaned string with printable Latin-1 characters preserved.
+        /// Control characters, including DEL and C1 controls, are replaced with spaces.</returns>
         /// <remarks>
-        /// Security: Removes control characters (0-31, 127) that could be used for log injection.
+        /// Characters outside the printable Latin-1 range are also replaced with spaces.
         /// </remarks>
         public static string SanitizeForLog(this object? obj)
         {
@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         {
             // This explicitly excludes:
             // - Control characters (0-31) including tab, newline, carriage return
-            // - DEL character (127)
+            // - DEL and C1 control characters (127-159), including NEXT LINE (133)
             return SafeCharacters.TryGetValue(aChar, out char safeCharacter) ? safeCharacter : ' ';
         }
 

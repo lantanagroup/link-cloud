@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -504,21 +505,21 @@
 <p>In addition to FHIR endpoints, the service supports <strong>SFTP-based acquisition</strong> for tenants that drop extract files (e.g., Cerner CCL pipe-delimited extracts) onto a remote SFTP server rather than exposing a queryable FHIR API. See <a href="#sftp-data-acquisition">SFTP Data Acquisition</a> below.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nDataAcquisitionService_6CAFA860["Service: Data Acquisition Service"]
-  nPatientCensusScheduled_49BC5D3C["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_6CAFA860
-  nDataAcquisitionRequested_2BDBDA78["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_6CAFA860
-  nDataAcquisitionService_6CAFA860 -->|provides| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
-  nDataAcquisitionService_6CAFA860 -->|provides| nGetServiceInfo_56528670["Query: GetServiceInfo"]
-  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_2BDBDA78
-    nDataAcquisitionService_6CAFA860
+nDataAcquisitionService_4FE22F9["Service: Data Acquisition Service"]
+  nPatientCensusScheduled_58E981CF["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_4FE22F9
+  nDataAcquisitionRequested_5C612234["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_4FE22F9
+  nDataAcquisitionService_4FE22F9 -->|provides| nGetFacilityConfig_427D2ED9["Query: GetFacilityConfig"]
+  nDataAcquisitionService_4FE22F9 -->|provides| nGetServiceInfo_169D6996["Query: GetServiceInfo"]
+  subgraph nDataAccess_5840AA13_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_5C612234
+    nDataAcquisitionService_4FE22F9
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nPatientCensusScheduled_49BC5D3C
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nPatientCensusScheduled_58E981CF
   end
-  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
-    nGetFacilityConfig_3026B4B5
-    nGetServiceInfo_56528670
+  subgraph nTenant_6236140_domain["Domain: Tenant"]
+    nGetFacilityConfig_427D2ED9
+    nGetServiceInfo_169D6996
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -1705,8 +1706,8 @@ nDataAcquisitionService_6CAFA860["Service: Data Acquisition Service"]
 <h3 class="mt-4">OpenAPI Operations</h3>
 
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>GET</strong> <code>/api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
     <p class="text-muted">Gets authentication settings for a given facilityId and config type.</p>
     <h6>Route Parameters</h6>
     
@@ -1723,8 +1724,8 @@ nDataAcquisitionService_6CAFA860["Service: Data Acquisition Service"]
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>POST</strong> <code>/api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
     <p class="text-muted">Creates a AuthenticationSettings for a facility.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -1742,8 +1743,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>PUT</strong> <code>/api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
     <p class="text-muted">Updates a AuthenticationSettings for a facility.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -1761,8 +1762,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{facilityId}/{queryConfigurationTypePathParameter}/authentication</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-queryconfigurationtypepathparameter-authentication" class="card-body export-collapsible">
     
     <h6>Route Parameters</h6>
     
@@ -1779,8 +1780,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-connectionvalidation-facilityid-validate" aria-expanded="false"><strong>GET</strong> <code>/api/data/connectionValidation/{facilityId}/$validate</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-connectionvalidation-facilityid-validate" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-connectionvalidation-facilityid-validate" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/connectionValidation/{facilityId}/$validate</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-connectionvalidation-facilityid-validate" class="card-body export-collapsible">
     <p class="text-muted">Validates the connection between the facility and the Link.</p>
     <h6>Route Parameters</h6>
     
@@ -1805,8 +1806,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-connectionvalidation-validate" aria-expanded="false"><strong>GET</strong> <code>/api/data/connectionValidation/$validate</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-connectionvalidation-validate" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-connectionvalidation-validate" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/connectionValidation/$validate</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-connectionvalidation-validate" class="card-body export-collapsible">
     <p class="text-muted">Validates connectivity to a FHIR server using only a server URL, without requiring an existing facility configuration.</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -1823,8 +1824,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-antiforgery-token" aria-expanded="false"><strong>GET</strong> <code>/api/data/antiforgery-token</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-antiforgery-token" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-antiforgery-token" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/antiforgery-token</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-antiforgery-token" class="card-body export-collapsible">
     
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -1833,8 +1834,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-info" aria-expanded="false"><strong>GET</strong> <code>/api/data/info</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-info" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-info" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/info</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-info" class="card-body export-collapsible">
     
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -1843,9 +1844,9 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-id" class="card-body export-collapsible">
-    <p class="text-muted">GET /api/data/encounter-mappings/{id}</p>
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/encounter-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data-acquisition/encounter-mappings/{id}</p>
     <h6>Route Parameters</h6>
     
 <div class="table-responsive">
@@ -1861,9 +1862,9 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/encounter-mappings/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-id" class="card-body export-collapsible">
-    <p class="text-muted">PUT /api/data/encounter-mappings/{id}
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-encounter-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/encounter-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-encounter-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">PUT /api/data-acquisition/encounter-mappings/{id}
 Updates the MappedToOrg flag for the specified EncounterMapping.</p>
     <h6>Route Parameters</h6>
     
@@ -1880,9 +1881,9 @@ Updates the MappedToOrg flag for the specified EncounterMapping.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid" class="card-body export-collapsible">
-    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/encounter-mappings/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}
 Returns 200 OK with empty list [] when none exist.</p>
     <h6>Route Parameters</h6>
     
@@ -1899,9 +1900,9 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" class="card-body export-collapsible">
-    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</p>
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid-encounters-encounterid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid-encounters-encounterid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</p>
     <h6>Route Parameters</h6>
     
 <div class="table-responsive">
@@ -1917,9 +1918,9 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" aria-expanded="false"><strong>PUT</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" class="card-body export-collapsible">
-    <p class="text-muted">PUT /api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-encounter-mappings-facilities-facilityid-encounters-encounterid" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-encounter-mappings-facilities-facilityid-encounters-encounterid" class="card-body export-collapsible">
+    <p class="text-muted">PUT /api/data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
 Updates the MappedToOrg flag for the specified encounter within a facility.</p>
     <h6>Route Parameters</h6>
     
@@ -1936,9 +1937,9 @@ Updates the MappedToOrg flag for the specified encounter within a facility.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-patients-patientid" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/patients/{patientId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-patients-patientid" class="card-body export-collapsible">
-    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}/patients/{patientId}
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid-patients-patientid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/encounter-mappings/facilities/{facilityId}/patients/{patientId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid-patients-patientid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/patients/{patientId}
 Returns 200 OK with empty list [] when none exist.</p>
     <h6>Route Parameters</h6>
     
@@ -1955,9 +1956,9 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/search</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-search" class="card-body export-collapsible">
-    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}/search</p>
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/encounter-mappings/facilities/{facilityId}/search</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-encounter-mappings-facilities-facilityid-search" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/search</p>
     <h6>Route Parameters</h6>
     
 <div class="table-responsive">
@@ -1981,9 +1982,9 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-encounter-mappings" aria-expanded="false"><strong>POST</strong> <code>/api/data/encounter-mappings</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-encounter-mappings" class="card-body export-collapsible">
-    <p class="text-muted">POST /api/data/encounter-mappings</p>
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-encounter-mappings" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/encounter-mappings</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-encounter-mappings" class="card-body export-collapsible">
+    <p class="text-muted">POST /api/data-acquisition/encounter-mappings</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
     <h6 class="mt-3">Query Parameters</h6>
@@ -1991,8 +1992,44 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirqueries" aria-expanded="false"><strong>GET</strong> <code>/api/data/{facilityId}/FhirQueries</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirqueries" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilities-facilityid-fhir-authentication-configuration" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilities-facilityid-fhir-authentication-configuration" class="card-body export-collapsible">
+    <p class="text-muted">Gets the facility&#39;s generic OAuth configuration.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td>The facility whose configuration to read.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-facilities-facilityid-fhir-authentication-configuration" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-facilities-facilityid-fhir-authentication-configuration" class="card-body export-collapsible">
+    <p class="text-muted">Creates or replaces the facility&#39;s generic OAuth configuration.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td>The facility whose configuration to replace.</td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-fhirqueries" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{facilityId}/FhirQueries</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-fhirqueries" class="card-body export-collapsible">
     <p class="text-muted">Get query results for a correlation Id</p>
     <h6>Route Parameters</h6>
     
@@ -2017,8 +2054,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs" class="card-body export-collapsible">
     <p class="text-muted">Get a list of data acquisition logs.</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -2035,8 +2072,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-id" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-id" class="card-body export-collapsible">
     <p class="text-muted">Get a data acquisition log entry.</p>
     <h6>Route Parameters</h6>
     
@@ -2053,8 +2090,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-logs-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/acquisition-logs/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-logs-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-acquisition-logs-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/acquisition-logs/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-acquisition-logs-id" class="card-body export-collapsible">
     <p class="text-muted">Update a data acquisition log entry.</p>
     <h6>Route Parameters</h6>
     
@@ -2071,8 +2108,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-logs-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/acquisition-logs/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-logs-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-acquisition-logs-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/acquisition-logs/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-acquisition-logs-id" class="card-body export-collapsible">
     <p class="text-muted">Delete a data acquisition log entry.</p>
     <h6>Route Parameters</h6>
     
@@ -2089,8 +2126,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-id-notes" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/{id}/notes</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-id-notes" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-id-notes" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/{id}/notes</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-id-notes" class="card-body export-collapsible">
     <p class="text-muted">Get note entries for a data acquisition log entry.</p>
     <h6>Route Parameters</h6>
     
@@ -2107,8 +2144,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-id-reference-resources" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/{id}/reference-resources</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-id-reference-resources" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-id-reference-resources" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/{id}/reference-resources</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-id-reference-resources" class="card-body export-collapsible">
     <p class="text-muted">Get reference resources for a data acquisition log entry.</p>
     <h6>Route Parameters</h6>
     
@@ -2133,8 +2170,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-facility-facilityid" class="card-body export-collapsible">
     
     <h6>Route Parameters</h6>
     
@@ -2159,8 +2196,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-logs-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/acquisition-logs/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-logs-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-acquisition-logs-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/acquisition-logs/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-acquisition-logs-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">Soft delete all data acquisition log entries for a facility.</p>
     <h6>Route Parameters</h6>
     
@@ -2177,8 +2214,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-facility-facilityid-patient-patientid" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/facility/{facilityId}/patient/{patientId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-facility-facilityid-patient-patientid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-facility-facilityid-patient-patientid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/facility/{facilityId}/patient/{patientId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-facility-facilityid-patient-patientid" class="card-body export-collapsible">
     <p class="text-muted">Get a list of data acquisition logs for a patient.</p>
     <h6>Route Parameters</h6>
     
@@ -2203,8 +2240,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-statistics" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/report/{reportId}/statistics</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-statistics" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-statistics" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportId}/statistics</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-statistics" class="card-body export-collapsible">
     <p class="text-muted">Get data acquisition log statistics for a report.</p>
     <h6>Route Parameters</h6>
     
@@ -2221,8 +2258,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-status-counts" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/report/{reportId}/status-counts</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-status-counts" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-status-counts" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportId}/status-counts</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-status-counts" class="card-body export-collapsible">
     <p class="text-muted">Get data acquisition log status counts for a report.</p>
     <h6>Route Parameters</h6>
     
@@ -2247,8 +2284,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-logs-report-reporttrackingid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/acquisition-logs/report/{reportTrackingId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-logs-report-reporttrackingid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-acquisition-logs-report-reporttrackingid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportTrackingId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-acquisition-logs-report-reporttrackingid" class="card-body export-collapsible">
     <p class="text-muted">Soft delete all data acquisition log entries for a report tracking ID.</p>
     <h6>Route Parameters</h6>
     
@@ -2265,8 +2302,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-patch-api-data-acquisition-logs-report-reporttrackingid-restore" aria-expanded="false"><strong>PATCH</strong> <code>/api/data/acquisition-logs/report/{reportTrackingId}/restore</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-patch-api-data-acquisition-logs-report-reporttrackingid-restore" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-patch-api-data-acquisition-acquisition-logs-report-reporttrackingid-restore" aria-expanded="false"><strong>PATCH</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportTrackingId}/restore</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-patch-api-data-acquisition-acquisition-logs-report-reporttrackingid-restore" class="card-body export-collapsible">
     <p class="text-muted">Restore soft deleted data acquisition log entries for a report tracking ID.</p>
     <h6>Route Parameters</h6>
     
@@ -2283,8 +2320,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-patch-api-data-acquisition-logs-facility-facilityid-restore" aria-expanded="false"><strong>PATCH</strong> <code>/api/data/acquisition-logs/facility/{facilityId}/restore</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-patch-api-data-acquisition-logs-facility-facilityid-restore" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-patch-api-data-acquisition-acquisition-logs-facility-facilityid-restore" aria-expanded="false"><strong>PATCH</strong> <code>/api/data-acquisition/acquisition-logs/facility/{facilityId}/restore</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-patch-api-data-acquisition-acquisition-logs-facility-facilityid-restore" class="card-body export-collapsible">
     <p class="text-muted">Restore soft deleted data acquisition log entries for a facility.</p>
     <h6>Route Parameters</h6>
     
@@ -2301,8 +2338,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-id-process" aria-expanded="false"><strong>POST</strong> <code>/api/data/acquisition-logs/{id}/process</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-id-process" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-id-process" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/acquisition-logs/{id}/process</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-id-process" class="card-body export-collapsible">
     <p class="text-muted">Process a data acquisition log entry.</p>
     <h6>Route Parameters</h6>
     
@@ -2319,8 +2356,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-process-bulk" aria-expanded="false"><strong>POST</strong> <code>/api/data/acquisition-logs/process-bulk</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-process-bulk" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-process-bulk" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/acquisition-logs/process-bulk</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-process-bulk" class="card-body export-collapsible">
     <p class="text-muted">Process multiple data acquisition log entries.</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -2329,8 +2366,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-cancel-bulk" aria-expanded="false"><strong>POST</strong> <code>/api/data/acquisition-logs/cancel-bulk</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-cancel-bulk" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-cancel-bulk" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/acquisition-logs/cancel-bulk</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-cancel-bulk" class="card-body export-collapsible">
     <p class="text-muted">Cancel multiple data acquisition log entries.</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -2347,8 +2384,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-process-by-filter" aria-expanded="false"><strong>POST</strong> <code>/api/data/acquisition-logs/process-by-filter</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-process-by-filter" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-process-by-filter" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/acquisition-logs/process-by-filter</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-process-by-filter" class="card-body export-collapsible">
     <p class="text-muted">Process data acquisition log entries based on search criteria.</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -2357,8 +2394,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-cancel-by-filter" aria-expanded="false"><strong>POST</strong> <code>/api/data/acquisition-logs/cancel-by-filter</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-logs-cancel-by-filter" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-cancel-by-filter" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/acquisition-logs/cancel-by-filter</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-acquisition-logs-cancel-by-filter" class="card-body export-collapsible">
     <p class="text-muted">Cancel data acquisition log entries based on search criteria.</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -2375,8 +2412,8 @@ Returns 200 OK with empty list [] when none exist.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-summary" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/report/{reportId}/summary</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-summary" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-summary" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportId}/summary</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-summary" class="card-body export-collapsible">
     <p class="text-muted">Returns a lightweight summary of data acquisition activity for a report.
 Totals, status counts and resource-type counts computed via DB aggregates.
 Intended for dashboard polling and run monitoring.</p>
@@ -2395,8 +2432,8 @@ Intended for dashboard polling and run monitoring.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-acquired-resource-ids" aria-expanded="false"><strong>GET</strong> <code>/api/data/acquisition-logs/report/{reportId}/acquired-resource-ids</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-logs-report-reportid-acquired-resource-ids" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-acquired-resource-ids" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportId}/acquired-resource-ids</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-acquired-resource-ids" class="card-body export-collapsible">
     <p class="text-muted">Get all ResourceAcquiredIds from completed logs for a facility/report pair.
 Intended for automation reconciliation.</p>
     <h6>Route Parameters</h6>
@@ -2422,8 +2459,35 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-config-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-config/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-location-config-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-acquired-resource-counts-by-patient" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/acquisition-logs/report/{reportId}/acquired-resource-counts-by-patient</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-acquisition-logs-report-reportid-acquired-resource-counts-by-patient" class="card-body export-collapsible">
+    <p class="text-muted">Completed acquired-resource counts grouped by patient and resource type.
+One database group-by. Facility is optional. An empty facility counts the whole report.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>reportId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-config-id" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/location-config/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-config-id" class="card-body export-collapsible">
     <p class="text-muted">GET /location-org-configs/{id}</p>
     <h6>Route Parameters</h6>
     
@@ -2440,8 +2504,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-location-config-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/location-config/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-location-config-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-location-config-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/location-config/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-location-config-id" class="card-body export-collapsible">
     <p class="text-muted">PUT /location-org-configs/{id}</p>
     <h6>Route Parameters</h6>
     
@@ -2458,8 +2522,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-config-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-config/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-config-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-config-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/location-config/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-config-id" class="card-body export-collapsible">
     <p class="text-muted">DELETE /location-org-configs/{id}</p>
     <h6>Route Parameters</h6>
     
@@ -2476,8 +2540,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-config-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-config-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">GET /location-org-configs/facility/{facilityId}</p>
     <h6>Route Parameters</h6>
     
@@ -2494,8 +2558,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>POST</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-location-config-facility-facilityid" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-location-config-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">POST /location-org-configs/facility/{facilityId}</p>
     <h6>Route Parameters</h6>
     
@@ -2512,8 +2576,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>PUT</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-location-config-facility-facilityid" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-location-config-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">PUT /location-org-configs/facility/{facilityId} (updates ALL configs for the facility)</p>
     <h6>Route Parameters</h6>
     
@@ -2530,8 +2594,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-config-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-config-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">DELETE /location-org-configs/facility/{facilityId}</p>
     <h6>Route Parameters</h6>
     
@@ -2548,8 +2612,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-config/facility/{facilityId}/search</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid-search" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-config-facility-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/location-config/facility/{facilityId}/search</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-config-facility-facilityid-search" class="card-body export-collapsible">
     <p class="text-muted">GET /location-org-configs/facility/{facilityId}/search</p>
     <h6>Route Parameters</h6>
     
@@ -2574,8 +2638,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-mappings/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-location-mappings-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/location-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-mappings-id" class="card-body export-collapsible">
     <p class="text-muted">GET /api/location-mappings/{id}</p>
     <h6>Route Parameters</h6>
     
@@ -2592,8 +2656,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-location-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/location-mappings/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-location-mappings-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-location-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/location-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-location-mappings-id" class="card-body export-collapsible">
     <p class="text-muted">PUT /api/location-mappings/{id}</p>
     <h6>Route Parameters</h6>
     
@@ -2610,8 +2674,8 @@ Intended for automation reconciliation.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-mappings/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-mappings-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/location-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-mappings-id" class="card-body export-collapsible">
     <p class="text-muted">DELETE /api/location-mappings/{id}
 Deletes the mapping with the specified Id</p>
     <h6>Route Parameters</h6>
@@ -2629,8 +2693,8 @@ Deletes the mapping with the specified Id</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-mappings/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-mappings-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/location-mappings/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-mappings-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">GET /api/location-mappings/facility/{facilityId}
 Returns 200 OK with empty list [] when none exist</p>
     <h6>Route Parameters</h6>
@@ -2648,8 +2712,8 @@ Returns 200 OK with empty list [] when none exist</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-mappings/facility/{facilityId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-facility-facilityid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-mappings-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/location-mappings/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-location-mappings-facility-facilityid" class="card-body export-collapsible">
     <p class="text-muted">DELETE /api/location-mappings/facility/{facilityId}
 Deletes ALL mappings for the facility</p>
     <h6>Route Parameters</h6>
@@ -2667,8 +2731,8 @@ Deletes ALL mappings for the facility</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-mappings/facility/{facilityId}/search</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid-search" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-mappings-facility-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/location-mappings/facility/{facilityId}/search</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-location-mappings-facility-facilityid-search" class="card-body export-collapsible">
     <p class="text-muted">GET /api/location-mappings/facility/{facilityId}/search</p>
     <h6>Route Parameters</h6>
     
@@ -2693,8 +2757,8 @@ Deletes ALL mappings for the facility</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirqueryconfiguration" aria-expanded="false"><strong>GET</strong> <code>/api/data/{facilityId}/fhirQueryConfiguration</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirqueryconfiguration" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-fhirqueryconfiguration" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{facilityId}/fhirQueryConfiguration</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-fhirqueryconfiguration" class="card-body export-collapsible">
     <p class="text-muted">Gets a FhirQueryConfiguration record for a given facilityId.</p>
     <h6>Route Parameters</h6>
     
@@ -2711,8 +2775,8 @@ Deletes ALL mappings for the facility</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-facilityid-fhirqueryconfiguration" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{facilityId}/fhirQueryConfiguration</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-facilityid-fhirqueryconfiguration" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-fhirqueryconfiguration" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{facilityId}/fhirQueryConfiguration</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-fhirqueryconfiguration" class="card-body export-collapsible">
     <p class="text-muted">Hard deletes a FhirQueryConfiguration record for a given facilityId.</p>
     <h6>Route Parameters</h6>
     
@@ -2729,8 +2793,8 @@ Deletes ALL mappings for the facility</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-fhirqueryconfiguration" aria-expanded="false"><strong>POST</strong> <code>/api/data/fhirQueryConfiguration</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-fhirqueryconfiguration" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-fhirqueryconfiguration" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/fhirQueryConfiguration</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-fhirqueryconfiguration" class="card-body export-collapsible">
     <p class="text-muted">Creates a FhirQueryConfiguration record for a facility. Should only be used for initial configuration.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -2740,8 +2804,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-fhirqueryconfiguration" aria-expanded="false"><strong>PUT</strong> <code>/api/data/fhirQueryConfiguration</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-fhirqueryconfiguration" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-fhirqueryconfiguration" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/fhirQueryConfiguration</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-fhirqueryconfiguration" class="card-body export-collapsible">
     <p class="text-muted">Updates a FhirQueryConfiguration record for a facility. This update will do a clean replace of the existing record and will not update the delta between the 2 records.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -2751,9 +2815,9 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirquerylist" aria-expanded="false"><strong>GET</strong> <code>/api/data/{facilityId}/fhirQueryList</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirquerylist" class="card-body export-collapsible">
-    
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-fhirquerylist" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{facilityId}/fhirQueryList</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-fhirquerylist" class="card-body export-collapsible">
+    <p class="text-muted">Gets the FhirQueryList configuration for a given facilityId.</p>
     <h6>Route Parameters</h6>
     
 <div class="table-responsive">
@@ -2761,16 +2825,26 @@ Supported Authentication Types: Basic, Epic</p>
     <thead>
       <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
     </thead>
-    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td>The facility whose configuration should be returned.</td></tr></tbody>
   </table>
 </div>
     <h6 class="mt-3">Query Parameters</h6>
-    <p class="text-muted">None</p>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>includePatients</td><td></td><td>No</td><td>When true, includes the patients that are present on each of the ehrPatientLists. Defaults to false.
+Each configured list is read from the facility&#39;s EHR, so enabling this adds one EHR round trip per list.
+If any list cannot be read the whole request fails; no partially populated configuration is returned.</td></tr></tbody>
+  </table>
+</div>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-facilityid-fhirquerylist" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{facilityId}/fhirQueryList</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-facilityid-fhirquerylist" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-fhirquerylist" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{facilityId}/fhirQueryList</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-fhirquerylist" class="card-body export-collapsible">
     <p class="text-muted">Deletes a FhirQueryConfiguration record for a given facilityId.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -2788,8 +2862,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-fhirquerylist" aria-expanded="false"><strong>POST</strong> <code>/api/data/fhirQueryList</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-fhirquerylist" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-fhirquerylist" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/fhirQueryList</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-fhirquerylist" class="card-body export-collapsible">
     <p class="text-muted">Creates a FhirQueryConfiguration record for a given facilityId.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -2799,8 +2873,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-fhirquerylist" aria-expanded="false"><strong>PUT</strong> <code>/api/data/fhirQueryList</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-fhirquerylist" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-fhirquerylist" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/fhirQueryList</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-fhirquerylist" class="card-body export-collapsible">
     <p class="text-muted">Updates a FhirQueryConfiguration record for a given facilityId.
 Supported Authentication Types: Basic, Epic</p>
     <h6>Route Parameters</h6>
@@ -2810,8 +2884,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-facilityid-queryplan" aria-expanded="false"><strong>GET</strong> <code>/api/data/{facilityId}/QueryPlan</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-facilityid-queryplan" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-queryplan" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{facilityId}/QueryPlan</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-facilityid-queryplan" class="card-body export-collapsible">
     <p class="text-muted">Gets a QueryPlanConfig record for a given facilityId.</p>
     <h6>Route Parameters</h6>
     
@@ -2836,8 +2910,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-facilityid-queryplan" aria-expanded="false"><strong>POST</strong> <code>/api/data/{facilityId}/QueryPlan</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-facilityid-queryplan" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-facilityid-queryplan" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/{facilityId}/QueryPlan</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-facilityid-queryplan" class="card-body export-collapsible">
     <p class="text-muted">Creates a QueryPlanConfig for a facility</p>
     <h6>Route Parameters</h6>
     
@@ -2854,8 +2928,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-facilityid-queryplan" aria-expanded="false"><strong>PUT</strong> <code>/api/data/{facilityId}/QueryPlan</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-facilityid-queryplan" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-facilityid-queryplan" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/{facilityId}/QueryPlan</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-facilityid-queryplan" class="card-body export-collapsible">
     <p class="text-muted">Updates a QueryPlanConfig record for a facilityId, queryPlanType, and queryPlan.</p>
     <h6>Route Parameters</h6>
     
@@ -2872,8 +2946,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-facilityid-queryplan" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{facilityId}/QueryPlan</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-facilityid-queryplan" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-queryplan" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{facilityId}/QueryPlan</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-queryplan" class="card-body export-collapsible">
     <p class="text-muted">Hard deletes a QueryPlanConfig for a given facilityId and queryPlanType.</p>
     <h6>Route Parameters</h6>
     
@@ -2898,8 +2972,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-facilityid-queryplan-all" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{facilityId}/QueryPlan/All</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-facilityid-queryplan-all" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-queryplan-all" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{facilityId}/QueryPlan/All</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-facilityid-queryplan-all" class="card-body export-collapsible">
     <p class="text-muted">Hard deletes all QueryPlanConfigs for a given facilityId.</p>
     <h6>Route Parameters</h6>
     
@@ -2916,8 +2990,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-sftp-configurations-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/sftp-configurations/{id}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-sftp-configurations-id" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-sftp-configurations-id" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/sftp-configurations/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-sftp-configurations-id" class="card-body export-collapsible">
     <p class="text-muted">Gets an SftpConfiguration record by its unique identifier.</p>
     <h6>Route Parameters</h6>
     
@@ -2934,8 +3008,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-organizationid-sftp-configurations" aria-expanded="false"><strong>GET</strong> <code>/api/data/{organizationId}/sftp-configurations</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-organizationid-sftp-configurations" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-organizationid-sftp-configurations" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-organizationid-sftp-configurations" class="card-body export-collapsible">
     <p class="text-muted">Gets an SftpConfiguration record for a given organization.</p>
     <h6>Route Parameters</h6>
     
@@ -2952,8 +3026,8 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-organizationid-sftp-configurations" aria-expanded="false"><strong>POST</strong> <code>/api/data/{organizationId}/sftp-configurations</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-organizationid-sftp-configurations" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-organizationid-sftp-configurations" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-organizationid-sftp-configurations" class="card-body export-collapsible">
     <p class="text-muted">Creates an SftpConfiguration record for an organization. Should only be used for initial configuration.
 Optionally accepts credentials which will be stored securely in a configured secret manager.
 Supported Authentication Types: Basic (default)</p>
@@ -2972,8 +3046,8 @@ Supported Authentication Types: Basic (default)</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-organizationid-sftp-configurations-configurationid" aria-expanded="false"><strong>PUT</strong> <code>/api/data/{organizationId}/sftp-configurations/{configurationId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-organizationid-sftp-configurations-configurationid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-organizationid-sftp-configurations-configurationid" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations/{configurationId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-organizationid-sftp-configurations-configurationid" class="card-body export-collapsible">
     <p class="text-muted">Updates an SftpConfiguration record for an organization. This update will do a clean replace of the existing record.
 Supported Authentication Types: Basic (default)</p>
     <h6>Route Parameters</h6>
@@ -2991,8 +3065,8 @@ Supported Authentication Types: Basic (default)</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-organizationid-sftp-configurations-configurationid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{organizationId}/sftp-configurations/{configurationId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-organizationid-sftp-configurations-configurationid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-organizationid-sftp-configurations-configurationid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations/{configurationId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-organizationid-sftp-configurations-configurationid" class="card-body export-collapsible">
     <p class="text-muted">Deletes an SftpConfiguration record for a given organization.</p>
     <h6>Route Parameters</h6>
     
@@ -3009,8 +3083,8 @@ Supported Authentication Types: Basic (default)</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-organizationid-sftp-configurations-credentials" aria-expanded="false"><strong>PUT</strong> <code>/api/data/{organizationId}/sftp-configurations/credentials</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-put-api-data-organizationid-sftp-configurations-credentials" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-acquisition-organizationid-sftp-configurations-credentials" aria-expanded="false"><strong>PUT</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations/credentials</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-acquisition-organizationid-sftp-configurations-credentials" class="card-body export-collapsible">
     <p class="text-muted">Updates SFTP credentials for an organization&#39;s configuration.
 Credentials are stored securely in a configured secret manager.</p>
     <h6>Route Parameters</h6>
@@ -3028,8 +3102,8 @@ Credentials are stored securely in a configured secret manager.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-organizationid-sftp-configurations-credentials" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/{organizationId}/sftp-configurations/credentials</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-delete-api-data-organizationid-sftp-configurations-credentials" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-acquisition-organizationid-sftp-configurations-credentials" aria-expanded="false"><strong>DELETE</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations/credentials</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-acquisition-organizationid-sftp-configurations-credentials" class="card-body export-collapsible">
     <p class="text-muted">Deletes SFTP credentials for an organization.
 The SFTP configuration itself is not deleted.</p>
     <h6>Route Parameters</h6>
@@ -3047,8 +3121,8 @@ The SFTP configuration itself is not deleted.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-organizationid-sftp-configurations-credentials-status" aria-expanded="false"><strong>GET</strong> <code>/api/data/{organizationId}/sftp-configurations/credentials/status</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-organizationid-sftp-configurations-credentials-status" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-organizationid-sftp-configurations-credentials-status" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations/credentials/status</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-organizationid-sftp-configurations-credentials-status" class="card-body export-collapsible">
     <p class="text-muted">Gets the credential status for an organization&#39;s SFTP configuration.
 Returns whether credentials exist, without exposing the actual values.</p>
     <h6>Route Parameters</h6>
@@ -3066,8 +3140,8 @@ Returns whether credentials exist, without exposing the actual values.</p>
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-organizationid-sftp-configurations-test-connection" aria-expanded="false"><strong>POST</strong> <code>/api/data/{organizationId}/sftp-configurations/test-connection</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-organizationid-sftp-configurations-test-connection" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-organizationid-sftp-configurations-test-connection" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/{organizationId}/sftp-configurations/test-connection</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-organizationid-sftp-configurations-test-connection" class="card-body export-collapsible">
     <p class="text-muted">Tests the SFTP connection for an organization&#39;s configuration.
 Verifies connectivity to the SFTP server and optionally checks if the remote directory is accessible.</p>
     <h6>Route Parameters</h6>
@@ -3085,8 +3159,27 @@ Verifies connectivity to the SFTP server and optionally checks if the remote dir
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-sftp-logs" aria-expanded="false"><strong>GET</strong> <code>/api/data/sftp-logs</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-sftp-logs" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-sftp-configurations-test-connection" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/sftp-configurations/test-connection</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-sftp-configurations-test-connection" class="card-body export-collapsible">
+    <p class="text-muted">Tests an ad-hoc SFTP connection using connection details supplied directly in the request, without requiring a saved configuration.
+Optionally lists files found in the report directory and, for each file, a preview of the patients it contains.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>includeFileContent</td><td></td><td>No</td><td>When true, includes a files element listing the files found in reportDirectory, along with a preview of the patients found in each file. Defaults to false.</td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-sftp-logs" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/sftp-logs</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-sftp-logs" class="card-body export-collapsible">
     <p class="text-muted">Search SFTP logs</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -3103,8 +3196,8 @@ Verifies connectivity to the SFTP server and optionally checks if the remote dir
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-sftp-logs" aria-expanded="false"><strong>POST</strong> <code>/api/data/sftp-logs</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-sftp-logs" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-sftp-logs" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/sftp-logs</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-sftp-logs" class="card-body export-collapsible">
     <p class="text-muted">Create SFTP log</p>
     <h6>Route Parameters</h6>
     <p class="text-muted">None</p>
@@ -3113,8 +3206,8 @@ Verifies connectivity to the SFTP server and optionally checks if the remote dir
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-sftp-logs-logid" aria-expanded="false"><strong>GET</strong> <code>/api/data/sftp-logs/{logId}</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-get-api-data-sftp-logs-logid" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-acquisition-sftp-logs-logid" aria-expanded="false"><strong>GET</strong> <code>/api/data-acquisition/sftp-logs/{logId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-acquisition-sftp-logs-logid" class="card-body export-collapsible">
     <p class="text-muted">Get SFTP log by external ID</p>
     <h6>Route Parameters</h6>
     
@@ -3131,8 +3224,8 @@ Verifies connectivity to the SFTP server and optionally checks if the remote dir
   </div>
 </div>
 <div class="card mb-3">
-  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-sftp-logs-logid-reset" aria-expanded="false"><strong>POST</strong> <code>/api/data/sftp-logs/{logId}/reset</code></a></div>
-  <div id="openapi-card-dataacquisitionservice-post-api-data-sftp-logs-logid-reset" class="card-body export-collapsible">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-acquisition-sftp-logs-logid-reset" aria-expanded="false"><strong>POST</strong> <code>/api/data-acquisition/sftp-logs/{logId}/reset</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-acquisition-sftp-logs-logid-reset" class="card-body export-collapsible">
     <p class="text-muted">Reset an SFTP log for retry after configuration has been fixed.
 Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.</p>
     <h6>Route Parameters</h6>
@@ -3164,21 +3257,21 @@ Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nDataAcquisitionService_6CAFA860["Service: Data Acquisition Service"]
-  nPatientCensusScheduled_49BC5D3C["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_6CAFA860
-  nDataAcquisitionRequested_2BDBDA78["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_6CAFA860
-  nDataAcquisitionService_6CAFA860 -->|provides| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
-  nDataAcquisitionService_6CAFA860 -->|provides| nGetServiceInfo_56528670["Query: GetServiceInfo"]
-  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_2BDBDA78
-    nDataAcquisitionService_6CAFA860
+nDataAcquisitionService_4FE22F9["Service: Data Acquisition Service"]
+  nPatientCensusScheduled_58E981CF["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_4FE22F9
+  nDataAcquisitionRequested_5C612234["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_4FE22F9
+  nDataAcquisitionService_4FE22F9 -->|provides| nGetFacilityConfig_427D2ED9["Query: GetFacilityConfig"]
+  nDataAcquisitionService_4FE22F9 -->|provides| nGetServiceInfo_169D6996["Query: GetServiceInfo"]
+  subgraph nDataAccess_5840AA13_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_5C612234
+    nDataAcquisitionService_4FE22F9
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nPatientCensusScheduled_49BC5D3C
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nPatientCensusScheduled_58E981CF
   end
-  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
-    nGetFacilityConfig_3026B4B5
-    nGetServiceInfo_56528670
+  subgraph nTenant_6236140_domain["Domain: Tenant"]
+    nGetFacilityConfig_427D2ED9
+    nGetServiceInfo_169D6996
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

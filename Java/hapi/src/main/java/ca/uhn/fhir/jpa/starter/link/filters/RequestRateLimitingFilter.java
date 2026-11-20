@@ -70,17 +70,17 @@ public class RequestRateLimitingFilter extends OncePerRequestFilter {
         response.setHeader("X-RateLimit-Reset", String.valueOf(secondsUntilRefill));
 
         if (probe.isConsumed()) {
-            logger.debug("Request from {} allowed. Remaining tokens: {}", clientIp, bucket.getAvailableTokens());
+            logger.debug("Request from {} allowed. Remaining tokens: {}", HttpServletRequestUtils.sanitizeForLog(clientIp), bucket.getAvailableTokens());
             chain.doFilter(request, response);
         } else {
-            logger.warn("Rate limit exceeded for client: {}. Request denied.", clientIp);
+            logger.warn("Rate limit exceeded for client: {}. Request denied.", HttpServletRequestUtils.sanitizeForLog(clientIp));
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(secondsUntilRefill));
         }
     }
 
     private Bucket createBucket(String clientIp) {
-        logger.debug("Creating new rate limiting bucket for client: {}", clientIp);
+        logger.debug("Creating new rate limiting bucket for client: {}", HttpServletRequestUtils.sanitizeForLog(clientIp));
 
         // simple bandwidth that completely refills every duration
         Bandwidth bandwidth = Bandwidth.builder()

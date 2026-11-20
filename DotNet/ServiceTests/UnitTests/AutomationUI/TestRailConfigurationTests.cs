@@ -704,6 +704,29 @@ public class TestRailStartupTests
     }
 
     [Fact]
+    public async Task Startup_check_neutralizes_control_characters_in_remote_suite_names()
+    {
+        var suite = new TestRailNamedItem { Id = 40, Name = "Scenarios\r\nInjected entry" };
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetSuitesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([suite]);
+        var options = TestRailOptionsBinderTests.Bind(TestRailOptionsBinderTests.Complete(new()
+        {
+            ["ScenarioSuiteId"] = "40",
+            ["ApiHealthSuiteId"] = "99"
+        }));
+        var logger = new ListLogger<TestRailStartupCheckService>();
+        var check = new TestRailStartupCheckService(Options.Create(options), api.Object, logger);
+
+        await check.RunCheckAsync(CancellationToken.None);
+
+        logger.Entries.Should().NotBeEmpty();
+        logger.Entries.Should().OnlyContain(e => !e.Message.Any(char.IsControl));
+        logger.Entries.Should().Contain(e => e.Message.Contains("Scenarios  Injected entry"));
+        suite.Name.Should().Be("Scenarios\r\nInjected entry");
+    }
+
+    [Fact]
     public async Task Startup_check_does_nothing_when_not_configured()
     {
         var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
