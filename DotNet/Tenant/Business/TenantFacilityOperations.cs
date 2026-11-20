@@ -1,10 +1,8 @@
-using AutoMapper;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
-using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Services;
 
@@ -22,16 +20,6 @@ namespace LantanaGroup.Link.Tenant.Business
     /// </remarks>
     public sealed class TenantFacilityOperations : IFacilityOperations
     {
-        /// <summary>
-        /// Built once rather than per request: the configuration is fixed, and compiling it is the
-        /// expensive half of using AutoMapper.
-        /// </summary>
-        private static readonly IMapper ModelToEntityMapper = new MapperConfiguration(cfg =>
-        {
-            cfg.CreateMap<FacilityModel, Facility>();
-            cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
-        }).CreateMapper();
-
         private readonly IFacilityManager _facilityManager;
         private readonly IFacilityQueries _facilityQueries;
         private readonly ScheduleService _scheduleService;
@@ -121,6 +109,6 @@ namespace LantanaGroup.Link.Tenant.Business
             }
         }
 
-        private static Facility ToEntity(FacilityModel model) => ModelToEntityMapper.Map<FacilityModel, Facility>(model);
+        private static Facility ToEntity(FacilityModel model) => FacilityModelMapping.ToEntity(model);
     }
 }
