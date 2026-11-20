@@ -1,0 +1,221 @@
+@model OperationSearchPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    var sortBy = string.IsNullOrWhiteSpace(query.SortBy) ? "CreateDate" : query.SortBy;
+    var sortDir = string.Equals(query.SortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
+    Dictionary<string, string> Route(int page, string? sort = null, string? dir = null, int pageSize = 0)
+    {
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string>
+        {
+            ["page"] = page.ToString(),
+            ["pageSize"] = chosen.ToString(),
+            ["sortBy"] = sort ?? sortBy,
+            ["sortDir"] = dir ?? sortDir
+        };
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(query.OperationType)) route["operationType"] = query.OperationType;
+        if (!string.IsNullOrWhiteSpace(query.ResourceType)) route["resourceType"] = query.ResourceType;
+        if (!string.IsNullOrWhiteSpace(query.OperationId)) route["operationId"] = query.OperationId;
+        if (!string.IsNullOrWhiteSpace(query.VendorVersionId)) route["vendorVersionId"] = query.VendorVersionId;
+        if (query.IncludeDisabled) route["includeDisabled"] = "true";
+        return route;
+    }
+    Dictionary<string, string> PageRoute(int page, int pageSize) => Route(page, pageSize: pageSize);
+    var advanced = !string.IsNullOrWhiteSpace(query.ResourceType)
+        || !string.IsNullOrWhiteSpace(query.OperationId)
+        || !string.IsNullOrWhiteSpace(query.VendorVersionId)
+        || query.IncludeDisabled
+        || !string.Equals(sortBy, "CreateDate", StringComparison.OrdinalIgnoreCase)
+        || !string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Normalization operations</h1>
+<partial name="_Alerts" />
+<p class="text-muted">This search covers every facility. Open a facility to edit its operations. An operation with no facility belongs to vendor versions and is edited below.</p>
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search">
+            <input type="hidden" name="pageSize" value="@size" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="facilityId">Facility</label>
+                    <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="operationType">Type</label>
+                    <select id="operationType" name="operationType" class="form-select">
+                        <option value="">Any</option>
+                        @foreach (var type in FacilityNormalizationRules.OperationTypes)
+                        {
+                            if (string.Equals(type, query.OperationType, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@type" selected>@FacilityNormalizationRules.Label(type)</option>
+                            }
+                            else
+                            {
+                                <option value="@type">@FacilityNormalizationRules.Label(type)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Operations">Clear</a>
+                </div>
+            </div>
+            <details class="lu-advanced mt-2" @(advanced ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="resourceType">Resource</label>
+                        <input id="resourceType" name="resourceType" value="@query.ResourceType" class="form-control" list="resourceTypes" />
+                        <datalist id="resourceTypes">
+                            @foreach (var resource in Model.ResourceTypes)
+                            {
+                                <option value="@resource"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="operationId">Operation id</label>
+                        <input id="operationId" name="operationId" value="@query.OperationId" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="vendorVersionId">Vendor version id</label>
+                        <input id="vendorVersionId" name="vendorVersionId" value="@query.VendorVersionId" class="form-control" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="sortBy">Sort</label>
+                        <select id="sortBy" name="sortBy" class="form-select">
+                            @foreach (var field in ConfigurationRules.OperationSorts)
+                            {
+                                if (string.Equals(field, sortBy, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="@field" selected>@field</option>
+                                }
+                                else
+                                {
+                                    <option value="@field">@field</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="sortDir">Direction</label>
+                        <select id="sortDir" name="sortDir" class="form-select">
+                            @if (sortDir == "asc")
+                            {
+                                <option value="asc" selected>Ascending</option>
+                                <option value="desc">Descending</option>
+                            }
+                            else
+                            {
+                                <option value="asc">Ascending</option>
+                                <option value="desc" selected>Descending</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeDisabled" name="includeDisabled" value="true" @(query.IncludeDisabled ? "checked" : null) />
+                            <label class="form-check-label" for="includeDisabled">Include disabled</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+@if (Model.VendorEditor is not null)
+{
+    <div class="accordion mt-3" id="vendorOperationAccordion">
+        <partial name="_NormalizationOperationEditor" model="Model.VendorEditor" />
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ResourceWarning))
+{
+    <div class="alert alert-warning mt-3">@Model.ResourceWarning</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Operations</div>
+        <div class="card-body">
+            @if (Model.Operations.Count == 0)
+            {
+                <p class="mb-0">No operations found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col"><a asp-all-route-data="@Route(1, "Name", sortBy == "Name" && sortDir == "asc" ? "desc" : "asc")">Name</a></th>
+                                <th scope="col"><a asp-all-route-data="@Route(1, "OperationType", sortBy == "OperationType" && sortDir == "asc" ? "desc" : "asc")">Type</a></th>
+                                <th scope="col"><a asp-all-route-data="@Route(1, "FacilityId", sortBy == "FacilityId" && sortDir == "asc" ? "desc" : "asc")">Facility</a></th>
+                                <th scope="col">Resources</th>
+                                <th scope="col">Disabled</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Operations)
+                        {
+                            <tr>
+                                <td class="lu-wrap">@row.Name</td>
+                                <td>@FacilityNormalizationRules.Label(row.OperationType)</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(row.FacilityId))
+                                    {
+                                        <span class="text-muted">Vendor version</span>
+                                    }
+                                    else
+                                    {
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", "Tenants", new { id = row.FacilityId }) })" />
+                                    }
+                                </td>
+                                <td class="text-break">@(string.IsNullOrWhiteSpace(row.Resources) ? "—" : row.Resources)</td>
+                                <td>@(row.Disabled ? "Yes" : "No")</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(row.FacilityId))
+                                    {
+                                        <div class="lu-row-actions">
+                                            <a class="btn btn-au-link btn-sm lu-icon-btn" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
+                                            <form method="post" data-au-save asp-action="DeleteVendorOperation">
+                                                <input type="hidden" name="operationId" value="@row.Id" />
+                                                @if (row.VendorVersionIds.Count > 0)
+                                                {
+                                                    <input type="hidden" name="vendorVersionId" value="@row.VendorVersionIds[0]" />
+                                                }
+                                                <button data-hold="@Hold.Of("Delete this operation?", "Delete this operation?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                            </form>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Operation pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.PageSizes, Route = PageRoute })" />
+        </div>
+    </div>
+}

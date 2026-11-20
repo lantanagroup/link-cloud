@@ -1,0 +1,153 @@
+@model AcquisitionLogListPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Acquisition log";
+    ViewData["LogsSection"] = "acquisition";
+    var query = Model.Query;
+    var search = Model.Search;
+    var statuses = query.Status ?? [];
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to logs"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Acquisition log</h1>
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search" data-au-filter="400" data-au-target="acquisitionResults">
+            <input type="hidden" name="pageSize" value="@search.PageSize" />
+            <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="resourceType">Resource type</label>
+                <select id="resourceType" name="resourceType" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var type in LogsRules.ResourceTypes)
+                    {
+                        if (string.Equals(type, query.ResourceType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@type" selected>@type</option>
+                        }
+                        else
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="queryPhase">Phase</label>
+                <select id="queryPhase" name="queryPhase" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var phase in LogsRules.Phases)
+                    {
+                        if (string.Equals(phase, query.QueryPhase, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@phase" selected>@phase</option>
+                        }
+                        else
+                        {
+                            <option value="@phase">@phase</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="queryType">Query type</label>
+                <select id="queryType" name="queryType" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var type in LogsRules.QueryTypes)
+                    {
+                        if (string.Equals(type, query.QueryType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@type" selected>@type</option>
+                        }
+                        else
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Acquisition">Clear</a>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.PatientId) || !string.IsNullOrWhiteSpace(query.ReportId) || !string.IsNullOrWhiteSpace(query.ResourceId) || (query.Status?.Count > 0) || !string.IsNullOrWhiteSpace(query.Priority) || query.MinAgeHours != LogsRules.DefaultMinAgeHours || query.IncludeDeleted || query.CancellableOnly || !string.IsNullOrWhiteSpace(query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="patientId">Patient</label>
+                <input id="patientId" name="patientId" value="@query.PatientId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="reportId">Report</label>
+                <input id="reportId" name="reportId" value="@query.ReportId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="resourceId">Resource id</label>
+                <input id="resourceId" name="resourceId" value="@query.ResourceId" class="form-control" />
+            </div>
+            <div class="col-12">
+                <div class="form-label" id="statusLabel">Status</div>
+                <div class="d-flex flex-wrap gap-2" role="group" aria-labelledby="statusLabel">
+                    @foreach (var status in LogsRules.Statuses)
+                    {
+                        var selected = statuses.Any(value => value.Split(',').Any(part => part.Trim().Equals(status, StringComparison.OrdinalIgnoreCase)));
+                        <input class="btn-check" type="checkbox" name="status" id="status-@status" value="@status" autocomplete="off" @(selected ? "checked" : null) />
+                        <label class="lu-chip" for="status-@status">@status</label>
+                    }
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="priority">Priority</label>
+                <select id="priority" name="priority" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var priority in LogsRules.Priorities)
+                    {
+                        if (string.Equals(priority, query.Priority, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@priority" selected>@priority</option>
+                        }
+                        else
+                        {
+                            <option value="@priority">@priority</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="minAgeHours">Min age (hours)</label>
+                <input id="minAgeHours" name="minAgeHours" type="number" min="0" max="@LogsRules.MaxMinAgeHours" value="@query.MinAgeHours" class="form-control" />
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
+                    <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="cancellableOnly" name="cancellableOnly" value="true" @(query.CancellableOnly ? "checked" : null) />
+                    <label class="form-check-label" for="cancellableOnly">Cancellable only</label>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <partial name="_AutomationScope" model="query.Scope" />
+            </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+<p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
+<div id="acquisitionResults" data-au-refresh="12000">
+    <partial name="_AcquisitionLogList" model="Model" />
+</div>

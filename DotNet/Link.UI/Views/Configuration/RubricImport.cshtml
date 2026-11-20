@@ -1,0 +1,103 @@
+@model RubricImportPage
+@{
+    var review = Model.Review;
+    var definition = review?.Definition;
+    var canImport = Model.Effect is "new-rubric" or "new-version" or "replace-draft";
+    var replaceHold = Hold.Of(
+        "Replace the saved draft",
+        "Replace the draft already stored for this version with the definition you reviewed.",
+        "The draft that is saved now is overwritten. A published or retired version is left as it is. Nothing is published.",
+        "Hold to import");
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Rubrics")!, "Back to rubrics"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Import a rubric</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (Model.Configured)
+{
+    <form method="post" asp-action="PostImportRubric" enctype="multipart/form-data" data-au-save>
+        @if (!string.IsNullOrWhiteSpace(Model.FileError))
+        {
+            <div class="alert alert-warning">@Model.FileError</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Failure))
+        {
+            <div class="alert alert-warning">@Model.Failure</div>
+        }
+        <div class="mb-3">
+            <label class="form-label" for="importFile">File</label>
+            <input id="importFile" name="file" type="file" accept=".json,.yaml,.yml,application/json,application/yaml" class="form-control" />
+            <p class="form-text">A .json, .yaml, or .yml file. The review tells you what saving it would do. Nothing is published.</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="importText">Definition</label>
+            <textarea id="importText" name="text" class="form-control" rows="12">@Model.Text</textarea>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="submit" class="btn btn-au-execute" name="intent" value="review">Review</button>
+            <button type="submit" class="btn btn-au-link" name="intent" value="review-next">Review as the next version</button>
+        </div>
+
+        @if (review is not null)
+        {
+            <div class="au-card card">
+                <div class="card-header">Review</div>
+                <div class="card-body">
+                    @if (review.Valid)
+                    {
+                        <p><span class="badge au-badge-success">Valid</span></p>
+                    }
+                    else
+                    {
+                        <p><span class="badge au-badge-danger">Not valid</span></p>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.Effect))
+                    {
+                        <p>@RubricCompare.EffectText(Model.Effect)</p>
+                    }
+                    @if (definition is not null)
+                    {
+                        <p class="mb-1">@definition.Id @definition.Semver</p>
+                        <p class="mb-1">@(string.IsNullOrWhiteSpace(definition.Title) ? "No title" : definition.Title)</p>
+                        <p>@definition.Checks.Count @(definition.Checks.Count == 1 ? "check" : "checks")</p>
+                    }
+                    @if (review.Errors is { Count: > 0 })
+                    {
+                        <ul>
+                            @foreach (var error in review.Errors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    }
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (canImport)
+                        {
+                            if (Model.Effect == "replace-draft")
+                            {
+                                <button type="submit" class="btn btn-success" name="intent" value="import" data-hold="@replaceHold">Import draft</button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-success" name="intent" value="import">Import draft</button>
+                            }
+                        }
+                        @if (definition is not null)
+                        {
+                            <button type="submit" class="btn btn-au-link" name="intent" value="open">Open in editor</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </form>
+}

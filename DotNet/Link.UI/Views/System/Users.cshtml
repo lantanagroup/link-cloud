@@ -1,0 +1,174 @@
+@model UserListPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    Dictionary<string, string> Route(int page, int pageSize = 0)
+    {
+        var chosen = pageSize is 10 or 25 or 50 ? pageSize : query.PageSize;
+        var route = new Dictionary<string, string>
+        {
+            ["page"] = page.ToString(),
+            ["pageSize"] = chosen.ToString()
+        };
+        if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(query.Role)) route["role"] = query.Role;
+        if (!string.IsNullOrWhiteSpace(query.Claim)) route["claim"] = query.Claim;
+        if (query.IncludeDeactivated) route["includeDeactivated"] = "true";
+        if (query.IncludeDeleted) route["includeDeleted"] = "true";
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to system"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Accounts</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search" data-au-filter="300" data-au-target="userResults">
+            <input type="hidden" name="pageSize" value="@query.PageSize" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="searchText">Search</label>
+                    <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Users">Clear</a>
+                </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.FacilityId) || !string.IsNullOrWhiteSpace(query.Role) || !string.IsNullOrWhiteSpace(query.Claim) || query.IncludeDeactivated || query.IncludeDeleted) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="role">Role</label>
+                        <input id="role" name="role" value="@query.Role" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="claim">Claim</label>
+                        <input id="claim" name="claim" value="@query.Claim" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="includeDeactivated" name="includeDeactivated" value="true" @(query.IncludeDeactivated ? "checked" : null) />
+                            <label class="form-check-label" for="includeDeactivated">Include deactivated</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
+                            <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+<div class="au-card card mb-3 d-none" id="accountCreate" data-lu-panel data-lu-hide-on-cancel>
+    <div class="card-header">New account</div>
+    <div class="card-body">
+        <form method="post" data-au-save asp-action="CreateUser" class="row g-2">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="username">Username</label>
+                <input id="username" name="username" class="form-control" maxlength="255" autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="firstName">First name</label>
+                <input id="firstName" name="firstName" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="lastName">Last name</label>
+                <input id="lastName" name="lastName" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="email">Email</label>
+                <input id="email" name="email" class="form-control" maxlength="255" autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="middleName">Middle name</label>
+                <input id="middleName" name="middleName" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Roles are assigned from the account page after the account exists.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Accounts</span>
+        <span class="d-flex align-items-center gap-2">
+            <span class="lu-live-label">This list updates on its own.</span>
+            <button type="button" class="btn btn-sm btn-success" data-lu-reveal="accountCreate">+ Add</button>
+        </span>
+    </div>
+    <div class="card-body">
+        <div id="userResults" data-au-refresh="20000">
+        @if (Model.Users.Count == 0)
+        {
+            <p class="mb-0">No accounts match this search. Add one, or clear the search.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-2 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Username</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Roles</th>
+                            <th scope="col">Status</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var user in Model.Users)
+                    {
+                        <tr>
+                            <td>@user.Username</td>
+                            <td>@user.FirstName @user.LastName</td>
+                            <td>@user.Email</td>
+                            <td>@string.Join(", ", user.Roles)</td>
+                            <td>
+                                <span class="badge @StatusPills.ForAccountState(user.IsDeleted, user.IsActive)">@(user.IsDeleted ? "Deleted" : user.IsActive ? "Active" : "Deactivated")</span>
+                            </td>
+                            <td class="text-nowrap">
+                                <div class="lu-row-actions">
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                                    @if (user.IsDeleted)
+                                    {
+                                        <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline">
+                                            <button data-hold="@Hold.Of("Restore this account?", "Restore this account?", "The selected logs change.", "Hold to restore")" type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+        <partial name="_BottomPager" model="@(new BottomPager { Label = "Account pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = query.PageSize, Sizes = new[] { 10, 25, 50 }, Route = Route })" />
+        </div>
+    </div>
+</div>

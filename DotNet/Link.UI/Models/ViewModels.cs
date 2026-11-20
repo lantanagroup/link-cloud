@@ -1,0 +1,24 @@
+﻿namespace Link.UI.Models;
+
+public sealed class TenantListItem
+{
+    public string FacilityId { get; init; } = string.Empty;
+    public string DisplayName { get; init; } = string.Empty;
+    public bool IsDeleted { get; init; }
+    public bool IsTest { get; init; }
+}
+
+public sealed class TenantListViewModel
+{
+    public IReadOnlyList<TenantListItem> Tenants { get; init; } = Array.Empty<TenantListItem>();
+    public string? Search { get; init; }
+    public string Scope { get; init; } = Link.UI.Services.AutomationMarkRules.All;
+    public bool IncludeDeleted { get; init; }
+    public string? DeletedNote { get; init; }
+    public string? ErrorMessage { get; init; }
+    public bool LoadedSuccessfully { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public int TotalCount { get; init; }
+    public int TotalPages { get; init; }
+}

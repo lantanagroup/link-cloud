@@ -1,0 +1,170 @@
+@model RubricDetailPage
+@{
+    var rubric = Model.Rubric;
+    var use = rubric is null ? null : RubricText.PipelineUse(Model.Settings, rubric.RubricId);
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Rubrics")!, "Back to rubrics"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">@(string.IsNullOrWhiteSpace(rubric?.Title) ? rubric?.RubricId ?? "Validation rubric" : rubric.Title)</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (rubric is not null)
+{
+    <p class="text-muted mb-2">@rubric.RubricId@if (!string.IsNullOrWhiteSpace(rubric.Owner)) { <text> · @rubric.Owner</text> }</p>
+    <p>
+        @if (use is not null)
+        {
+            <span class="badge @RubricText.InUseBadge" title="@RubricText.PipelineUseTitle(use)">In Use</span>
+        }
+        @if (string.IsNullOrEmpty(rubric.LatestPublishedSemver))
+        {
+            <span class="text-muted">No published version</span>
+        }
+        else
+        {
+            <span>Active <a asp-action="RubricVersion" asp-route-rubricId="@rubric.RubricId" asp-route-semver="@rubric.LatestPublishedSemver">@rubric.LatestPublishedSemver</a></span>
+        }
+    </p>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="btn btn-success" asp-action="NewRubricVersion" asp-route-rubricId="@rubric.RubricId">New version</a>
+        <a class="btn btn-au-link" asp-action="CompareRubrics" asp-route-rubricId="@rubric.RubricId">Compare</a>
+    </div>
+
+    <div class="au-card card mb-3">
+        <div class="card-header">Versions</div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Checks</th>
+                        <th>Dry run</th>
+                        <th>Published</th>
+                        <th>Retired</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var version in rubric.Versions ?? [])
+                    {
+                        var active = version.Status == "PUBLISHED" && version.Semver == rubric.LatestPublishedSemver;
+                        <tr>
+                            <td><a asp-action="RubricVersion" asp-route-rubricId="@rubric.RubricId" asp-route-semver="@version.Semver">@version.Semver</a></td>
+                            <td>
+                                <span class="badge @RubricText.StatusBadge(version.Status)">@RubricText.StatusLabel(version.Status)</span>
+                                @if (active)
+                                {
+                                    <span class="badge @RubricText.ActiveBadge">Active</span>
+                                }
+                            </td>
+                            <td>@(version.CheckCount?.ToString() ?? "—")</td>
+                            <td>
+                                @RubricText.DryRunLabel(version.DryRunCompletedAt, version.DryRunStatus)
+                                @if (version.DryRunCompletedAt is not null)
+                                {
+                                    <div class="small text-muted">@LinkUiTime.Display(version.DryRunCompletedAt)</div>
+                                }
+                            </td>
+                            <td>
+                                @if (version.PublishedAt is not null)
+                                {
+                                    @LinkUiTime.Display(version.PublishedAt)
+                                    @if (!string.IsNullOrWhiteSpace(version.PublishedBy))
+                                    {
+                                        <div class="small text-muted">@version.PublishedBy</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (version.RetiredAt is not null)
+                                {
+                                    @LinkUiTime.Display(version.RetiredAt)
+                                    @if (!string.IsNullOrWhiteSpace(version.RetiredBy))
+                                    {
+                                        <div class="small text-muted">@version.RetiredBy</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="text-nowrap">
+                                @if (version.Status == "DRAFT")
+                                {
+                                    <a asp-action="EditRubric" asp-route-rubricId="@rubric.RubricId" asp-route-semver="@version.Semver">Edit</a>
+                                }
+                                @if (version.Status != "RETIRED")
+                                {
+                                    <a asp-action="DryRunRubric" asp-route-rubricId="@rubric.RubricId" asp-route-semver="@version.Semver">Dry run</a>
+                                }
+                                @foreach (var action in RubricLifecycle.ActionsFor(version.Status))
+                                {
+                                    <a asp-action="RubricVersion" asp-route-rubricId="@rubric.RubricId" asp-route-semver="@version.Semver" asp-route-do="@action">@RubricLifecycle.ActionName(action)</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="au-card card">
+        <div class="card-header">History (@Model.Events.Count)</div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(Model.EventsError))
+            {
+                <div class="alert alert-warning mb-0">
+                    <p><strong>The history could not be loaded.</strong></p>
+                    <p class="mb-0">@Model.EventsError</p>
+                </div>
+            }
+            else if (Model.Events.Count == 0)
+            {
+                <p class="mb-0">Nothing has been recorded for this rubric.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0" aria-label="History of this rubric">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>What</th>
+                                <th>Version</th>
+                                <th>Who</th>
+                                <th>Checksum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var history in Model.Events)
+                            {
+                                <tr>
+                                    <td>@LinkUiTime.Display(history.OccurredAt)</td>
+                                    <td>@RubricText.ActionLabel(history.Action)</td>
+                                    <td>@history.Semver</td>
+                                    <td>@(string.IsNullOrWhiteSpace(history.Actor) ? "—" : history.Actor)</td>
+                                    <td>@(history.Checksum ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

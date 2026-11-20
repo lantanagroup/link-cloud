@@ -212,7 +212,7 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
         }
         else
         {
-            @foreach (var api in apiLatency)
+            @foreach (var api in apiLatency.Where(a => a.Key != "acquisition-worker"))
             {
                 var width = !api.Unavailable && maxApiP95 > 0 && api.P95Ms is > 0
                     ? Math.Clamp(api.P95Ms.Value / maxApiP95 * 100, 4, 100)
@@ -248,16 +248,16 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
         {
             <div class="mt-3">
                 <div class="fw-semibold small mb-2">Slowest endpoints this run</div>
-                <table class="table au-table mb-0">
-                    <thead><tr><th>Service</th><th>Call</th><th>Slow</th><th>Calls</th></tr></thead>
+                <table class="table au-table au-slowest-endpoints mb-0">
+                    <thead><tr><th class="au-se-service">Service</th><th class="au-se-call">Call</th><th class="au-se-num text-end">Slow</th><th class="au-se-num text-end">Calls</th></tr></thead>
                     <tbody>
                     @foreach (var route in slowestRoutes)
                     {
                         <tr>
-                            <td>@route.Service</td>
-                            <td><code>@route.Method @route.Route</code></td>
-                            <td>@FormatMs(route.P95Ms)</td>
-                            <td>@route.Count.ToString("0")</td>
+                            <td class="au-se-service" title="@route.Service">@route.Service</td>
+                            <td class="au-se-call"><code>@route.Method @route.Route</code></td>
+                            <td class="au-se-num text-end">@FormatMs(route.P95Ms)</td>
+                            <td class="au-se-num text-end">@route.Count.ToString("0")</td>
                         </tr>
                     }
                     </tbody>

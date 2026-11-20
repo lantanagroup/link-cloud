@@ -70,6 +70,15 @@ public interface ITerminologyServiceClient
     Task<LinkApiResponse<string>> GetValueSetsAsync(string? url = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// ValueSet summaries (<c>_summary=true</c>), enough to list id, url, and version
+    /// without expanding every code.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetValueSetSummariesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>CodeSystem summaries (<c>_summary=true</c>).</summary>
+    Task<LinkApiResponse<string>> GetCodeSystemSummariesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Looks up the details of a code in a CodeSystem:
     /// <c>GET /api/terminology/fhir/CodeSystem/$lookup</c> (or <c>/CodeSystem/{id}/$lookup</c> when
     /// <paramref name="id"/> is supplied). Used for code-detail lookup.

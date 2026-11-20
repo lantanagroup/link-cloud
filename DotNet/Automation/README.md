@@ -1,4 +1,4 @@
-﻿# Automation
+# Automation
 
 `Automation` is the platform-agnostic foundation library for deterministic synthetic FHIR
 generation, predictive pipeline modeling, and reusable automation primitives. It has no

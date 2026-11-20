@@ -1,0 +1,59 @@
+@model RubricActionPlan
+@{
+    var rubricId = (string)ViewData["RubricId"]!;
+    var semver = (string)ViewData["Semver"]!;
+    var checksum = ViewData["Checksum"] as string;
+    var actionName = Model.Action switch
+    {
+        "publish" => "PublishRubric",
+        "retire" => "RetireRubric",
+        _ => "DeleteRubricDraft"
+    };
+    var buttonClass = Model.Action == "publish" ? "btn btn-success" : "btn btn-danger";
+}
+
+<div class="au-card card mb-3" id="action-@Model.Action">
+    <div class="card-header">@Model.Heading</div>
+    <div class="card-body">
+        @if (Model.Action == "publish")
+        {
+            <p class="small text-muted">Dry run: @ViewData["DryRun"]</p>
+        }
+        @if (Model.Consequences.Count > 0)
+        {
+            <ul>
+                @foreach (var line in Model.Consequences)
+                {
+                    <li>@line</li>
+                }
+            </ul>
+        }
+        @if (Model.Warnings.Count > 0)
+        {
+            <ul>
+                @foreach (var line in Model.Warnings)
+                {
+                    <li>@line</li>
+                }
+            </ul>
+        }
+        @if (Model.Blocked is not null)
+        {
+            <p class="mb-2">@Model.Blocked</p>
+            @if (Model.NeedsDryRun)
+            {
+                <a class="btn btn-au-link" asp-action="DryRunRubric" asp-route-rubricId="@rubricId" asp-route-semver="@semver">Run a dry run</a>
+            }
+        }
+        else
+        {
+            <form method="post" asp-action="@actionName" asp-route-rubricId="@rubricId" asp-route-semver="@semver" data-au-save>
+                @if (!string.IsNullOrEmpty(checksum))
+                {
+                    <input type="hidden" name="checksum" value="@checksum" />
+                }
+                <button type="submit" class="@buttonClass" data-hold="@RubricLifecycle.HoldSpec(Model)">@Model.ConfirmLabel</button>
+            </form>
+        }
+    </div>
+</div>

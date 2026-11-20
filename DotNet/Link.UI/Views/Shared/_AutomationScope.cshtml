@@ -1,0 +1,28 @@
+@model string?
+@if (LinkUiFeatures.Value.AutomationEnabled)
+{
+    var scope = AutomationMarkRules.NormalizeScope(Model);
+    <div class="d-flex align-items-center gap-2">
+    <label class="col-form-label py-0 text-nowrap" for="automationScope">Facility type</label>
+    <select id="automationScope" name="scope" class="form-select">
+        @if (scope == AutomationMarkRules.Automation)
+        {
+            <option value="all">All</option>
+            <option value="real">Real</option>
+            <option value="automation" selected>Automation</option>
+        }
+        else if (scope == AutomationMarkRules.Real)
+        {
+            <option value="all">All</option>
+            <option value="real" selected>Real</option>
+            <option value="automation">Automation</option>
+        }
+        else
+        {
+            <option value="all" selected>All</option>
+            <option value="real">Real</option>
+            <option value="automation">Automation</option>
+        }
+    </select>
+    </div>
+}

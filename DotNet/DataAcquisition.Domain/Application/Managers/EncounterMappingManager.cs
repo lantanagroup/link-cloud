@@ -22,7 +22,7 @@ public interface IEncounterMappingManager
     Task<EncounterMappingModel> UpdateByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId, UpdateEncounterMappingModel model);
     Task<int> RecomputeMappedToOrgForLocationMappingAsync(int organizationLocationMappingId, CancellationToken cancellationToken = default);
     Task DeleteByIdAsync(int id);
-    Task DeleteByFacilityIdAsync(string facilityId);
+    Task DeleteByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default);
     Task DeleteByPatientIdAsync(string patientId);
     Task DeleteByEncounterIdAndFacilityIdAsync(string encounterId, string facilityId);
 }
@@ -185,14 +185,17 @@ public class EncounterMappingManager : IEncounterMappingManager
         }
     }
 
-    public async Task DeleteByFacilityIdAsync(string facilityId)
+    public async Task DeleteByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var entities = await _database.EncounterMappingRepository.FindAsync(m => m.FacilityId == facilityId);
-        foreach (var entity in entities)
-        {
-            _database.EncounterMappingRepository.Remove(entity);
-        }
-        await _database.SaveChangesAsync();
+        // EncounterLocation references both the encounter row and the location mapping.
+        // The location-mapping foreign key does not cascade, so the child rows have to
+        // go first or a later location-mapping delete fails.
+        await _dbContext.EncounterLocations
+            .Where(location => location.EncounterMapping.FacilityId == facilityId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await _dbContext.EncounterMappings
+            .Where(mapping => mapping.FacilityId == facilityId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task DeleteByPatientIdAsync(string patientId)

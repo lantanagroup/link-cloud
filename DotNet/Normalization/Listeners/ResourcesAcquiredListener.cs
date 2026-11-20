@@ -273,6 +273,8 @@ public class ResourcesAcquiredListener : BackgroundService
         var copiedKeys = new List<string>(cacheKeys.Count);
 
         var mappingOutcomes = new MappingOutcomeAccumulator();
+        var normalizedResources = 0;
+        var failedOperations = 0;
 
         await RegisterConfiguredCodeMapsAsync(
             scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
@@ -299,6 +301,8 @@ public class ResourcesAcquiredListener : BackgroundService
                         $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
                         $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
                 }
+
+                normalizedResources += resources.Count;
 
                 if (sequences == null || sequences.Count == 0)
                 {
@@ -366,6 +370,7 @@ public class ResourcesAcquiredListener : BackgroundService
                             else
                             {
                                 stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:Failure");
+                                failedOperations++;
                                 if (operation is CodeMapOperation codeMapOperation)
                                 {
                                     mappingOutcomes.AddFailure(codeMapOperation); 
@@ -427,6 +432,7 @@ public class ResourcesAcquiredListener : BackgroundService
         }
 
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+        await RecordReportActivityAsync(scope, result.Message.Value, result.Message.Key.FacilityId, correlationId, normalizedResources, failedOperations, cancellationToken);
 
         // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
         // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
@@ -447,6 +453,27 @@ public class ResourcesAcquiredListener : BackgroundService
             cancellationToken);
 
         await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+    }
+
+    // Per-report counts for the report page. Best effort: a failed count write never holds up the pipeline.
+    private async Task RecordReportActivityAsync(IServiceScope scope, ResourcesAcquiredValue value, string facilityId, string correlationId, int resources, int failures, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var store = scope.ServiceProvider.GetService<LantanaGroup.Link.Normalization.Application.Services.ReportActivity.INormalizationReportActivityStore>();
+            if (store is null)
+                return;
+            var reportIds = (value.ScheduledReports ?? []).Select(s => s.ReportTrackingId).Where(id => !string.IsNullOrWhiteSpace(id));
+            await store.RecordAsync(facilityId, reportIds, correlationId, value.QueryType ?? "", resources, failures, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not record report normalization counts for FacilityId={FacilityId}, CorrelationId={CorrelationId}.", facilityId.SanitizeForLog(), correlationId.SanitizeForLog());
+        }
     }
 
     private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)

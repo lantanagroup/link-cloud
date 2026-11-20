@@ -1,0 +1,34 @@
+@model Link.UI.Models.FacilityHubViewModel
+<div class="fw-semibold mb-1">Scheduled reports</div>
+@if (Model.DmrpEnabled)
+{
+    <p class="text-muted mb-0">
+        Scheduled reports for this facility come from its DMRP reporting plans and cannot be set here.
+    </p>
+    @if (!Model.IsCreate && ( !string.IsNullOrWhiteSpace(Model.DailyReports) || !string.IsNullOrWhiteSpace(Model.WeeklyReports) || !string.IsNullOrWhiteSpace(Model.MonthlyReports)))
+    {
+        <ul class="mb-0 mt-2">
+            <li>Daily: @(string.IsNullOrWhiteSpace(Model.DailyReports) ? "none" : Model.DailyReports)</li>
+            <li>Weekly: @(string.IsNullOrWhiteSpace(Model.WeeklyReports) ? "none" : Model.WeeklyReports)</li>
+            <li>Monthly: @(string.IsNullOrWhiteSpace(Model.MonthlyReports) ? "none" : Model.MonthlyReports)</li>
+        </ul>
+    }
+}
+else
+{
+    <p class="text-muted">Comma-separated measure ids. The same id cannot appear in more than one period.</p>
+    <div class="row g-3">
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="dailyReports">Daily</label>
+            <input id="dailyReports" name="DailyReports" value="@Model.DailyReports" class="form-control" />
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="weeklyReports">Weekly</label>
+            <input id="weeklyReports" name="WeeklyReports" value="@Model.WeeklyReports" class="form-control" />
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="monthlyReports">Monthly</label>
+            <input id="monthlyReports" name="MonthlyReports" value="@Model.MonthlyReports" class="form-control" />
+        </div>
+    </div>
+}
