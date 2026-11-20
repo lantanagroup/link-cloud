@@ -213,7 +213,8 @@ vaas:
       # Cron (Spring format, evaluated in UTC) for ShadowComparisonDailyReportJob; defaults to 00:15 UTC daily.
        daily-cron: "0 15 0 * * *"
     # Where the primary engine's findings are stored for the shadow consumer (ShadowFindingsStore), in the
-    # internal blob container. Each blob is deleted after its comparison.
+    # internal blob container. Each blob is deleted after its comparison. Only blobs under the current prefix are
+    # read or deleted, so let the ShadowCompareEvent topic drain before changing it (see app-config.yaml).
     shadow-compare:
       blob-prefix: shadow-compare/
 

@@ -1135,18 +1135,18 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_shadowSendFailsAsynchronously_deletesTheFindingsBlob() throws Exception {
+    void process_shadowSendFailsAsynchronously_keepsTheFindingsBlob() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
         when(shadowFindingsStore.store(any(), any(), any(), anyList())).thenReturn(FINDINGS_BLOB);
         CompletableFuture<SendResult<String, ShadowCompareEvent>> failed = new CompletableFuture<>();
-        failed.completeExceptionally(new RuntimeException("send failed"));
+        // As at delivery.timeout.ms: the broker may have appended the event and only the acknowledgement was lost.
+        failed.completeExceptionally(new org.apache.kafka.common.errors.TimeoutException("Expiring 1 record(s)"));
         when(shadowCompareEventTemplate.send(any(ProducerRecord.class))).thenReturn(failed);
 
         assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
 
-        // Off the callback's thread: on a real producer that is the sender thread ValidationComplete shares.
-        verify(shadowFindingsStore).deleteAsync(FINDINGS_BLOB);
+        // An appended event could still point at the blob, so it is left for the lifecycle rule.
         verify(shadowFindingsStore, never()).delete(any());
     }
 }

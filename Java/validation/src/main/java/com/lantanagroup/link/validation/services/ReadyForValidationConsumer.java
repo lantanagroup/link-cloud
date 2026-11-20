@@ -185,9 +185,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
      * engine and compares the results. This is asynchronous so shadow failures never affect validation.
      * <p>
      * The findings go to blob storage and the event carries the blob name (a claim check), because one patient's
-     * findings can exceed the Kafka message size limit. Without blob storage they go on the event as before. If the
-     * send fails, the blob is deleted, since no event will ever point at it; off the calling thread when the
-     * failure arrives on the producer's callback.
+     * findings can exceed the Kafka message size limit. Without blob storage they go on the event as before. If
+     * {@code send()} throws, the blob is deleted, since the record never reached the producer. If the send fails
+     * later, the blob is kept, because the event may have been appended even though the send reported failure.
      */
     private void publishShadowCompareEvent(
             UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
@@ -218,14 +218,15 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                     .send(new ProducerRecord<>(ShadowCompareEvent.TOPIC, null, facilityId, event, headers))
                     .whenComplete((result, ex) -> {
                         if (ex != null) {
+                            // The blob is kept. A send that fails here, at delivery.timeout.ms say, may
+                            // still have been appended with only the acknowledgement lost, and that event
+                            // would point at the blob. The lifecycle rule on the prefix removes it if not.
                             _logger.warn("Failed to send ShadowCompareEvent for report {}",
                                     LogUtils.sanitize(reportId), ex);
-                            // This runs on the producer's sender thread, which the ValidationComplete
-                            // send shares, so the blob call must not happen here.
-                            shadowFindingsStore.deleteAsync(findingsBlobName);
                         }
                     });
         } catch (RuntimeException e) {
+            // Thrown by send() itself, before the record reached the producer, so no event can point at the blob.
             shadowFindingsStore.delete(findingsBlobName);
             throw e;
         }

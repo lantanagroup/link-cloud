@@ -1084,7 +1084,7 @@ services:
       required: false
       defaultValue: "0 15 0 * * *"
     - key: "vaas.bridge.shadow-compare.blob-prefix"
-      description: "Prefix, in the internal blob container, under which Validation stores each patient's primary-engine findings for the shadow comparison (a claim check: the findings can exceed the Kafka message size limit, so ShadowCompareEvent carries only the blob name). The shadow consumer deletes each blob once it has compared; a storage lifecycle rule on this prefix removes any left behind. An empty value is ignored and the default used, so that these blobs can always be told apart from the patient payloads in the same container."
+      description: "Prefix, in the internal blob container, under which Validation stores each patient's primary-engine findings for the shadow comparison (a claim check: the findings can exceed the Kafka message size limit, so ShadowCompareEvent carries only the blob name). The shadow consumer deletes each blob once it has compared; a storage lifecycle rule on this prefix removes any left behind. An empty value is ignored and the default used, so that these blobs can always be told apart from the patient payloads in the same container. Validation reads this once at startup and acts only on blobs under the current prefix. Before changing it, let the ShadowCompareEvent topic drain (consumer group validation-shadow at zero lag): an event still queued from before the change names a blob under the old prefix, so its comparison is skipped and its blob is not deleted. Point the lifecycle rule at the new prefix as well, and keep it on the old one until that prefix is empty."
       required: false
       defaultValue: "shadow-compare/"
     - key: "validation.categoryOverride.enabled"

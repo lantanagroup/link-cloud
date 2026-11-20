@@ -94,7 +94,6 @@ class ShadowFindingsStoreTest {
         assertNull(store.store("f", "r", "p", List.of(finding())));
         assertThrows(IllegalStateException.class, () -> store.load(OWN_BLOB));
         assertDoesNotThrow(() -> store.delete(OWN_BLOB));
-        assertDoesNotThrow(() -> store.deleteAsync(OWN_BLOB));
     }
 
     @Test
@@ -116,13 +115,6 @@ class ShadowFindingsStoreTest {
         when(blobStorageService.deleteIfExists(any())).thenThrow(new RuntimeException("ABS down"));
 
         assertDoesNotThrow(() -> store("shadow-compare/").delete(OWN_BLOB));
-    }
-
-    @Test
-    void deleteAsync_deletesTheBlobOffTheCallingThread() {
-        store("shadow-compare/").deleteAsync(OWN_BLOB);
-
-        verify(blobStorageService, timeout(5000)).deleteIfExists(OWN_BLOB);
     }
 
     @Test
