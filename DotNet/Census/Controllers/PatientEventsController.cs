@@ -171,7 +171,7 @@ public class PatientEventsController : Controller
             return BadRequest("Patient event ID is required.");
         }
 
-        using var transaction = await _patientEventQueries.StartTransaction();
+        using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
         try
         {
             var patientEventFaciltyId = (await _patientEventQueries.GetPatientEventById(id, cancellationToken))?.FacilityId;
@@ -194,7 +194,7 @@ public class PatientEventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting patient event with ID {Id}", id?.Replace("\r", "").Replace("\n", ""));
+            _logger.LogError(ex, "Error deleting patient event with ID {Id}", id.SanitizeForLog());
             await transaction.RollbackAsync(cancellationToken);
             return Problem(
                 detail: "An error occurred while processing your request.",
@@ -222,7 +222,7 @@ public class PatientEventsController : Controller
             return BadRequest("Correlation ID is required.");
         }
 
-        using var transaction = await _patientEventQueries.StartTransaction();
+        using var transaction = await _patientEventQueries.StartTransaction(cancellationToken);
         try
         {
             await _patientEventQueries.DeletePatientEventByCorrelationId(correlationId, cancellationToken);
@@ -237,7 +237,7 @@ public class PatientEventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting patient events for correlation ID {CorrelationId}", correlationId?.Replace("\r", "").Replace("\n", ""));
+            _logger.LogError(ex, "Error deleting patient events for correlation ID {CorrelationId}", correlationId.SanitizeForLog());
             await transaction.RollbackAsync(cancellationToken);
             return Problem(
                 detail: "An error occurred while processing your request.",

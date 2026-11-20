@@ -92,7 +92,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CensusPatientList]') AND [c].[name] = N'CreatedDate');
-    IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT [' + @var0 + '];');
+    DECLARE @dropConstraint0 nvarchar(max) = N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT ' + QUOTENAME(@var0) + N';';
+    IF @var0 IS NOT NULL EXEC(@dropConstraint0);
     ALTER TABLE [CensusPatientList] DROP COLUMN [CreatedDate];
 END;
 GO
@@ -107,7 +108,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CensusPatientList]') AND [c].[name] = N'UpdatedDate');
-    IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT [' + @var1 + '];');
+    DECLARE @dropConstraint1 nvarchar(max) = N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT ' + QUOTENAME(@var1) + N';';
+    IF @var1 IS NOT NULL EXEC(@dropConstraint1);
     ALTER TABLE [CensusPatientList] DROP COLUMN [UpdatedDate];
 END;
 GO
@@ -122,7 +124,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CensusPatientList]') AND [c].[name] = N'DisplayName');
-    IF @var2 IS NOT NULL EXEC(N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT [' + @var2 + '];');
+    DECLARE @dropConstraint2 nvarchar(max) = N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT ' + QUOTENAME(@var2) + N';';
+    IF @var2 IS NOT NULL EXEC(@dropConstraint2);
     ALTER TABLE [CensusPatientList] ALTER COLUMN [DisplayName] nvarchar(max) NULL;
 END;
 GO
@@ -137,7 +140,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CensusPatientList]') AND [c].[name] = N'DischargeDate');
-    IF @var3 IS NOT NULL EXEC(N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT [' + @var3 + '];');
+    DECLARE @dropConstraint3 nvarchar(max) = N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT ' + QUOTENAME(@var3) + N';';
+    IF @var3 IS NOT NULL EXEC(@dropConstraint3);
     ALTER TABLE [CensusPatientList] ALTER COLUMN [DischargeDate] datetime2 NULL;
 END;
 GO
@@ -152,7 +156,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CensusPatientList]') AND [c].[name] = N'AdmitDate');
-    IF @var4 IS NOT NULL EXEC(N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT [' + @var4 + '];');
+    DECLARE @dropConstraint4 nvarchar(max) = N'ALTER TABLE [CensusPatientList] DROP CONSTRAINT ' + QUOTENAME(@var4) + N';';
+    IF @var4 IS NOT NULL EXEC(@dropConstraint4);
     ALTER TABLE [CensusPatientList] ALTER COLUMN [AdmitDate] datetime2 NULL;
 END;
 GO
@@ -167,7 +172,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CensusConfig]') AND [c].[name] = N'ModifyDate');
-    IF @var5 IS NOT NULL EXEC(N'ALTER TABLE [CensusConfig] DROP CONSTRAINT [' + @var5 + '];');
+    DECLARE @dropConstraint5 nvarchar(max) = N'ALTER TABLE [CensusConfig] DROP CONSTRAINT ' + QUOTENAME(@var5) + N';';
+    IF @var5 IS NOT NULL EXEC(@dropConstraint5);
     ALTER TABLE [CensusConfig] ALTER COLUMN [ModifyDate] datetime2 NULL;
 END;
 GO
@@ -198,7 +204,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[PatientCensusHistory]') AND [c].[name] = N'ReportId');
-    IF @var6 IS NOT NULL EXEC(N'ALTER TABLE [PatientCensusHistory] DROP CONSTRAINT [' + @var6 + '];');
+    DECLARE @dropConstraint6 nvarchar(max) = N'ALTER TABLE [PatientCensusHistory] DROP CONSTRAINT ' + QUOTENAME(@var6) + N';';
+    IF @var6 IS NOT NULL EXEC(@dropConstraint6);
     ALTER TABLE [PatientCensusHistory] DROP COLUMN [ReportId];
     EXEC(N'ALTER TABLE [PatientCensusHistory] ADD [ReportId] AS CONCAT(FacilityId, ''-'', CensusDateTime)');
 END;

@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -515,12 +516,11 @@
 <li><a href="https://swagger.io/tools/open-source/open-source-integrations/">Java</a></li>
 </ul>
 <h2 id="versioning" class="content-heading">Versioning <a href="#versioning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Versioning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Do we want to do this?</p>
 <p>By versioning our APIs we can make breaking changes without impacting clients. When a breaking change occurs a new version of the API can be released and clients can choose when to migrate to the new version of the API and make changes necessary to work with the new version.</p>
-<p>URL versioning can be accomplished as follows:</p>
+<p>Link does not currently implement API versioning. However, should the need arise, it can be implemented as follows:</p>
 <ul>
-<li><code>https://tenant-service/api/v1/facilities</code></li>
-<li><code>https://tenant-service/api/v2/facilities</code></li>
+<li>Version 1 (as it is currently, no v# prefix): <code>https://tenant-service/api/facilities</code></li>
+<li>Versions 2 and later: <code>https://tenant-service/api/v2/facilities</code></li>
 </ul>
 <h2 id="error-response" class="content-heading">Error Response <a href="#error-response" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Error Response"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>When an error occurs in an API an HTTP response with a status code of 500 (Internal Server Error) should be returned. The body of the response should be that of a the Problem Details object. See more <a href="https://datatracker.ietf.org/doc/html/rfc7807">here</a>.</p>
@@ -607,7 +607,7 @@
 }
 </code></pre>
 <p>If the request is made to an endpoint that performs a search, it will return an HTTP status code of 200 (OK). The response body will contain a PagedListModel that contains an array of the resource model and a PagedMetadata object.</p>
-<p>If the request is made to an endpoint that performs a search and no results were found, it should return an HTTP status code of 204 (No Content).</p>
+<p>If the request is made to an endpoint that performs a search and no results were found, it should return 200 (OK) with the paged model containing an empty Records list.</p>
 <h4 id="pagedmodel-interface" class="content-heading">PagedModel Interface <a href="#pagedmodel-interface" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PagedModel Interface"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <pre><code class="language-csharp">public interface IPagedModel&lt;T&gt; where T : class
 {
@@ -791,6 +791,7 @@ builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;(
 </code></pre>
 <h1 id="route-guidelines" class="content-heading">Route Guidelines <a href="#route-guidelines" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Route Guidelines"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p><strong>1. Remove component name from route</strong></p>
+<p><em>Note: This is not currently implemented. Currently, each service defines its own route prefix. It is proposed that all services are switched to the below guidance when time permits.</em></p>
 <p>To simplify route definitions, the URL within the request should be a sufficient indicator on which Link Cloud component is being accessed.</p>
 <table>
 <thead>
@@ -888,7 +889,7 @@ builder.Services.AddHttpClient&lt;INotificationService, NotificationService&gt;(
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-napi_guidance_2EAD0860["Design: API Guidance"]</pre>
+napi_guidance_1A446003["Design: API Guidance"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

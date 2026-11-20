@@ -11,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -240,6 +241,93 @@ public class DataAcquisitionLogManagerTests
         // Assert
         var deletedLog = await dbContext.DataAcquisitionLogs.FindAsync(log.Id);
         Assert.Null(deletedLog);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithResourceIds_StoresCountPerResourceType()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(dbContext);
+        var manager = CreateManager(scope);
+
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Status = RequestStatus.Completed,
+            ResourceAcquiredIds = ["Observation/1", "Observation/2", "Condition/c1", ""]
+        });
+
+        var expected = new Dictionary<string, int>
+        {
+            ["Observation"] = 2,
+            ["Condition"] = 1
+        };
+        Assert.Equal(expected, await GetResourceTypeCountsAsync(dbContext, log.Id));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ResourceIdsSavedAgain_ReplacesTheCounts()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(dbContext);
+        var manager = CreateManager(scope);
+
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Observation/1", "Condition/c1"]
+        });
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Observation/1", "Observation/2", "Observation/3"]
+        });
+
+        Assert.Equal(new Dictionary<string, int> { ["Observation"] = 3 },
+                     await GetResourceTypeCountsAsync(dbContext, log.Id));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NoResourceIds_KeepsExistingCounts()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(dbContext);
+        var manager = CreateManager(scope);
+
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Encounter/e1"]
+        });
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Status = RequestStatus.Completed
+        });
+
+        Assert.Equal(new Dictionary<string, int> { ["Encounter"] = 1 },
+                     await GetResourceTypeCountsAsync(dbContext, log.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_LogWithResourceTypeCounts_DeletesTheCounts()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(dbContext);
+        var manager = CreateManager(scope);
+
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Encounter/e1"]
+        });
+        await manager.DeleteAsync(log.Id);
+
+        Assert.Empty(await GetResourceTypeCountsAsync(dbContext, log.Id));
     }
 
     [Fact]
@@ -1102,6 +1190,70 @@ public class DataAcquisitionLogManagerTests
         return logs;
     }
 
+    [Fact]
+    public async Task UpdateAsync_RetryAfterFailingBetweenTheDeletes_ReplacesTheCounts()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var setupContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var log = await AddPendingLogAsync(setupContext);
+        await CreateManager(scope).UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Observation/1", "Observation/2"]
+        });
+
+        var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
+            .UseSqlServer(setupContext.Database.GetConnectionString())
+            .AddInterceptors(new FailFirstCountDelete())
+            .Options;
+        await using (var failingContext = new DataAcquisitionDbContext(options))
+        {
+            var failingManager = new DataAcquisitionLogManager(
+                new Mock<ILogger<DataAcquisitionLogManager>>().Object,
+                scope.ServiceProvider.GetRequiredService<IDatabase>(),
+                failingContext,
+                scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
+                CreateSemaphoreProviderMock(),
+                scope.ServiceProvider.GetRequiredService<IResourceCache>());
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => failingManager.UpdateAsync(
+                new UpdateDataAcquisitionLogModel { Id = log.Id, ResourceAcquiredIds = ["Observation/1"] }));
+        }
+
+        using var retryScope = _fixture.ServiceProvider.CreateScope();
+        await CreateManager(retryScope).UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            ResourceAcquiredIds = ["Observation/1"]
+        });
+
+        Assert.Equal(new Dictionary<string, int> { ["Observation"] = 1 },
+                     await GetResourceTypeCountsAsync(setupContext, log.Id));
+    }
+
+    private static async Task<DataAcquisitionLog> AddPendingLogAsync(DataAcquisitionDbContext dbContext)
+    {
+        var log = new DataAcquisitionLog
+        {
+            FacilityId = $"TypeCounts_{Guid.NewGuid():N}",
+            Status = RequestStatus.Pending,
+            CorrelationId = Guid.NewGuid().ToString()
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        return log;
+    }
+
+    private static async Task<Dictionary<string, int>> GetResourceTypeCountsAsync(DataAcquisitionDbContext dbContext,
+                                                                                long logId)
+    {
+        return await dbContext.DataAcquisitionLogResourceTypeCounts
+            .AsNoTracking()
+            .Where(c => c.DataAcquisitionLogId == logId)
+            .ToDictionaryAsync(c => c.ResourceType, c => c.Count);
+    }
+
     /// <summary>
     /// Regression (run 24d4820a): a log's terminal status must not be visible before its resource-id rows.
     /// TryCompleteTailAsync builds ResourcesAcquired.CacheKeys from those rows once every sibling is terminal;
@@ -1185,6 +1337,29 @@ public class DataAcquisitionLogManagerTests
         {
             lock (Commands) Commands.Add(command.CommandText);
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+
+    // Fails the first delete of a log's resource-type counts, after the resource-id delete has already committed.
+    private sealed class FailFirstCountDelete : DbCommandInterceptor
+    {
+        private bool _failed;
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            System.Data.Common.DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_failed &&
+                command.CommandText.Contains("DELETE", StringComparison.OrdinalIgnoreCase) &&
+                command.CommandText.Contains("DataAcquisitionLogResourceTypeCounts", StringComparison.Ordinal))
+            {
+                _failed = true;
+                throw new InvalidOperationException("Simulated failure between the resource-id and count deletes.");
+            }
+
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
         }
     }
 }

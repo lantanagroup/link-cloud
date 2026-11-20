@@ -451,6 +451,17 @@ class RubricDefinitionValidatorTest {
     }
 
     @Test
+    @DisplayName("TERMINOLOGY rejects backreferences that the linear-time whitelist engine cannot execute")
+    void terminologyRejectsBackreferences() {
+        var errors = errorsOf(() -> validator.validate(payload(
+                check("c1", CheckType.TERMINOLOGY, PiqiDimension.TERMINOLOGY)
+                        .parameters(params("{\"valueSetWhitelistRegex\":\"^(a)\\\\1$\"}")).build()
+        ).build()));
+
+        assertThat(errors).anyMatch(e -> e.contains("invalid regular expression"));
+    }
+
+    @Test
     @DisplayName("VALUESET without path/valueSet -> rejected")
     void valuesetMissingParams() {
         var p = payload(check("c1", CheckType.VALUESET, PiqiDimension.TERMINOLOGY).build()).build();

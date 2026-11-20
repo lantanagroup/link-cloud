@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -515,15 +516,15 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nresources_acquired_7C72478A["Event: Resources Acquired"]
-  nDataAcquisitionWorkerService_34AD5529["Service: DataAcquisitionWorkerService"] -->|produces| nresources_acquired_7C72478A
-  nresources_acquired_7C72478A -->|consumed by| nNormalizationService_78B0F5BC["Service: NormalizationService"]
-  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
-    nDataAcquisitionWorkerService_34AD5529
-    nresources_acquired_7C72478A
+nresources_acquired_5854A477["Event: Resources Acquired"]
+  nDataAcquisitionWorkerService_848F0E1["Service: DataAcquisitionWorkerService"] -->|produces| nresources_acquired_5854A477
+  nresources_acquired_5854A477 -->|consumed by| nNormalizationService_1FF7DC8D["Service: NormalizationService"]
+  subgraph nDataAccess_5840AA13_domain["Domain: Data Access"]
+    nDataAcquisitionWorkerService_848F0E1
+    nresources_acquired_5854A477
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nNormalizationService_78B0F5BC
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nNormalizationService_1FF7DC8D
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
