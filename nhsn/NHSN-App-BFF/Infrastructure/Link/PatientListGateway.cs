@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Mappers;
@@ -57,13 +58,13 @@ internal sealed class PatientListGateway : IPatientListGateway
         {
             var createResponse = await _dataAcquisitionClient.CreateFhirListConfigurationAsync(payload, cancellationToken);
             EnsureConfigurationSaved(createResponse, facilityId);
-            _logger.LogInformation("Created FHIR List configuration for facility {FacilityId}.", facilityId);
+            _logger.LogInformation("Created FHIR List configuration for facility {FacilityId}.", facilityId.SanitizeForLog());
             return;
         }
 
         var updateResponse = await _dataAcquisitionClient.UpdateFhirListConfigurationAsync(payload, cancellationToken);
         EnsureConfigurationSaved(updateResponse, facilityId);
-        _logger.LogInformation("Updated FHIR List configuration for facility {FacilityId}.", facilityId);
+        _logger.LogInformation("Updated FHIR List configuration for facility {FacilityId}.", facilityId.SanitizeForLog());
     }
 
     // A 400 here is Data Acquisition's own model validation rejecting the payload - most often the
@@ -90,7 +91,7 @@ internal sealed class PatientListGateway : IPatientListGateway
 
         var response = await _dataAcquisitionClient.DeleteFhirListConfigurationAsync(facilityId, cancellationToken);
         LinkResponseHandler.EnsureSuccess(response, ServiceName, nameof(DeleteConfigurationIfExistsAsync));
-        _logger.LogInformation("Deleted FHIR List configuration for facility {FacilityId}.", facilityId);
+        _logger.LogInformation("Deleted FHIR List configuration for facility {FacilityId}.", facilityId.SanitizeForLog());
     }
 
     // Data Acquisition reads every configured list from the EHR when includePatients is set, so this
@@ -164,7 +165,7 @@ internal sealed class PatientListGateway : IPatientListGateway
 
         var deleteResponse = await _dataAcquisitionClient.DeleteSftpConfigurationAsync(facilityId, existing.Id, cancellationToken);
         LinkResponseHandler.EnsureSuccess(deleteResponse, ServiceName, nameof(SaveConfigurationAsync));
-        _logger.LogInformation("Deleted stale sFTP configuration for facility {FacilityId} before saving its FHIR List configuration.", facilityId);
+        _logger.LogInformation("Deleted stale sFTP configuration for facility {FacilityId} before saving its FHIR List configuration.", facilityId.SanitizeForLog());
     }
 }
 

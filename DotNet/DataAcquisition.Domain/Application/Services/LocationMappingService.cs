@@ -424,7 +424,7 @@ public class LocationMappingService(
             _logger.LogDebug(
                 "Removed {RemovedCount} resource(s) without mapped encounter organization for facility {FacilityId}.",
                 removedCount,
-                facilityId);
+                facilityId.SanitizeForLog());
         }
 
         return filteredResources;

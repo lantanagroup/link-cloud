@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Mappers;
 using LantanaGroup.Link.Sdk.ApiClient;
@@ -38,7 +39,7 @@ internal sealed class SftpConfigurationGateway : ISftpConfigurationGateway
             var createResponse = await _dataAcquisitionClient.CreateSftpConfigurationAsync(facilityId, payload, cancellationToken);
             LogIfFailed(createResponse, nameof(SaveConfigurationAsync));
             LinkResponseHandler.EnsureSuccess(createResponse, ServiceName, nameof(SaveConfigurationAsync));
-            _logger.LogInformation("Created sFTP configuration for facility {FacilityId}.", facilityId);
+            _logger.LogInformation("Created sFTP configuration for facility {FacilityId}.", facilityId.SanitizeForLog());
             return;
         }
 
@@ -46,7 +47,7 @@ internal sealed class SftpConfigurationGateway : ISftpConfigurationGateway
             facilityId, existing.Id ?? string.Empty, payload, cancellationToken);
         LogIfFailed(updateResponse, nameof(SaveConfigurationAsync));
         LinkResponseHandler.EnsureSuccess(updateResponse, ServiceName, nameof(SaveConfigurationAsync));
-        _logger.LogInformation("Updated sFTP configuration for facility {FacilityId}.", facilityId);
+        _logger.LogInformation("Updated sFTP configuration for facility {FacilityId}.", facilityId.SanitizeForLog());
     }
 
     // LinkServiceException's own Message deliberately excludes RawBody, so the actual validation
