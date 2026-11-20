@@ -124,7 +124,7 @@ public class ReportScheduleControllerManifestTests
         var result = await harness.Controller.GetManifest(harness.Schedule.Id.ToString(), force: true);
 
         Assert.IsType<EmptyResult>(result);
-        harness.Producer.Verify(p => p.Generate(harness.Schedule, It.IsAny<CancellationToken>()), Times.Once);
+        harness.Producer.Verify(p => p.Generate(harness.Schedule, ManifestGenerationMode.AdHoc, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -169,6 +169,12 @@ public class ReportScheduleControllerManifestTests
         harness.Producer.Verify(
             p => p.Produce(It.IsAny<ReportScheduleModel>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        harness.Producer.Verify(
+            p => p.Generate(It.IsAny<ReportScheduleModel>(), ManifestGenerationMode.AdHoc, It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.Producer.Verify(
+            p => p.Generate(It.IsAny<ReportScheduleModel>(), ManifestGenerationMode.Scheduled, It.IsAny<CancellationToken>()),
+            Times.Never);
         harness.ScheduleManager.Verify(
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -208,7 +214,7 @@ public class ReportScheduleControllerManifestTests
                 .Callback<Expression<Func<ReportSchedule, bool>>, CancellationToken>((expr, _) => CapturedPredicate = expr)
                 .ReturnsAsync(scheduleExists ? [Schedule] : []);
 
-            var generate = Producer.Setup(p => p.Generate(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()));
+            var generate = Producer.Setup(p => p.Generate(It.IsAny<ReportScheduleModel>(), It.IsAny<ManifestGenerationMode>(), It.IsAny<CancellationToken>()));
             if (generateThrows != null)
             {
                 generate.ThrowsAsync(generateThrows);
@@ -250,7 +256,7 @@ public class ReportScheduleControllerManifestTests
             Encoding.UTF8.GetString(((MemoryStream)HttpContext.Response.Body).ToArray());
 
         public void VerifyNotGenerated() =>
-            Producer.Verify(p => p.Generate(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()), Times.Never);
+            Producer.Verify(p => p.Generate(It.IsAny<ReportScheduleModel>(), It.IsAny<ManifestGenerationMode>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
 

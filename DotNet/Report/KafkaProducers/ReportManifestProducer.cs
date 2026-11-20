@@ -59,14 +59,20 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         /// <summary>
         /// Builds the manifest resources from what is persisted now. Checks no gate and writes nothing.
-        /// <see cref="Produce"/> calls it only once every entry is terminal. The ad-hoc manifest
-        /// endpoint calls it whenever asked, so the <see cref="OperationOutcome"/> flags what is
-        /// still in flight: one <c>incomplete</c> warning per non-terminal entry, plus one warning
-        /// when the reporting period has not closed. Neither appears on the scheduled path.
         /// </summary>
+        /// <param name="schedule">The report schedule.</param>
+        /// <param name="mode">
+        /// <see cref="ManifestGenerationMode.AdHoc"/> makes the <see cref="OperationOutcome"/> flag what
+        /// is still in flight: one <c>incomplete</c> warning per non-terminal entry, plus one warning when
+        /// the reporting period has not closed. <see cref="ManifestGenerationMode.Scheduled"/>, which
+        /// <see cref="Produce"/> passes, adds neither. Entries are read here, separately from the gate
+        /// <see cref="Produce"/> checks, so an entry can change in between; without this mode that change
+        /// would surface as a warning in the submitted manifest.
+        /// </param>
+        /// <param name="cancellationToken">Checked once per patient in every per-patient loop.</param>
         /// <exception cref="FacilityConfigNotFoundException">Tenant has no config for the facility.</exception>
         /// <exception cref="TenantUnavailableException">Tenant could not be asked.</exception>
-        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
+        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, ManifestGenerationMode mode, CancellationToken cancellationToken = default)
         {
             using var scope = _serviceScopeFactory.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
@@ -80,7 +86,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(reportEntries.Select(x => x.PatientId).Distinct().ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).Distinct().ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime, cancellationToken),
             ];
 
             var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id, cancellationToken);
@@ -90,7 +96,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 manifestResources.Add(aggregate);
             }
 
-            var operationOutcome = CreateOperationOutcome(schedule, reportEntries);
+            var operationOutcome = CreateOperationOutcome(schedule, reportEntries, mode, cancellationToken);
 
             if (operationOutcome.Issue.Count > 0)
             {
@@ -105,9 +111,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
+        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule, ManifestGenerationMode mode, CancellationToken cancellationToken = default)
         {
-            List<Resource> resources = await Generate(schedule, cancellationToken);
+            List<Resource> resources = await Generate(schedule, mode, cancellationToken);
             return ToBundle(resources);
         }
 
@@ -141,12 +147,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            List<Resource> manifestResources = await Generate(schedule, cancellationToken);
+            List<Resource> manifestResources = await Generate(schedule, ManifestGenerationMode.Scheduled, cancellationToken);
 
             Uri? payloadUri;
             try
             {
                 payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // A shutdown or abandoned request is not an upload failure: no failure audit event.
+                throw;
             }
             catch (Exception ex)
             {
@@ -232,7 +243,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             });
         }
 
-        private List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate)
+        private static List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
         {
             var admittedPatients = new List();
             admittedPatients.Meta = new Meta { Profile = [ReportConstants.BundleSettings.CensusProfileUrl] };
@@ -250,6 +261,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (var patient in patientIds)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 string reference = patient.StartsWith("Patient/") ? patient : "Patient/" + patient;
                 admittedPatients.Entry.Add(new List.EntryComponent()
                 {
@@ -287,11 +300,16 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return facilityConfig ?? throw new FacilityConfigNotFoundException(notFound);
         }
 
-        private static OperationOutcome CreateOperationOutcome(ReportScheduleModel schedule, List<ReportEntry> reportEntries)
+        private static OperationOutcome CreateOperationOutcome(
+            ReportScheduleModel schedule,
+            List<ReportEntry> reportEntries,
+            ManifestGenerationMode mode,
+            CancellationToken cancellationToken)
         {
             var operationOutcome = new OperationOutcome();
+            var flagInFlight = mode == ManifestGenerationMode.AdHoc;
 
-            if (!schedule.EndOfReportPeriodJobHasRun)
+            if (flagInFlight && !schedule.EndOfReportPeriodJobHasRun)
             {
                 operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
                 {
@@ -301,8 +319,15 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 });
             }
 
-            foreach (var entry in reportEntries.Where(x => x.ReportingStatus == ReportingStatus.FailedValidation))
+            foreach (var entry in reportEntries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (entry.ReportingStatus != ReportingStatus.FailedValidation)
+                {
+                    continue;
+                }
+
                 operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
                 {
                     Severity = OperationOutcome.IssueSeverity.Error,
@@ -311,8 +336,20 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 });
             }
 
-            foreach (var entry in reportEntries.Where(x => !ReportEntryTerminalStatuses.IsTerminal(x.ReportingStatus, x.SubmissionStatus)))
+            if (!flagInFlight)
             {
+                return operationOutcome;
+            }
+
+            foreach (var entry in reportEntries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (ReportEntryTerminalStatuses.IsTerminal(entry.ReportingStatus, entry.SubmissionStatus))
+                {
+                    continue;
+                }
+
                 operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
                 {
                     Severity = OperationOutcome.IssueSeverity.Warning,

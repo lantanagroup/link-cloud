@@ -44,7 +44,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness();
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var device = Assert.Single(resources.OfType<Device>());
         Assert.Equal(
@@ -57,7 +57,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness();
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var patientList = Assert.Single(resources.OfType<List>());
         Assert.Equal(
@@ -73,7 +73,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness();
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var organization = Assert.Single(resources.OfType<Organization>());
         Assert.Equal(
@@ -95,7 +95,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness();
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         Assert.Equal(
             new[] { ReportConstants.BundleSettings.SubmittingDeviceProfile },
@@ -115,7 +115,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness();
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var deviceName = Assert.Single(Assert.Single(resources.OfType<Device>()).DeviceName);
         Assert.Equal(ReportConstants.BundleSettings.DeviceName, deviceName.Name);
@@ -136,7 +136,7 @@ public class ReportManifestProducerTests
             Commit = "abc1234"
         });
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var versions = Assert.Single(resources.OfType<Device>()).Version;
         Assert.Collection(versions,
@@ -155,7 +155,7 @@ public class ReportManifestProducerTests
             ProductVersion = "0.9.0"
         });
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var version = Assert.Single(Assert.Single(resources.OfType<Device>()).Version);
         AssertDeviceVersion(version, "version", null, "0.9.0");
@@ -174,7 +174,7 @@ public class ReportManifestProducerTests
             Version = "1.2.3"
         });
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var device = Assert.Single(resources.OfType<Device>());
         var version = Assert.Single(device.Version);
@@ -383,7 +383,7 @@ public class ReportManifestProducerTests
             ("patient-stalled", reporting, submission)
         ]);
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
         Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
@@ -408,7 +408,7 @@ public class ReportManifestProducerTests
             ("p-failed", ReportingStatus.FailedValidation, SubmissionStatus.Submitted)
         ]);
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
         Assert.Equal(OperationOutcome.IssueSeverity.Error, issue.Severity);
@@ -424,7 +424,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness(entries: [(PatientId, ReportingStatus.FailedValidation, SubmissionStatus.Submitting)]);
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var issues = Assert.Single(resources.OfType<OperationOutcome>()).Issue;
         Assert.Collection(issues,
@@ -442,7 +442,7 @@ public class ReportManifestProducerTests
             ("patient-2", ReportingStatus.NotReportable, SubmissionStatus.NotEligable)
         ]);
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var census = Assert.Single(resources.OfType<List>());
         Assert.Equal(
@@ -459,7 +459,7 @@ public class ReportManifestProducerTests
     {
         var harness = new Harness(endOfReportPeriodJobHasRun: false);
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
         Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
@@ -476,7 +476,7 @@ public class ReportManifestProducerTests
             .ThrowsAsync(new InvalidOperationException("No Facility Config found"));
 
         await Assert.ThrowsAsync<LantanaGroup.Link.Report.Application.FacilityConfigNotFoundException>(
-            () => harness.Producer.Generate(harness.Schedule));
+            () => harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc));
     }
 
     [Fact]
@@ -488,7 +488,7 @@ public class ReportManifestProducerTests
             .ReturnsAsync((FacilityModel)null!);
 
         await Assert.ThrowsAsync<LantanaGroup.Link.Report.Application.FacilityConfigNotFoundException>(
-            () => harness.Producer.Generate(harness.Schedule));
+            () => harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc));
     }
 
     [Fact]
@@ -500,7 +500,7 @@ public class ReportManifestProducerTests
             .ThrowsAsync(new HttpRequestException("connection refused"));
 
         await Assert.ThrowsAsync<LantanaGroup.Link.Report.Application.TenantUnavailableException>(
-            () => harness.Producer.Generate(harness.Schedule));
+            () => harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc));
     }
 
     /// <summary>
@@ -514,8 +514,8 @@ public class ReportManifestProducerTests
             allEntriesComplete: false,
             entries: [(PatientId, ReportingStatus.PendingValidation, SubmissionStatus.PendingValidation)]);
 
-        var resources = await harness.Producer.Generate(harness.Schedule);
-        var bundle = await harness.Producer.GenerateAsBundle(harness.Schedule);
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc);
+        var bundle = await harness.Producer.GenerateAsBundle(harness.Schedule, ManifestGenerationMode.AdHoc);
 
         Assert.Equal(Bundle.BundleType.Collection, bundle.Type);
         Assert.Equal(
@@ -536,6 +536,147 @@ public class ReportManifestProducerTests
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
     }
 
+    /// <summary>
+    /// Entries are read again after the completion gate passes, so one can change in between. The
+    /// scheduled manifest is what gets submitted, so it must not carry in-flight or open-period warnings
+    /// whatever state the entries are in.
+    /// </summary>
+    [Fact]
+    public async Task Generate_ScheduledMode_AddsNoInFlightOrPeriodWarnings()
+    {
+        var harness = new Harness(
+            endOfReportPeriodJobHasRun: false,
+            entries:
+            [
+                (PatientId, ReportingStatus.PendingValidation, SubmissionStatus.PendingValidation),
+                ("p-failed", ReportingStatus.FailedValidation, SubmissionStatus.Submitting)
+            ]);
+
+        var resources = await harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.Scheduled);
+
+        var issue = Assert.Single(Assert.Single(resources.OfType<OperationOutcome>()).Issue);
+        Assert.Equal(OperationOutcome.IssueType.Invalid, issue.Code);
+        Assert.Contains("p-failed", issue.Diagnostics);
+    }
+
+    /// <summary>
+    /// The same race, observed through Produce: the gate says complete, but by the time Generate reads
+    /// the entries one is in flight. The uploaded manifest still carries no incomplete warning.
+    /// </summary>
+    [Fact]
+    public async Task Produce_EntryChangesAfterGate_UploadsManifestWithoutIncompleteWarning()
+    {
+        var harness = new Harness(entries:
+        [
+            (PatientId, ReportingStatus.PassedValidation, SubmissionStatus.Submitted),
+            ("p-late", ReportingStatus.PatientIdentified, null)
+        ]);
+        List<Resource>? uploaded = null;
+        harness.BlobStorage
+            .Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()))
+            .Callback<ReportScheduleModel, IEnumerable<Resource>, CancellationToken>((_, r, _) => uploaded = r.ToList())
+            .ReturnsAsync(new Uri("https://blob.example.com/internal/manifest.ndjson"));
+
+        Assert.True(await harness.Producer.Produce(harness.Schedule));
+
+        Assert.NotNull(uploaded);
+        Assert.Empty(uploaded!.OfType<OperationOutcome>());
+    }
+
+    #endregion
+
+    #region Cancellation
+
+    /// <summary>
+    /// Cancelled while Tenant is answering: the census loop is the next per-patient loop, and it must
+    /// stop there, before the aggregates are read at all.
+    /// </summary>
+    [Fact]
+    public async Task Generate_CancelledBeforeCensus_StopsInPatientListLoop()
+    {
+        using var cts = new CancellationTokenSource();
+        var harness = new Harness();
+        harness.TenantApiService
+            .Setup(t => t.GetFacilityConfig(FacilityId, It.IsAny<CancellationToken>()))
+            .Callback(() => cts.Cancel())
+            .ReturnsAsync(new FacilityModel { FacilityId = FacilityId, FacilityName = FacilityName });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => harness.Producer.Generate(harness.Schedule, ManifestGenerationMode.AdHoc, cts.Token));
+
+        harness.PopulationManager.Verify(
+            m => m.FindAsync(It.IsAny<Expression<Func<ReportPopulation, bool>>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Cancelled once the aggregates are built: the OperationOutcome's loop over the entries checks the
+    /// token per patient instead of finishing the diagnostics.
+    /// </summary>
+    [Theory]
+    [InlineData(ManifestGenerationMode.AdHoc)]
+    [InlineData(ManifestGenerationMode.Scheduled)]
+    public async Task Generate_CancelledAfterAggregation_StopsInOperationOutcomeLoop(ManifestGenerationMode mode)
+    {
+        using var cts = new CancellationTokenSource();
+        var harness = new Harness(entries: [(PatientId, ReportingStatus.PendingValidation, SubmissionStatus.PendingValidation)]);
+        harness.PopulationManager
+            .Setup(m => m.FindAsync(It.IsAny<Expression<Func<ReportPopulation, bool>>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => cts.Cancel())
+            .ReturnsAsync([]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => harness.Producer.Generate(harness.Schedule, mode, cts.Token));
+    }
+
+    /// <summary>
+    /// A cancelled upload is a shutdown or an abandoned request, not a blob storage failure, so it must
+    /// propagate rather than be reported as one through a failure audit event.
+    /// </summary>
+    [Fact]
+    public async Task Produce_UploadCancelled_PropagatesWithoutFailureAuditEvent()
+    {
+        using var cts = new CancellationTokenSource();
+        var harness = new Harness(enableSubmission: false);
+        harness.BlobStorage
+            .Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()))
+            .Returns<ReportScheduleModel, IEnumerable<Resource>, CancellationToken>((_, _, token) =>
+            {
+                cts.Cancel();
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult<Uri?>(null);
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => harness.Producer.Produce(harness.Schedule, cancellationToken: cts.Token));
+
+        harness.AuditKafkaProducer.VerifyNoOtherCalls();
+        harness.ScheduleManager.Verify(
+            m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
+    }
+
+    /// <summary>
+    /// The guard is narrow: an OperationCanceledException that is not the caller's cancellation (an
+    /// HTTP timeout inside the blob SDK, say) is still an upload failure, audited as before.
+    /// </summary>
+    [Fact]
+    public async Task Produce_UploadTimesOutWithoutCallerCancellation_StillAuditsFailure()
+    {
+        var harness = new Harness(enableSubmission: false);
+        harness.BlobStorage
+            .Setup(b => b.UploadManifestAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<IEnumerable<Resource>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TaskCanceledException("upload timed out"));
+
+        var produced = await harness.Producer.Produce(harness.Schedule);
+
+        Assert.False(produced);
+        harness.AuditKafkaProducer.Verify(
+            p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, AuditEventMessage>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     #endregion
 
     private sealed class Harness
@@ -548,6 +689,7 @@ public class ReportManifestProducerTests
         public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducer { get; } = new();
         public Mock<IProducer<string, AuditEventMessage>> AuditKafkaProducer { get; } = new();
         public Mock<ITenantApiService> TenantApiService { get; } = new();
+        public Mock<IReportPopulationManager> PopulationManager { get; } = new();
 
         /// <param name="enableSubmission">
         /// False models a report requested with bypassSubmission: true.
@@ -620,8 +762,7 @@ public class ReportManifestProducerTests
                 .Setup(t => t.GetFacilityConfig(FacilityId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new FacilityModel { FacilityId = FacilityId, FacilityName = FacilityName });
 
-            var reportPopulationManager = new Mock<IReportPopulationManager>();
-            reportPopulationManager
+            PopulationManager
                 .Setup(m => m.FindAsync(It.IsAny<Expression<Func<ReportPopulation, bool>>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(
                 [
@@ -650,7 +791,7 @@ public class ReportManifestProducerTests
 
             var aggregator = new MeasureReportAggregator(
                 Mock.Of<ILogger<MeasureReportAggregator>>(),
-                reportPopulationManager.Object);
+                PopulationManager.Object);
 
             var blobSettings = Options.Create(new BlobStorageSettings
             {

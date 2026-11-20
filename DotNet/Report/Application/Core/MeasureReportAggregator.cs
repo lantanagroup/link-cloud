@@ -33,6 +33,8 @@ public class MeasureReportAggregator
 
         foreach (var reportPopulation in reportPopulations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var measureReport = new MeasureReport
             {
                 Meta = new Meta { Profile = ImmutableList.Create(AggregateMeasureReportProfile) },
@@ -50,6 +52,8 @@ public class MeasureReportAggregator
 
             foreach (var groupPopulation in reportPopulation.GroupPopulations)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 CodeableConcept populationCode;
                 try
                 {
@@ -70,8 +74,11 @@ public class MeasureReportAggregator
                     Mode = ListMode.Snapshot
                 };
 
+                // One entry per patient MeasureReport, so this is the loop that grows with the census.
                 foreach (var mrp in groupPopulation.MeasureReportPopulations)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     subjectList.Entry.Add(new List.EntryComponent
                     {
                         Item = new ResourceReference($"MeasureReport/{mrp.MeasureReportId}")

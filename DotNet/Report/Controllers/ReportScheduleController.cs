@@ -451,7 +451,7 @@ namespace LantanaGroup.Link.Report.Controllers
             List<Hl7.Fhir.Model.Resource> resources;
             try
             {
-                resources = await _reportManifestProducer.Generate(schedule, cancellationToken);
+                resources = await _reportManifestProducer.Generate(schedule, ManifestGenerationMode.AdHoc, cancellationToken);
             }
             catch (FacilityConfigNotFoundException ex)
             {
