@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace Automation.UI.Controllers;
 
@@ -17,41 +18,73 @@ public class FacilityTemplatesController(
     public async Task<IActionResult> Index(
         int page = 1,
         int pageSize = 25,
+        string? search = null,
+        string? vendor = null,
+        string? kind = null,
+        string sortBy = "name",
+        string sortDir = "asc",
         CancellationToken ct = default)
     {
-        // Validate pagination parameters.
         page = Math.Max(1, page);
 
         if (pageSize is not (10 or 25 or 50 or 100))
             pageSize = 25;
 
-        // Get the total number of facility templates.
-        var totalCount = await store.CountAsync(ct);
+        search = search?.Sanitize().Trim();
+        vendor = vendor?.Sanitize().Trim();
+        kind = kind?.Sanitize().Trim();
 
-        // Calculate the total number of pages.
+        kind = kind?.ToLowerInvariant() switch
+        {
+            "system" => "System",
+            "custom" => "Custom",
+            _ => null
+        };
+
+        sortBy = sortBy?.ToLowerInvariant() switch
+        {
+            "vendor" => "vendor",
+            "kind" => "kind",
+            _ => "name"
+        };
+
+        sortDir = string.Equals(sortDir, "desc",
+            StringComparison.OrdinalIgnoreCase)
+            ? "desc"
+            : "asc";
+
+        var totalCount = await store.CountFilteredAsync(
+            search, vendor, kind, ct);
+
         var totalPages = Math.Max(
             1,
             (int)Math.Ceiling(totalCount / (double)pageSize));
 
-        // Keep the requested page within valid bounds.
         page = Math.Min(page, totalPages);
 
-        // Calculate the offset.
         var skip = (page - 1) * pageSize;
 
-        // Retrieve only the requested page.
-        var templates = await store.GetPageAsync(
+        var templates = await store.GetFilteredPageAsync(
             skip,
             pageSize,
+            search,
+            vendor,
+            kind,
+            sortBy,
+            sortDir,
             ct);
 
-        // Expose pagination information to the view.
         ViewBag.CurrentPage = page;
         ViewBag.PageSize = pageSize;
         ViewBag.TotalCount = totalCount;
         ViewBag.TotalPages = totalPages;
 
-        // Preserve existing dropdown data.
+        ViewBag.Search = search;
+        ViewBag.Vendor = vendor;
+        ViewBag.Kind = kind;
+        ViewBag.SortBy = sortBy;
+        ViewBag.SortDir = sortDir;
+
         ViewBag.QueryPlanTemplates =
             await queryPlanTemplateStore.GetAllAsync(ct);
 
@@ -66,7 +99,6 @@ public class FacilityTemplatesController(
 
         return View(templates);
     }
-
 
     [HttpGet]
     public async Task<IActionResult> GetJson(Guid id, CancellationToken ct)

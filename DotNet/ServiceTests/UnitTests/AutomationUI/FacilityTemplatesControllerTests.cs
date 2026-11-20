@@ -308,9 +308,160 @@ public class FacilityTemplatesControllerTests
         (await _store.GetByIdAsync(template.Id)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task GetFilteredPage_sorts_by_name_descending()
+    {
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Alpha"
+        });
+
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Zulu"
+        });
+
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bravo"
+        });
+
+        var results = await _store.GetFilteredPageAsync(
+            0,
+            10,
+            null,
+            null,
+            null,
+            "name",
+            "desc");
+
+        results.Select(t => t.Name)
+            .Should()
+            .Equal("Zulu", "Bravo", "Alpha");
+    }
+
+    [Theory]
+    [InlineData("name", "asc", "name", "asc")]
+    [InlineData("name", "desc", "name", "desc")]
+    [InlineData("vendor", "asc", "vendor", "asc")]
+    [InlineData("vendor", "desc", "vendor", "desc")]
+    [InlineData("kind", "asc", "kind", "asc")]
+    [InlineData("kind", "desc", "kind", "desc")]
+    [InlineData("VENDOR", "DESC", "vendor", "desc")]
+    [InlineData("invalid", "invalid", "name", "asc")]
+    public async Task Index_normalizes_and_forwards_sorting(
+        string sortBy,
+        string sortDir,
+        string expectedSortBy,
+        string expectedSortDir)
+    {
+        var controller = CreateController();
+
+        var result = await controller.Index(
+            sortBy: sortBy,
+            sortDir: sortDir);
+
+        result.Should().BeOfType<ViewResult>();
+
+        _store.LastSortBy.Should().Be(expectedSortBy);
+        _store.LastSortDir.Should().Be(expectedSortDir);
+
+        ((string)controller.ViewBag.SortBy).Should().Be(expectedSortBy);
+        ((string)controller.ViewBag.SortDir).Should().Be(expectedSortDir);
+    }
+
+    [Theory]
+    [InlineData("custom", "Custom")]
+    [InlineData("CUSTOM", "Custom")]
+    [InlineData("CuStOm", "Custom")]
+    [InlineData("system", "System")]
+    [InlineData("SYSTEM", "System")]
+    [InlineData("SyStEm", "System")]
+    [InlineData("invalid", null)]
+    public async Task Index_normalizes_kind_filter(
+        string kind,
+        string? expectedKind)
+    {
+        var controller = CreateController();
+
+        var result = await controller.Index(kind: kind);
+
+        result.Should().BeOfType<ViewResult>();
+
+        _store.LastKind.Should().Be(expectedKind);
+        ((string?)controller.ViewBag.Kind).Should().Be(expectedKind);
+    }
+
+    [Fact]
+    public async Task Index_forwards_trimmed_search_and_vendor()
+    {
+        var controller = CreateController();
+
+        var result = await controller.Index(
+            search: "  Epic  ",
+            vendor: "  Cerner  ",
+            kind: "custom");
+
+        result.Should().BeOfType<ViewResult>();
+
+        _store.LastSearch.Should().Be("Epic");
+        _store.LastVendor.Should().Be("Cerner");
+        _store.LastKind.Should().Be("Custom");
+
+        ((string?)controller.ViewBag.Search).Should().Be("Epic");
+        ((string?)controller.ViewBag.Vendor).Should().Be("Cerner");
+    }
+
+    [Theory]
+    [InlineData(0, 10, 1, 0, 10)]
+    [InlineData(-1, 10, 1, 0, 10)]
+    [InlineData(2, 10, 2, 10, 10)]
+    [InlineData(99, 10, 3, 20, 10)]
+    [InlineData(1, 15, 1, 0, 25)]
+    public async Task Index_clamps_page_and_validates_page_size(
+        int page,
+        int pageSize,
+        int expectedPage,
+        int expectedSkip,
+        int expectedTake)
+    {
+        for (var i = 0; i < 25; i++)
+        {
+            _store.Add(new FacilityTemplate
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Template {i:D2}"
+            });
+        }
+
+        var controller = CreateController();
+
+        var result = await controller.Index(
+            page: page,
+            pageSize: pageSize);
+
+        result.Should().BeOfType<ViewResult>();
+
+        _store.LastSkip.Should().Be(expectedSkip);
+        _store.LastTake.Should().Be(expectedTake);
+
+        ((int)controller.ViewBag.CurrentPage).Should().Be(expectedPage);
+        ((int)controller.ViewBag.PageSize).Should().Be(expectedTake);
+    }
+
     private sealed class FakeFacilityTemplateStore : IFacilityTemplateStore
     {
         private readonly Dictionary<Guid, FacilityTemplate> _templates = [];
+        public int LastSkip { get; private set; }
+        public int LastTake { get; private set; }
+        public string? LastSearch { get; private set; }
+        public string? LastVendor { get; private set; }
+        public string? LastKind { get; private set; }
+        public string? LastSortBy { get; private set; }
+        public string? LastSortDir { get; private set; }
 
         public void Add(FacilityTemplate template)
         {
@@ -335,6 +486,82 @@ public class FacilityTemplatesControllerTests
                 .Skip(skip)
                 .Take(take)
                 .ToList());
+
+        public Task<long> CountFilteredAsync(
+            string? search,
+            string? vendor,
+            string? kind,
+            CancellationToken ct = default) =>
+            Task.FromResult((long)FilterTemplates(search, vendor, kind).Count());
+
+        public Task<List<FacilityTemplate>> GetFilteredPageAsync(
+            int skip,
+            int take,
+            string? search,
+            string? vendor,
+            string? kind,
+            string sortBy = "name",
+            string sortDir = "asc",
+            CancellationToken ct = default)
+        {
+
+            LastSkip = skip;
+            LastTake = take;
+            LastSearch = search;
+            LastVendor = vendor;
+            LastKind = kind;
+            LastSortBy = sortBy;
+            LastSortDir = sortDir;
+
+            var filtered = FilterTemplates(search, vendor, kind);
+
+            var descending = string.Equals(
+                sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+            IOrderedEnumerable<FacilityTemplate> sorted =
+                sortBy.ToLowerInvariant() switch
+                {
+                    "vendor" => descending
+                        ? filtered.OrderByDescending(t => t.VendorName)
+                        : filtered.OrderBy(t => t.VendorName),
+
+                    "kind" => descending
+                        ? filtered.OrderByDescending(t => t.IsSystem)
+                        : filtered.OrderBy(t => t.IsSystem),
+
+                    _ => descending
+                        ? filtered.OrderByDescending(t => t.Name)
+                        : filtered.OrderBy(t => t.Name)
+                };
+
+            var ordered = sortBy.Equals("name", StringComparison.OrdinalIgnoreCase)
+                ? sorted.ThenBy(t => t.Id)
+                : sorted.ThenBy(t => t.Name).ThenBy(t => t.Id);
+
+            return Task.FromResult(ordered
+                .Skip(skip)
+                .Take(take)
+                .ToList());
+        }
+
+        private IEnumerable<FacilityTemplate> FilterTemplates(
+            string? search,
+            string? vendor,
+            string? kind)
+        {
+            return _templates.Values.Where(t =>
+                (string.IsNullOrWhiteSpace(search) ||
+                 t.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+
+                (string.IsNullOrWhiteSpace(vendor) ||
+                 string.Equals(t.VendorName, vendor.Trim(), StringComparison.Ordinal)) &&
+
+                (string.IsNullOrWhiteSpace(kind) ||
+                 (kind.Equals("System", StringComparison.OrdinalIgnoreCase) && t.IsSystem) ||
+                 (kind.Equals("Custom", StringComparison.OrdinalIgnoreCase) && !t.IsSystem) ||
+                 (!kind.Equals("System", StringComparison.OrdinalIgnoreCase) &&
+                  !kind.Equals("Custom", StringComparison.OrdinalIgnoreCase))));
+        }
 
         public Task<FacilityTemplate?> GetByIdAsync(
             Guid id,
