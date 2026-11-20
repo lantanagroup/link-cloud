@@ -236,8 +236,8 @@
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
-        "resolved": "2.6.2",
-        "contentHash": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w=="
+        "resolved": "2.7.0",
+        "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
       },
       "Castle.Core": {
         "type": "Transitive",
@@ -2817,7 +2817,7 @@
         "dependencies": {
           "LinqKit": "[1.3.11, )",
           "PemUtils": "[3.0.0.82, )",
-          "SSH.NET": "[2024.2.0, )",
+          "SSH.NET": "[2026.0.1, )",
           "Serilog.AspNetCore": "[8.0.3, )",
           "Serilog.Enrichers.Span": "[3.1.0, )",
           "Serilog.Exceptions": "[8.4.0, )",
@@ -3992,11 +3992,11 @@
       },
       "SSH.NET": {
         "type": "CentralTransitive",
-        "requested": "[2024.2.0, )",
-        "resolved": "2025.1.0",
-        "contentHash": "jrnbtf0ItVaXAe6jE8X/kSLa6uC+0C+7W1vepcnRQB/rD88qy4IxG7Lf1FIbWmkoc4iVXv0pKrz+Wc6J4ngmHw==",
+        "requested": "[2026.0.1, )",
+        "resolved": "2026.0.1",
+        "contentHash": "74/nnq/n7EZLGLsUTt4aEE+/iet3B6ahi2iFfXgRXb6rNAvxsxLwbhLZ6lzITfAEB1vkmuAI3gXxOp2HcUMa2g==",
         "dependencies": {
-          "BouncyCastle.Cryptography": "2.6.2",
+          "BouncyCastle.Cryptography": "2.7.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.3"
         }
       },
