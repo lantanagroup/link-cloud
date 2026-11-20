@@ -38,7 +38,7 @@
     <PackageVersion Include="Grpc.Net.Client" Version="2.80.0" />
     <PackageVersion Include="Hl7.Fhir.R4" Version="6.2.0" />
     <PackageVersion Include="Hl7.Fhir.Specification.R4" Version="6.2.0" />
-    <PackageVersion Include="HtmlSanitizer" Version="9.0.892" />
+    <PackageVersion Include="HtmlSanitizer" Version="9.2.1039" />
     <PackageVersion Include="jose-jwt" Version="4.1.0" />
     <PackageVersion Include="JWT" Version="10.1.1" />
     <PackageVersion Include="LantanaGroup.Thetis.Generation.Abstractions" Version="1.1.0" />
