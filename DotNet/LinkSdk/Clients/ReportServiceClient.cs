@@ -78,6 +78,12 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
     public Task<LinkApiResponse> SetReportsDeletedStatusForFacilityAsync(string facilityId, bool deleted, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"/schedules/facility/{facilityId}/status").SetQueryParam("deleted", deleted).PatchAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<string>> GetScheduleManifestAsync(string reportScheduleId, ReportManifestFormat format = ReportManifestFormat.Ndjson, bool force = false, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"/schedules/{reportScheduleId}/manifest")
+            .SetQueryParam("format", format == ReportManifestFormat.Json ? "json" : "ndjson")
+            .SetQueryParam("force", force.ToString().ToLowerInvariant())
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByIdAsync(string id, CancellationToken cancellationToken = default) =>
         SendAsync<ReportEntryApiModel>(() => Request($"/entries/{id}").GetAsync(cancellationToken: cancellationToken));
 
