@@ -82,7 +82,7 @@ public class ReportActivityCountEndpointTests
     }
 
     private static ReportScheduleController Create(Mock<IReportScheduledManager> manager) =>
-        new(Mock.Of<ILogger<ReportScheduleController>>(), Mock.Of<IDatabase>(), manager.Object)
+        new(Mock.Of<ILogger<ReportScheduleController>>(), Mock.Of<IDatabase>(), manager.Object, ManifestProducerMocks.Create().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

@@ -161,7 +161,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         } else {
             results = validate(correlationId, facilityId, patientId, reportId, bundle);
         }
-        appendPreQualOperationOutcome(bundle, results, payloadUri);
+        appendPreQualOperationOutcome(bundle, results, payloadUri, patientId);
         boolean isValid = checkIsValid(results, rubricStatus);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
 
@@ -232,12 +232,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         }
     }
 
-    /**
-     * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
-     * findings and appends it to the same patient NDJSON blob in ABS. No-op when the flag is off, when
-     * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
-     */
-    private void appendPreQualOperationOutcome(Bundle bundle, List<Result> results, String payloadUri) {
+    /** Appends the pre-qualification OperationOutcome to the patient's own NDJSON blob, when enabled. */
+    private void appendPreQualOperationOutcome(
+            Bundle bundle, List<Result> results, String payloadUri, String patientId) {
         if (!preQualificationConfig.isWritePreQualOperationOutcome()) {
             return;
         }
@@ -245,26 +242,19 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             _logger.debug("Pre-qual OperationOutcome enabled but no blob storage or payload URI; skipping append");
             return;
         }
-        // Replay guard. The offset is acknowledged even when process() throws (AsyncListener), so a
-        // failure after this append - producing ValidationComplete, say - sends the record to the retry
-        // topic and process() runs again. The bundle is re-read from the same blob on that replay, so a
-        // pre-qual OperationOutcome already present in it means we appended one previously and must not
-        // append a second. Keyed on the oo-total extension, which only this writer emits. An unrelated
-        // OperationOutcome without that extension is ignored here.
-        //
-        // This narrows the window rather than closing it, and the remaining gaps are tracked in
-        // LEGLINK-800: the REST fallback supplies a bundle with no previously appended OperationOutcome
-        // so the check is blind, concurrent consumers can both observe it as absent, and the check and
-        // the append are not atomic. The same replay also duplicates the Result rows written by
-        // validate().
+        // Replay guard: the offset is acknowledged even when process() throws, so a later failure
+        // replays this record and would append a second outcome. Keyed on oo-total, which only this
+        // writer emits. Narrows the window rather than closing it; remaining gaps in LEGLINK-800.
         if (hasPreQualOperationOutcome(bundle)) {
             _logger.info("Pre-qual OperationOutcome already present in the patient NDJSON; skipping append (replay)");
             return;
         }
         PreQualOperationOutcomeBuilder.MeasureReportRef measureReport =
                 preQualOperationOutcomeBuilder.resolveMeasureReport(bundle);
+        // The record's patient id, which is also what the blob is named after - not a bundle lookup.
         preQualOperationOutcomeBuilder
-                .build(results, measureReport, preQualificationConfig.isWriteExpressionsInOperationOutcome())
+                .build(results, measureReport, patientId,
+                        preQualificationConfig.isWriteExpressionsInOperationOutcome())
                 .ifPresent(operationOutcome -> {
                     String line = fhirContext.newJsonParser().encodeResourceToString(operationOutcome);
                     String blobName = BlobUrlParts.parse(payloadUri).getBlobName();

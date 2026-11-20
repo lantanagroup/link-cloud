@@ -178,8 +178,17 @@ public class ValidationService {
             } catch (IOException ex) {
                 throw new UncheckedIOException("Failed to load artifact validation support", ex);
             }
+            // Anchored on toValidate, not resource: HAPI's indices count entries in the filtered copy, so
+            // an index resolved in the original bundle would name a different resource. Must run before
+            // toOriginalPath below, or the index and the id end up in different coordinates.
+            Bundle validatedBundle = toValidate instanceof Bundle validated ? validated : null;
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
+                    .map(result -> {
+                        result.setExpression(
+                                InstanceAnchoredExpression.anchor(result.getExpression(), validatedBundle));
+                        return result;
+                    })
                     .toList();
             if (exclusion != null && exclusion.excludedAny()) {
                 // Findings must name an entry's position in the bundle as submitted, not in the filtered copy.

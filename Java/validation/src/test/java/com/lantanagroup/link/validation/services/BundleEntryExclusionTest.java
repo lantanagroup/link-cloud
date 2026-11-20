@@ -109,4 +109,30 @@ class BundleEntryExclusionTest {
         assertFalse(anyAt(excluded, "Bundle.entry[1]"), "the MeasureReport is left out: " + excluded);
         assertTrue(anyAt(excluded, "Bundle.entry[2]"), "the Observation keeps its submitted position, entry 2: " + excluded);
     }
+
+    @Test
+    void anchoringThenRemappingLeavesIndexAndIdInTheSameCoordinates() {
+        // The one ordering that works, and the reason the hybrid form needs pinning: HAPI indexes the
+        // FILTERED copy, so the id must be looked up there; the submitted artifact is the ORIGINAL, so
+        // the index must then be remapped. Get either half wrong and the expression names an index and
+        // an id that disagree - which, with where(id = ...), selects nothing at all.
+        Bundle original = patientBundle();
+        BundleEntryExclusion exclusion = BundleEntryExclusion.of(original, List.of("MeasureReport"));
+        assertTrue(exclusion.excludedAny());
+
+        // Dropping the MeasureReport moves the Observation from entry[2] to entry[1] in what HAPI saw.
+        String fromHapi = "Bundle.entry[1].resource.ofType(Observation).code";
+        String anchored = InstanceAnchoredExpression.anchor(fromHapi, exclusion.bundle());
+        String remapped = exclusion.toOriginalPath(anchored);
+
+        assertEquals("Bundle.entry[2].resource.ofType(Observation).where(id = 'o1').code", remapped,
+                "index remapped to the submitted bundle, id taken from the validated copy");
+
+        // And it resolves, against the bundle as submitted, to exactly the record it names.
+        List<org.hl7.fhir.r4.model.Base> selected = FHIR_CONTEXT.newFhirPath().evaluate(
+                original, "Bundle.entry[2].resource.ofType(Observation).where(id = 'o1')",
+                org.hl7.fhir.r4.model.Base.class);
+        assertEquals(1, selected.size());
+        assertEquals("o1", ((Observation) selected.get(0)).getIdElement().getIdPart());
+    }
 }
