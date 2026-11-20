@@ -70,7 +70,8 @@ public class ReportScheduleControllerRestoreTests
         new(
             Mock.Of<ILogger<ReportScheduleController>>(),
             Mock.Of<IDatabase>(),
-            manager.Object)
+            manager.Object,
+            ManifestProducerMocks.Create().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

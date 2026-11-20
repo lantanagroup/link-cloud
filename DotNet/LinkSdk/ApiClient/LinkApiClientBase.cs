@@ -194,23 +194,25 @@ public abstract class LinkApiClientBase : IDisposable
             var response = await action();
             var statusCode = response.StatusCode;
             var body = await response.GetStringAsync();
+            var contentType = response.ResponseMessage.Content?.Headers?.ContentType?.ToString();
             var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
             var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
             var requestBody = await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage);
             var traceId = ExtractTraceId(response);
 
             if (statusCode is >= 200 and < 300)
-                return new LinkApiResponse<string> { StatusCode = statusCode, Body = body, RawBody = body, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
-            return new LinkApiResponse<string> { StatusCode = statusCode, RawBody = body, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+                return new LinkApiResponse<string> { StatusCode = statusCode, Body = body, RawBody = body, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+            return new LinkApiResponse<string> { StatusCode = statusCode, RawBody = body, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
         }
         catch (FlurlHttpException ex)
         {
             var raw = await ex.GetResponseStringAsync();
+            var contentType = ex.Call?.Response?.ResponseMessage.Content?.Headers?.ContentType?.ToString();
             var requestUrl = ex.Call?.Request?.Url?.ToString();
             var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
             var requestBody = await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage);
             var traceId = ExtractTraceId(ex.Call?.Response);
-            return new LinkApiResponse<string> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
+            return new LinkApiResponse<string> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
         }
     }
 

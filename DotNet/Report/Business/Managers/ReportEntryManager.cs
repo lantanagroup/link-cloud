@@ -869,19 +869,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return summary;
         }
 
-        private static readonly ReportingStatus[] TerminalReportingStatuses =
-        [
-            ReportingStatus.NotReportable,
-            ReportingStatus.PassedValidation,
-            ReportingStatus.FailedValidation
-        ];
+        private static readonly ReportingStatus[] TerminalReportingStatuses = ReportEntryTerminalStatuses.Reporting;
 
-        private static readonly SubmissionStatus[] TerminalSubmissionStatuses =
-        [
-            SubmissionStatus.Submitted,
-            SubmissionStatus.NotEligable,
-            SubmissionStatus.NotSubmitted,
-        ];
+        private static readonly SubmissionStatus[] TerminalSubmissionStatuses = ReportEntryTerminalStatuses.Submission;
 
         public async Task<bool> AreAllEntriesCompleteAsync(string facilityId, Guid reportScheduleId,
             CancellationToken cancellationToken = default)
