@@ -446,6 +446,29 @@ public class DataAcquisitionServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task AuthenticationConfigurationWrites_DoNotCaptureTheRequestBody()
+    {
+        const string secret = "auth-secret-must-not-leak";
+        var body = new { authType = "Basic", userName = "svc", password = secret, clientSecret = secret, key = secret };
+
+        using (var createHttp = new FakeHttpBoundary("{}", 201))
+        using (var createClient = CreateClient(createHttp.BaseUrl))
+        {
+            var created = await createClient.CreateAuthenticationConfigurationAsync("f1", body);
+            Assert.Contains(secret, createHttp.SingleRequest().Body);
+            Assert.Null(created.RequestBody);
+        }
+
+        using (var updateHttp = new FakeHttpBoundary("{}", 202))
+        using (var updateClient = CreateClient(updateHttp.BaseUrl))
+        {
+            var updated = await updateClient.UpdateAuthenticationConfigurationAsync("f1", body);
+            Assert.Contains(secret, updateHttp.SingleRequest().Body);
+            Assert.Null(updated.RequestBody);
+        }
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task UpdateFhirAuthenticationConfigurationAsync_DoesNotCaptureTheRequestBody()
     {
         const string oauthTestSecret = "cl13nt-secret-must-not-leak";
