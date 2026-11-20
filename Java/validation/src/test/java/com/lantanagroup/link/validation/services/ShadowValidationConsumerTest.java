@@ -58,6 +58,7 @@ class ShadowValidationConsumerTest {
     @Mock private LegacyResultMapper legacyResultMapper;
     @Mock private LegacyShadowResultPersister legacyShadowResultPersister;
     @Mock private ShadowComparator shadowComparator;
+    @Mock private ShadowFindingsStore shadowFindingsStore;
     @Mock private ConsumerRecordRecoverer recoverer;
 
     private ObjectMapper objectMapper;
@@ -70,7 +71,7 @@ class ShadowValidationConsumerTest {
         consumer = new ShadowValidationConsumer(
                 fhirContext, reportClient, validationService, categorizationService,
                 Optional.empty(), rubricExecutionService, legacyResultMapper, objectMapper,
-                legacyShadowResultPersister, shadowComparator, RUBRIC_ID, recoverer);
+                legacyShadowResultPersister, shadowComparator, shadowFindingsStore, RUBRIC_ID, recoverer);
         bundle = new Bundle();
     }
 
@@ -201,5 +202,60 @@ class ShadowValidationConsumerTest {
         consumer.process(buildRecord(true, List.of()));
 
         verifyNoInteractions(shadowComparator, legacyShadowResultPersister);
+    }
+
+    private static final String FINDINGS_BLOB = "shadow-compare/facility-1/report-1/patient-1/x.json";
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findingsInBlob_areLoadedForTheComparisonAndTheBlobIsDeleted() {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of());
+        ConsumerRecord<String, ShadowCompareEvent> record = buildRecord(true, null);
+        record.value().setAuthoritativeResultBlobName(FINDINGS_BLOB);
+        when(shadowFindingsStore.load(FINDINGS_BLOB)).thenReturn(List.of(authoritativeFinding(), authoritativeFinding()));
+
+        consumer.process(record);
+
+        ArgumentCaptor<List<Result>> newResultsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(shadowComparator).compareAndLog(any(), any(), any(), any(), any(), any(), eq(true), any(), any(),
+                eq(0L), any(), newResultsCaptor.capture());
+        assertEquals(2, newResultsCaptor.getValue().size(), "the rubric findings come from the blob");
+        verify(shadowFindingsStore).delete(FINDINGS_BLOB);
+    }
+
+    @Test
+    void findingsBlobMissing_skipsTheComparisonAndStillDeletes() {
+        ConsumerRecord<String, ShadowCompareEvent> record = buildRecord(true, null);
+        record.value().setAuthoritativeResultBlobName(FINDINGS_BLOB);
+        when(shadowFindingsStore.load(FINDINGS_BLOB)).thenThrow(new RuntimeException("BlobNotFound"));
+
+        consumer.process(record);
+
+        verifyNoInteractions(shadowComparator, legacyShadowResultPersister, validationService);
+        verify(shadowFindingsStore).delete(FINDINGS_BLOB);
+    }
+
+    @Test
+    void comparisonFails_theBlobIsStillDeleted() {
+        when(reportClient.getSubmissionModel(FACILITY_ID, PATIENT_ID, REPORT_ID)).thenThrow(new RuntimeException("REST error"));
+        ConsumerRecord<String, ShadowCompareEvent> record = buildRecord(true, null);
+        record.value().setAuthoritativeResultBlobName(FINDINGS_BLOB);
+        when(shadowFindingsStore.load(FINDINGS_BLOB)).thenReturn(List.of());
+
+        consumer.process(record);
+
+        verify(shadowFindingsStore).delete(FINDINGS_BLOB);
+    }
+
+    @Test
+    void findingsOnTheEvent_neverTouchBlobStorage() {
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of());
+
+        consumer.process(buildRecord(true, List.of(authoritativeFinding())));
+
+        verify(shadowFindingsStore, never()).load(any());
+        verify(shadowFindingsStore).delete(null);
     }
 }

@@ -117,7 +117,8 @@ public class ReportScheduleControllerActiveFilterTests
         var controller = new ReportScheduleController(
             Mock.Of<ILogger<ReportScheduleController>>(),
             Mock.Of<IDatabase>(),
-            manager.Object);
+            manager.Object,
+            ManifestProducerMocks.Create().Object);
 
         await controller.GetByFacilityId(FacilityId, active: true, blocking: false, includeDeleted: includeDeleted);
 

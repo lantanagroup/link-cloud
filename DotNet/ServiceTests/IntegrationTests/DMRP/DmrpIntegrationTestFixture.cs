@@ -1,7 +1,10 @@
+using Confluent.Kafka;
+using IntegrationTests.Tenant;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -102,11 +105,32 @@ namespace IntegrationTests.DMRP
             _dbPath = Path.Combine(Path.GetTempPath(), dbName);
             var sqliteConnectionString = $"Data Source={_dbPath};";
 
+            // Recording producer, so a test can assert on the event a real request would emit. It is
+            // registered before AddLinkAuditing, whose own producer registration is a TryAdd and so
+            // leaves this one in place. Shared with Tenant's fixture rather than copied: there is one
+            // recorder, and DMRP's events are published by the same mechanism Tenant registers.
+            builder.Services.AddSingleton<TenantIntegrationTestFixture.RecordingAuditProducer>();
+            builder.Services.AddSingleton<IProducer<string, AuditEventMessage>>(sp =>
+                sp.GetRequiredService<TenantIntegrationTestFixture.RecordingAuditProducer>());
+
+            //LEGLINK-1343: DMRP's endpoints are marked [Auditable] and are served, in production, by
+            //Tenant's host and Tenant's registration. This fixture is their host here, so it registers
+            //the mechanism too - without it every request to a marked endpoint fails with an error
+            //naming the missing call.
+            builder.Services.AddLinkAuditing<TenantDbContext>();
+
+            //the audit metrics counter is built on IMeterFactory.
+            builder.Services.AddMetrics();
+
             builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
                 options.UseSqlite(sqliteConnectionString);
                 options.AddInterceptors(updateBaseEntityInterceptor);
+
+                //EF calls only the interceptors handed to the options, so an Update event carries the
+                //properties that changed only because of this line - as in Tenant's own Program.cs.
+                options.AddLinkAuditInterceptor(sp);
             });
 
             // The module only registers itself when the flag is set, so turn it on for the fixture.

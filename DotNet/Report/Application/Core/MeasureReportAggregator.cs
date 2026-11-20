@@ -25,14 +25,16 @@ public class MeasureReportAggregator
         _reportPopulationManager = reportPopulationManager;
     }
 
-    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId)
+    public async Task<List<MeasureReport>> CreateMeasureReportAggregate(ReportScheduleModel reportSchedule, string organizationId, CancellationToken cancellationToken = default)
     {
-        var reportPopulations = await _reportPopulationManager.FindAsync(rp => rp.ReportScheduleId == reportSchedule.Id);
+        var reportPopulations = await _reportPopulationManager.FindAsync(rp => rp.ReportScheduleId == reportSchedule.Id, cancellationToken);
 
         var aggregates = new List<MeasureReport>();
 
         foreach (var reportPopulation in reportPopulations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var measureReport = new MeasureReport
             {
                 Meta = new Meta { Profile = ImmutableList.Create(AggregateMeasureReportProfile) },
@@ -50,6 +52,8 @@ public class MeasureReportAggregator
 
             foreach (var groupPopulation in reportPopulation.GroupPopulations)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 CodeableConcept populationCode;
                 try
                 {
@@ -70,8 +74,11 @@ public class MeasureReportAggregator
                     Mode = ListMode.Snapshot
                 };
 
+                // One entry per patient MeasureReport, so this is the loop that grows with the census.
                 foreach (var mrp in groupPopulation.MeasureReportPopulations)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     subjectList.Entry.Add(new List.EntryComponent
                     {
                         Item = new ResourceReference($"MeasureReport/{mrp.MeasureReportId}")

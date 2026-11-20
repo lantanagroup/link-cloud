@@ -62,6 +62,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final LegacyResultMapper legacyResultMapper;
     private final ObjectMapper objectMapper;
     private final KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
+    private final ShadowFindingsStore shadowFindingsStore;
     private final boolean bridgeEnabled;
     private final boolean shadowEnabled;
     private final String rubricId;
@@ -82,6 +83,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             LegacyResultMapper legacyResultMapper,
             ObjectMapper objectMapper,
             @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate,
+            ShadowFindingsStore shadowFindingsStore,
             @Value("${vaas.bridge.enabled:false}") boolean bridgeEnabled,
             // ADR-0003 M1: the MeasureReport submission path always evaluates this rubric; see "Rubric selection".
             @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
@@ -104,6 +106,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.legacyResultMapper = legacyResultMapper;
         this.objectMapper = objectMapper;
         this.shadowCompareEventTemplate = shadowCompareEventTemplate;
+        this.shadowFindingsStore = shadowFindingsStore;
         this.bridgeEnabled = bridgeEnabled;
         this.shadowEnabled = shadowEnabled;
         this.rubricId = rubricId;
@@ -158,7 +161,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         } else {
             results = validate(correlationId, facilityId, patientId, reportId, bundle);
         }
-        appendPreQualOperationOutcome(bundle, results, payloadUri);
+        appendPreQualOperationOutcome(bundle, results, payloadUri, patientId);
         boolean isValid = checkIsValid(results, rubricStatus);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
 
@@ -180,6 +183,11 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     /**
      * Sends the already-computed result to {@code ShadowValidationConsumer}, which runs the other
      * engine and compares the results. This is asynchronous so shadow failures never affect validation.
+     * <p>
+     * The findings go to blob storage and the event carries the blob name (a claim check), because one patient's
+     * findings can exceed the Kafka message size limit. Without blob storage they go on the event as before. If
+     * {@code send()} throws, the blob is deleted, since the record never reached the producer. If the send fails
+     * later, the blob is kept, because the event may have been appended even though the send reported failure.
      */
     private void publishShadowCompareEvent(
             UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
@@ -193,28 +201,40 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         event.setPayloadUri(payloadUri);
         event.setRanNewEngine(ranNewEngine);
         event.setAuthoritativeValid(isValid);
-        event.setAuthoritativeResult(results.stream().map(ShadowFindingDto::from).toList());
+        List<ShadowFindingDto> findings = results.stream().map(ShadowFindingDto::from).toList();
+        String findingsBlobName = shadowFindingsStore.store(facilityId, reportId, patientId, findings);
+        if (findingsBlobName != null) {
+            event.setAuthoritativeResultBlobName(findingsBlobName);
+        } else {
+            event.setAuthoritativeResult(findings);
+        }
 
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
         if (correlationId != null) {
             headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
         }
-        shadowCompareEventTemplate
-                .send(new ProducerRecord<>(ShadowCompareEvent.TOPIC, null, facilityId, event, headers))
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        _logger.warn("Failed to send ShadowCompareEvent for report {}",
-                                LogUtils.sanitize(reportId), ex);
-                    }
-                });
+        try {
+            shadowCompareEventTemplate
+                    .send(new ProducerRecord<>(ShadowCompareEvent.TOPIC, null, facilityId, event, headers))
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            // The blob is kept. A send that fails here, at delivery.timeout.ms say, may
+                            // still have been appended with only the acknowledgement lost, and that event
+                            // would point at the blob. The lifecycle rule on the prefix removes it if not.
+                            _logger.warn("Failed to send ShadowCompareEvent for report {}",
+                                    LogUtils.sanitize(reportId), ex);
+                        }
+                    });
+        } catch (RuntimeException e) {
+            // Thrown by send() itself, before the record reached the producer, so no event can point at the blob.
+            shadowFindingsStore.delete(findingsBlobName);
+            throw e;
+        }
     }
 
-    /**
-     * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
-     * findings and appends it to the same patient NDJSON blob in ABS. No-op when the flag is off, when
-     * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
-     */
-    private void appendPreQualOperationOutcome(Bundle bundle, List<Result> results, String payloadUri) {
+    /** Appends the pre-qualification OperationOutcome to the patient's own NDJSON blob, when enabled. */
+    private void appendPreQualOperationOutcome(
+            Bundle bundle, List<Result> results, String payloadUri, String patientId) {
         if (!preQualificationConfig.isWritePreQualOperationOutcome()) {
             return;
         }
@@ -222,26 +242,19 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             _logger.debug("Pre-qual OperationOutcome enabled but no blob storage or payload URI; skipping append");
             return;
         }
-        // Replay guard. The offset is acknowledged even when process() throws (AsyncListener), so a
-        // failure after this append - producing ValidationComplete, say - sends the record to the retry
-        // topic and process() runs again. The bundle is re-read from the same blob on that replay, so a
-        // pre-qual OperationOutcome already present in it means we appended one previously and must not
-        // append a second. Keyed on the oo-total extension, which only this writer emits. An unrelated
-        // OperationOutcome without that extension is ignored here.
-        //
-        // This narrows the window rather than closing it, and the remaining gaps are tracked in
-        // LEGLINK-800: the REST fallback supplies a bundle with no previously appended OperationOutcome
-        // so the check is blind, concurrent consumers can both observe it as absent, and the check and
-        // the append are not atomic. The same replay also duplicates the Result rows written by
-        // validate().
+        // Replay guard: the offset is acknowledged even when process() throws, so a later failure
+        // replays this record and would append a second outcome. Keyed on oo-total, which only this
+        // writer emits. Narrows the window rather than closing it; remaining gaps in LEGLINK-800.
         if (hasPreQualOperationOutcome(bundle)) {
             _logger.info("Pre-qual OperationOutcome already present in the patient NDJSON; skipping append (replay)");
             return;
         }
         PreQualOperationOutcomeBuilder.MeasureReportRef measureReport =
                 preQualOperationOutcomeBuilder.resolveMeasureReport(bundle);
+        // The record's patient id, which is also what the blob is named after - not a bundle lookup.
         preQualOperationOutcomeBuilder
-                .build(results, measureReport, preQualificationConfig.isWriteExpressionsInOperationOutcome())
+                .build(results, measureReport, patientId,
+                        preQualificationConfig.isWriteExpressionsInOperationOutcome())
                 .ifPresent(operationOutcome -> {
                     String line = fhirContext.newJsonParser().encodeResourceToString(operationOutcome);
                     String blobName = BlobUrlParts.parse(payloadUri).getBlobName();
