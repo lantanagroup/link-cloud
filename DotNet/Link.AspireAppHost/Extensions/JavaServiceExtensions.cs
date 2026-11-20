@@ -66,6 +66,10 @@ internal static class JavaServiceExtensions
             // settings. Spring reads the comma-separated value as a list; an empty one validates every entry.
             .WithEnvironment("link.validation-excluded-resource-types",
                 string.Join(",", builder.Configuration.GetSection("Validation:ExcludedResourceTypes").Get<string[]>() ?? []))
+            // Whether each patient's NDJSON in the internal container ends with the pre-qualification
+            // OperationOutcome (Validation:WritePreQualOperationOutcome). Validation's own default is off.
+            .WithEnvironment("pre-qualification.write-pre-qual-operation-outcome",
+                (builder.Configuration.GetValue<bool?>("Validation:WritePreQualOperationOutcome") ?? false).ToString().ToLowerInvariant())
             // Validation adds /api/terminology/fhir itself.
             .WithEnvironment("LINK_TERMINOLOGYSERVICEURL", DotNetServiceExtensions.Url(Ports.Terminology))
             .WaitFor(validationDatabase));
