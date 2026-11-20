@@ -105,12 +105,13 @@ Quartz 3.18.1 never writes `FailedJobOriginalTriggerScheduledFiretime`, although
 exists, so the job does not read it.
 
 **Misfire.** Every instance is down at the cron time, so nothing fires. The trigger's misfire
-policy is fire-once-now: when an instance comes back it runs the job once, not once per missed day.
-Quartz does that by moving the trigger's next fire time to the recovery instant, so the firing
-reports that instant as its scheduled time, and `Recovering` is false. Nothing records the missed
-cron time. `DmrpNightlyJob` has the same behavior and describes it in its remarks.
+policy is fire-once-now: when an instance comes back it runs the job once, not once per missed day,
+and `Recovering` is false. Quartz 3.18 keeps the missed time in the `MISFIRE_ORIG_FIRE_TIME` column
+of `quartz.QRTZ_TRIGGERS`, so that firing reports the earliest missed cron time as its scheduled
+time. On a store without the column (Report's tables before the `AddQuartzMisfireOrigFireTime`
+migration) the firing reports the recovery instant instead.
 
-For retention this is acceptable, because the check ages reports against the date it runs, not
+Neither affects retention, because the check ages reports against the date it runs, not
 against 02:00. The check therefore takes its cutoff from the clock, not from
 `ScheduledFireTimeUtc`, and uses the fire time only for the run id, where a recovered run must match
 the run it replaces.

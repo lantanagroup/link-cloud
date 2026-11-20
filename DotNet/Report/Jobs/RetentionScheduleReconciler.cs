@@ -57,8 +57,7 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
                 RetentionScheduleSettings.DefaultCron);
         }
 
-        // A missed firing runs once on recovery and reports the recovery instant, not the missed cron time.
-        // See dev-docs/retention-schedule.md.
+        // A missed firing runs once on recovery. See dev-docs/retention-schedule.md for the time it reports.
         var definition = new CronJobDefinition
         {
             JobKey = jobKey,
