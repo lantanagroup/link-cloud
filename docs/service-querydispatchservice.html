@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -503,21 +504,21 @@
 <p>The Query Dispatch service is primarily responsible for applying a lag period prior to making FHIR resource query requests against a facility endpoint. The current implementation of the Query Dispatch service handles how long Link Cloud should wait before querying for a patient’s FHIR resources after being discharged. To ensure that the encounter related data for the patient has been settled (Medications have been closed, Labs have had their results finalized, etc), tenants are able to customize how long they would like the lag from discharge to querying to be.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nQueryDispatchService_2EC3D027["Service: Query Dispatch Service"]
-  nQueryDispatchService_2EC3D027 -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
-  nPatientEvent_5A657A5A["Event: PatientEvent"] -->|consumed by| nQueryDispatchService_2EC3D027
-  nReportScheduled_4CB82B8["Event: ReportScheduled"] -->|consumed by| nQueryDispatchService_2EC3D027
-  nQueryDispatchService_2EC3D027 -->|sends| nDataAcquisitionRequested_2BDBDA78["Command: DataAcquisitionRequested"]
-  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
-    nAuditableEventOccurred_AF8D6F7
+nQueryDispatchService_2B4A4222["Service: Query Dispatch Service"]
+  nQueryDispatchService_2B4A4222 -->|produces| nAuditableEventOccurred_68176780["Event: AuditableEventOccurred"]
+  nPatientEvent_244E6569["Event: PatientEvent"] -->|consumed by| nQueryDispatchService_2B4A4222
+  nReportScheduled_2017DAE9["Event: ReportScheduled"] -->|consumed by| nQueryDispatchService_2B4A4222
+  nQueryDispatchService_2B4A4222 -->|sends| nDataAcquisitionRequested_5C612234["Command: DataAcquisitionRequested"]
+  subgraph nCompliance_7C830199_domain["Domain: Compliance"]
+    nAuditableEventOccurred_68176780
   end
-  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_2BDBDA78
+  subgraph nDataAccess_5840AA13_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_5C612234
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nPatientEvent_5A657A5A
-    nQueryDispatchService_2EC3D027
-    nReportScheduled_4CB82B8
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nPatientEvent_244E6569
+    nQueryDispatchService_2B4A4222
+    nReportScheduled_2017DAE9
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -899,21 +900,21 @@ nQueryDispatchService_2EC3D027["Service: Query Dispatch Service"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nQueryDispatchService_2EC3D027["Service: Query Dispatch Service"]
-  nQueryDispatchService_2EC3D027 -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
-  nPatientEvent_5A657A5A["Event: PatientEvent"] -->|consumed by| nQueryDispatchService_2EC3D027
-  nReportScheduled_4CB82B8["Event: ReportScheduled"] -->|consumed by| nQueryDispatchService_2EC3D027
-  nQueryDispatchService_2EC3D027 -->|sends| nDataAcquisitionRequested_2BDBDA78["Command: DataAcquisitionRequested"]
-  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
-    nAuditableEventOccurred_AF8D6F7
+nQueryDispatchService_2B4A4222["Service: Query Dispatch Service"]
+  nQueryDispatchService_2B4A4222 -->|produces| nAuditableEventOccurred_68176780["Event: AuditableEventOccurred"]
+  nPatientEvent_244E6569["Event: PatientEvent"] -->|consumed by| nQueryDispatchService_2B4A4222
+  nReportScheduled_2017DAE9["Event: ReportScheduled"] -->|consumed by| nQueryDispatchService_2B4A4222
+  nQueryDispatchService_2B4A4222 -->|sends| nDataAcquisitionRequested_5C612234["Command: DataAcquisitionRequested"]
+  subgraph nCompliance_7C830199_domain["Domain: Compliance"]
+    nAuditableEventOccurred_68176780
   end
-  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_2BDBDA78
+  subgraph nDataAccess_5840AA13_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_5C612234
   end
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nPatientEvent_5A657A5A
-    nQueryDispatchService_2EC3D027
-    nReportScheduled_4CB82B8
+  subgraph nReport_2B3A9CF7_domain["Domain: Report"]
+    nPatientEvent_244E6569
+    nQueryDispatchService_2B4A4222
+    nReportScheduled_2017DAE9
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
