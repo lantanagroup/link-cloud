@@ -14,9 +14,9 @@ namespace LantanaGroup.Link.Report.Jobs;
 /// </summary>
 /// <remarks>
 /// A failed check is not refired; the next day's firing runs it again. A firing missed while every instance
-/// was down runs once at recovery and reports the recovery instant as its scheduled fire time, so
-/// <see cref="RetentionCheckRun.ScheduledFireTimeUtc"/> is not always the cron time and must not be used to
-/// compute retention ages. See dev-docs/retention-schedule.md.
+/// was down runs once at recovery and reports the earliest missed cron time as its scheduled fire time, so
+/// <see cref="RetentionCheckRun.ScheduledFireTimeUtc"/> is not always when the check runs and must not be used
+/// to compute retention ages. See dev-docs/retention-schedule.md.
 /// </remarks>
 [DisallowConcurrentExecution]
 public class RetentionCheckJob : IJob
