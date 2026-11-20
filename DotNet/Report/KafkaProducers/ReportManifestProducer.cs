@@ -1,7 +1,9 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -11,6 +13,7 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -54,18 +57,28 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _serviceInformation = serviceInformation;
         }
 
-        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Builds the manifest resources from what is persisted now. Checks no gate and writes nothing.
+        /// </summary>
+        /// <param name="schedule">The report schedule.</param>
+        /// <param name="mode">
+        /// <see cref="ManifestGenerationMode.AdHoc"/> makes the <see cref="OperationOutcome"/> flag what
+        /// is still in flight: one <c>incomplete</c> warning per non-terminal entry, plus one warning when
+        /// the reporting period has not closed. <see cref="ManifestGenerationMode.Scheduled"/>, which
+        /// <see cref="Produce"/> passes, adds neither. Entries are read here, separately from the gate
+        /// <see cref="Produce"/> checks, so an entry can change in between; without this mode that change
+        /// would surface as a warning in the submitted manifest.
+        /// </param>
+        /// <param name="cancellationToken">Checked once per patient in every per-patient loop.</param>
+        /// <exception cref="FacilityConfigNotFoundException">Tenant has no config for the facility.</exception>
+        /// <exception cref="TenantUnavailableException">Tenant could not be asked.</exception>
+        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, ManifestGenerationMode mode, CancellationToken cancellationToken = default)
         {
             using var scope = _serviceScopeFactory.CreateScope();
             var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id, cancellationToken);
 
-            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, cancellationToken);
-
-            if (facilityConfig == null)
-            {
-                throw new Exception($"Facility config was not found when attempting to generate a report manifest (ReportId = {schedule.Id}, FacilityId = {schedule.FacilityId});");
-            }
+            var facilityConfig = await GetFacilityConfig(schedule, cancellationToken);
 
             var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem, ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
@@ -73,24 +86,20 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).Distinct().ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime, cancellationToken),
             ];
 
-            var reportName = _blobStorageService.GetReportName(schedule);
-            var submittedPatientIds = reportEntries.Where(x => x.SubmissionStatus == SubmissionStatus.Submitted).Select(x => x.PatientId).ToList();
-            var patientFileDict = submittedPatientIds.ToDictionary(pid => pid, pid => $"{reportName}_{pid}.ndjson");
-            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id);
+            var aggregates = await _aggregator.CreateMeasureReportAggregate(schedule, organization.Id, cancellationToken);
 
             foreach (var aggregate in aggregates)
             {
                 manifestResources.Add(aggregate);
             }
 
-            var failedEntries = reportEntries.Where(x => x.ReportingStatus == ReportingStatus.FailedValidation).ToList();
+            var operationOutcome = CreateOperationOutcome(schedule, reportEntries, mode, cancellationToken);
 
-            if (failedEntries.Count > 0)
+            if (operationOutcome.Issue.Count > 0)
             {
-                var operationOutcome = CreateOperationOutcome(failedEntries);
                 manifestResources.Add(operationOutcome);
             }
 
@@ -102,9 +111,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
+        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule, ManifestGenerationMode mode, CancellationToken cancellationToken = default)
         {
-            List<Resource> resources = await Generate(schedule, cancellationToken);
+            List<Resource> resources = await Generate(schedule, mode, cancellationToken);
+            return ToBundle(resources);
+        }
+
+        /// <summary>
+        /// Wraps manifest resources in the <c>collection</c> Bundle <see cref="GenerateAsBundle"/> returns.
+        /// </summary>
+        public static Bundle ToBundle(IEnumerable<Resource> resources)
+        {
             Bundle bundle = new()
             {
                 Type = Bundle.BundleType.Collection
@@ -130,12 +147,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            List<Resource> manifestResources = await Generate(schedule, cancellationToken);
+            List<Resource> manifestResources = await Generate(schedule, ManifestGenerationMode.Scheduled, cancellationToken);
 
             Uri? payloadUri;
             try
             {
-                payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
+                payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // A shutdown or abandoned request is not an upload failure: no failure audit event.
+                throw;
             }
             catch (Exception ex)
             {
@@ -221,7 +243,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             });
         }
 
-        private List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate)
+        private static List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
         {
             var admittedPatients = new List();
             admittedPatients.Meta = new Meta { Profile = [ReportConstants.BundleSettings.CensusProfileUrl] };
@@ -239,6 +261,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (var patient in patientIds)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 string reference = patient.StartsWith("Patient/") ? patient : "Patient/" + patient;
                 admittedPatients.Entry.Add(new List.EntryComponent()
                 {
@@ -249,12 +273,61 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return admittedPatients;
         }
 
-        private OperationOutcome CreateOperationOutcome(List<ReportEntry> failedEntries)
+        private async Task<FacilityModel> GetFacilityConfig(ReportScheduleModel schedule, CancellationToken cancellationToken)
+        {
+            string notFound = $"Facility config was not found when attempting to generate a report manifest (ReportId = {schedule.Id}, FacilityId = {schedule.FacilityId}).";
+
+            FacilityModel? facilityConfig;
+            try
+            {
+                facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                // The Tenant client's signal for a 404.
+                throw new FacilityConfigNotFoundException(notFound, ex);
+            }
+            catch (Exception ex)
+            {
+                throw new TenantUnavailableException(
+                    $"Facility config could not be retrieved from Tenant when attempting to generate a report manifest (ReportId = {schedule.Id}, FacilityId = {schedule.FacilityId}).", ex);
+            }
+
+            return facilityConfig ?? throw new FacilityConfigNotFoundException(notFound);
+        }
+
+        private static OperationOutcome CreateOperationOutcome(
+            ReportScheduleModel schedule,
+            List<ReportEntry> reportEntries,
+            ManifestGenerationMode mode,
+            CancellationToken cancellationToken)
         {
             var operationOutcome = new OperationOutcome();
-            foreach (var entry in failedEntries)
+            var flagInFlight = mode == ManifestGenerationMode.AdHoc;
+
+            if (flagInFlight && !schedule.EndOfReportPeriodJobHasRun)
             {
-                // Assuming PatientSubmissionEntry has a ValidationMessage property; adjust as per actual model
+                operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
+                {
+                    Severity = OperationOutcome.IssueSeverity.Warning,
+                    Code = OperationOutcome.IssueType.Informational,
+                    Diagnostics = "The reporting period has not closed; the patient census may still change."
+                });
+            }
+
+            foreach (var entry in reportEntries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (entry.ReportingStatus != ReportingStatus.FailedValidation)
+                {
+                    continue;
+                }
+
                 operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
                 {
                     Severity = OperationOutcome.IssueSeverity.Error,
@@ -262,6 +335,29 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     Diagnostics = $"Validation failed for patient {entry.PatientId}"
                 });
             }
+
+            if (!flagInFlight)
+            {
+                return operationOutcome;
+            }
+
+            foreach (var entry in reportEntries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (ReportEntryTerminalStatuses.IsTerminal(entry.ReportingStatus, entry.SubmissionStatus))
+                {
+                    continue;
+                }
+
+                operationOutcome.Issue.Add(new OperationOutcome.IssueComponent
+                {
+                    Severity = OperationOutcome.IssueSeverity.Warning,
+                    Code = OperationOutcome.IssueType.Incomplete,
+                    Diagnostics = $"Processing incomplete for patient {entry.PatientId} (ReportingStatus = {entry.ReportingStatus}, SubmissionStatus = {entry.SubmissionStatus?.ToString() ?? "None"})"
+                });
+            }
+
             return operationOutcome;
         }
     }
