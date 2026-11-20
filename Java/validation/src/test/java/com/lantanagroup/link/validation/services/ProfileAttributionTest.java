@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -97,17 +99,17 @@ class ProfileAttributionTest {
     void findingsAreAttributedToTheirOwnProfile() {
         List<Result> results = newService(4).validate(bundle());
 
-        assertEquals(List.of(LAB_PROFILE), profilesAt(results, 0, "Observation.interpretation"),
+        assertEquals(List.of(LAB_PROFILE), profilesFor(results, "observation-0", "Observation.interpretation"),
                 "lab Observation: " + describe(results));
-        assertEquals(List.of(VITALS_PROFILE), profilesAt(results, 1, "Observation.subject"),
+        assertEquals(List.of(VITALS_PROFILE), profilesFor(results, "observation-1", "Observation.subject"),
                 "vitals Observation: " + describe(results));
-        assertEquals(List.of(LAB_PROFILE), profilesAt(results, 2, "Observation.interpretation"),
+        assertEquals(List.of(LAB_PROFILE), profilesFor(results, "observation-2", "Observation.interpretation"),
                 "dual-profile Observation, lab finding: " + describe(results));
-        assertEquals(List.of(VITALS_PROFILE), profilesAt(results, 2, "Observation.subject"),
+        assertEquals(List.of(VITALS_PROFILE), profilesFor(results, "observation-2", "Observation.subject"),
                 "dual-profile Observation, vitals finding: " + describe(results));
         // A resource declaring no profile is validated against the core StructureDefinition, and is attributed to it.
         assertEquals(List.of("http://hl7.org/fhir/StructureDefinition/Observation|4.0.1"),
-                profilesAt(results, 3, "Observation.status"),
+                profilesFor(results, "observation-3", "Observation.status"),
                 "unprofiled Observation: " + describe(results));
     }
 
@@ -128,13 +130,21 @@ class ProfileAttributionTest {
             if (result.getProfile() == null) {
                 continue;
             }
-            int index = entryIndex(result);
-            List<String> declared = bundle.getEntry().get(index).getResource().getMeta().getProfile().stream()
+            String id = resourceId(result);
+            Resource resource = bundle.getEntry().stream()
+                    .map(Bundle.BundleEntryComponent::getResource)
+                    .filter(r -> r != null && r.getIdElement().getIdPart() != null
+                            && r.getIdElement().getIdPart().equals(id))
+                    .findFirst()
+                    .orElse(null);
+            assertNotNull(resource,
+                    "No bundle entry carries id '" + id + "', taken from " + result.getExpression());
+            List<String> declared = resource.getMeta().getProfile().stream()
                     .map(CanonicalType::getValue)
                     .toList();
             String url = result.getProfile().replaceFirst("\\|.*$", "");
             assertTrue(declared.contains(url) || url.startsWith("http://hl7.org/fhir/StructureDefinition/"),
-                    "entry " + index + " declares " + declared + " but finding was attributed to "
+                    id + " declares " + declared + " but finding was attributed to "
                             + result.getProfile() + ": " + result.getMessage());
         }
     }
@@ -203,20 +213,32 @@ class ProfileAttributionTest {
                 .toList();
     }
 
-    private static List<String> profilesAt(List<Result> results, int entryIndex, String element) {
+    private static List<String> profilesFor(List<Result> results, String resourceId, String element) {
         return results.stream()
-                .filter(r -> entryIndex(r) == entryIndex)
+                .filter(r -> resourceId.equals(resourceId(r)))
                 .filter(r -> r.getMessage() != null && r.getMessage().contains(element)
                         && r.getMessage().contains("minimum required"))
                 .map(Result::getProfile)
                 .toList();
     }
 
-    private static int entryIndex(Result result) {
+    /**
+     * The id of the resource a finding points at, read from the expression's own {@code id = '...'}.
+     *
+     * <p>This used to parse the entry position out of {@code Bundle.entry[N]}. Expressions are anchored on
+     * the resource id now (LEGLINK-1495), so there is no position to read; matching the id also keeps this
+     * working if an expression carries both an index and an id.
+     */
+    private static String resourceId(Result result) {
         String expression = result.getExpression();
-        int start = expression.indexOf('[') + 1;
-        return Integer.parseInt(expression.substring(start, expression.indexOf(']', start)));
+        if (expression == null) {
+            return null;
+        }
+        Matcher matcher = ANCHORED_ID.matcher(expression);
+        return matcher.find() ? matcher.group(1) : null;
     }
+
+    private static final Pattern ANCHORED_ID = Pattern.compile("id\\s*=\\s*'([^']*)'");
 
     private static String describe(List<Result> results) {
         return results.stream()

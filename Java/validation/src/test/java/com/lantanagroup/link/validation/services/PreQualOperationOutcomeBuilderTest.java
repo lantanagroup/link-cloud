@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.r4.model.Bundle;
@@ -9,6 +10,7 @@ import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.IntegerType;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.OperationOutcome;
+import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.StringType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PreQualOperationOutcomeBuilderTest {
 
+    private static final FhirContext FHIR_CONTEXT = FhirContext.forR4();
     private static final String MEASURE_REPORT_ID = "mr-1";
+    private static final String PATIENT_ID = "patient-1";
     private static final PreQualOperationOutcomeBuilder.MeasureReportRef MEASURE_REPORT =
             new PreQualOperationOutcomeBuilder.MeasureReportRef(0, MEASURE_REPORT_ID);
 
@@ -70,7 +74,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
         Result r2 = result("Unable to validate.", "expr2", category("unable_to_validate_code", false));
 
-        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(2, oo.getIssue().size());
         int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
@@ -81,7 +85,7 @@ class PreQualOperationOutcomeBuilderTest {
     void build_setsOperationOutcomeId() {
         Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
 
-        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertNotNull(oo.getIdElement().getIdPart());
         assertFalse(oo.getIdElement().getIdPart().isBlank());
@@ -91,7 +95,7 @@ class PreQualOperationOutcomeBuilderTest {
     void build_issueCarriesSeverityCodeMessageAndCategoryExtension() {
         Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
 
-        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
         OperationOutcome.OperationOutcomeIssueComponent issue = oo.getIssueFirstRep();
 
         assertEquals(OperationOutcome.IssueSeverity.ERROR, issue.getSeverity());
@@ -107,7 +111,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result first = result("first message", "expr1", shared);
         Result second = result("second message", "expr2", shared);
 
-        OperationOutcome oo = builder.build(List.of(first, second), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(first, second), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(1, oo.getIssue().size());
         assertEquals("first message", oo.getIssueFirstRep().getDetails().getText());
@@ -122,7 +126,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result r1 = result("first message", "expr1", category("inactive_code", false));
         Result r2 = result("second message", "expr2", category("inactive_code", false));
 
-        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(1, oo.getIssue().size(), "Same category id must yield exactly one issue");
         int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
@@ -143,7 +147,7 @@ class PreQualOperationOutcomeBuilderTest {
     void build_oneResultMappingToMultipleSubmittedCategories_producesAnIssuePerCategory() {
         Result r = result("msg", "expr", category("cat_a", false), category("cat_b", false));
 
-        OperationOutcome oo = builder.build(List.of(r), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(2, oo.getIssue().size());
     }
@@ -173,7 +177,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result vitals = result("vitals message", "expr2", VITALS_PROFILE, shared);
         Result lab2 = result("lab message 2", "expr3", LAB_PROFILE, shared);
 
-        OperationOutcome oo = builder.build(List.of(lab1, vitals, lab2), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(lab1, vitals, lab2), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(2, oo.getIssue().size());
         int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
@@ -199,7 +203,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result lab = result("lab", "expr2", LAB_PROFILE, shared);
         Result noProfile2 = result("no profile 2", "expr3", (String) null, shared);
 
-        OperationOutcome oo = builder.build(List.of(noProfile1, lab, noProfile2), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(noProfile1, lab, noProfile2), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(2, oo.getIssue().size());
         OperationOutcome.OperationOutcomeIssueComponent noProfileIssue = oo.getIssue().get(0);
@@ -213,7 +217,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result submitted = result("included", "expr1", category("submitted", true, true));
         Result nonSubmitted = result("excluded", "expr2", category("not-submitted", false, false));
 
-        OperationOutcome oo = builder.build(List.of(submitted, nonSubmitted), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(submitted, nonSubmitted), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(1, oo.getIssue().size());
         CodeType cat = (CodeType) oo.getIssueFirstRep()
@@ -229,7 +233,7 @@ class PreQualOperationOutcomeBuilderTest {
                 category("submitted", false, true),
                 category("not-submitted", false, false));
 
-        OperationOutcome oo = builder.build(List.of(result), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(result), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         assertEquals(1, oo.getIssue().size());
         CodeType category = (CodeType) oo.getIssueFirstRep()
@@ -243,7 +247,7 @@ class PreQualOperationOutcomeBuilderTest {
     void build_noSubmittedFindings_returnsEmpty() {
         Result nonSubmitted = result("not submitted", "expr", category("not-submitted", false, false));
 
-        assertTrue(builder.build(List.of(nonSubmitted), MEASURE_REPORT, true).isEmpty());
+        assertTrue(builder.build(List.of(nonSubmitted), MEASURE_REPORT, PATIENT_ID, true).isEmpty());
     }
 
     @Test
@@ -251,7 +255,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result result = new Result();
         result.setCategories(null);
 
-        assertTrue(builder.build(List.of(result), MEASURE_REPORT, true).isEmpty());
+        assertTrue(builder.build(List.of(result), MEASURE_REPORT, PATIENT_ID, true).isEmpty());
     }
 
     // -------------------------------------------------------------------------
@@ -264,7 +268,7 @@ class PreQualOperationOutcomeBuilderTest {
         Result r1 = result("msg1", "Bundle.entry[14].resource.ofType(Condition).code.coding[0]", shared);
         Result r2 = result("msg2", "Bundle.entry[27].resource.ofType(Observation).code.coding[0]", shared);
 
-        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, PATIENT_ID, true).orElseThrow();
 
         List<String> expressions = expressionStrings(oo.getIssueFirstRep());
         assertEquals(3, expressions.size());
@@ -278,7 +282,7 @@ class PreQualOperationOutcomeBuilderTest {
     void build_writeExpressionsFalse_omitsAllExpressions() {
         Result r1 = result("msg", "expr", category("inactive_code", false));
 
-        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, false).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, PATIENT_ID, false).orElseThrow();
 
         assertTrue(oo.getIssueFirstRep().getExpression().isEmpty());
     }
@@ -287,7 +291,7 @@ class PreQualOperationOutcomeBuilderTest {
     void build_noMeasureReportRef_omitsLocatorButKeepsResultExpressions() {
         Result r1 = result("msg", "result-expr", category("inactive_code", false));
 
-        OperationOutcome oo = builder.build(List.of(r1), null, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1), null, PATIENT_ID, true).orElseThrow();
 
         List<String> expressions = expressionStrings(oo.getIssueFirstRep());
         assertEquals(List.of("result-expr"), expressions);
@@ -302,7 +306,7 @@ class PreQualOperationOutcomeBuilderTest {
         PreQualOperationOutcomeBuilder.MeasureReportRef ref =
                 new PreQualOperationOutcomeBuilder.MeasureReportRef(0, null);
 
-        OperationOutcome oo = builder.build(List.of(r1), ref, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1), ref, PATIENT_ID, true).orElseThrow();
 
         List<String> expressions = expressionStrings(oo.getIssueFirstRep());
         assertEquals(List.of("result-expr"), expressions);
@@ -360,18 +364,67 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
-    void build_measureReportAtNonZeroIndex_locatorUsesThatIndex() {
+    void build_locatorCarriesBothTheEntryPositionAndTheId() {
+        // The MVP form, and the form every other expression in the outcome takes: the position locates the
+        // entry, where(id = ...) says which record is meant, so a reader of the submitted NDJSON - which
+        // holds bare resources and no bundle - can still identify it, and a stale position selects nothing
+        // rather than the wrong record. LEGLINK-1495.
         Result r1 = result("msg", "result-expr", category("inactive_code", false));
         PreQualOperationOutcomeBuilder.MeasureReportRef ref =
                 new PreQualOperationOutcomeBuilder.MeasureReportRef(3, "report-xyz");
 
-        OperationOutcome oo = builder.build(List.of(r1), ref, true).orElseThrow();
+        OperationOutcome oo = builder.build(List.of(r1), ref, PATIENT_ID, true).orElseThrow();
 
         String locator = expressionStrings(oo.getIssueFirstRep()).get(0);
         assertEquals(
                 "Bundle.entry[3].resource.ofType(MeasureReport).where(id = 'report-xyz').extension[0]",
                 locator);
         assertFalse(locator.contains("entry[0]"), "Locator must not fall back to entry[0]");
+    }
+
+    // -------------------------------------------------------------------------
+    // Outcome-level extensions: the qualifying patient
+    // -------------------------------------------------------------------------
+
+    @Test
+    void build_writesQualifyingPatientReferenceOnTheOutcome() {
+        Result r1 = result("msg", "expr", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, PATIENT_ID, true)
+                .orElseThrow();
+
+        Extension extension =
+                oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_QUALIFYING_PATIENT_URL);
+        assertNotNull(extension, "The outcome must name the patient it describes");
+        assertEquals("Patient/" + PATIENT_ID, ((Reference) extension.getValue()).getReference());
+    }
+
+    @Test
+    void build_omitsQualifyingPatientWhenNoPatientId() {
+        Result r1 = result("msg", "expr", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT, null, true)
+                .orElseThrow();
+
+        assertNull(oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_QUALIFYING_PATIENT_URL),
+                "A missing patient id must omit the extension, not emit Patient/null");
+    }
+
+    @Test
+    void build_doesNotRepeatQualifyingPatientOnEachIssue() {
+        // One outcome describes one patient, so the value cannot differ between its issues; a per-issue
+        // copy would state the same fact once per category.
+        Result lab = result("msg", "expr", category("inactive_code", false));
+        Result other = result("other", "expr2", category("missing_location_period", false));
+
+        OperationOutcome oo = builder.build(List.of(lab, other), MEASURE_REPORT, PATIENT_ID, true)
+                .orElseThrow();
+
+        assertEquals(2, oo.getIssue().size());
+        for (OperationOutcome.OperationOutcomeIssueComponent issue : oo.getIssue()) {
+            assertNull(issue.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_QUALIFYING_PATIENT_URL),
+                    "The patient belongs on the outcome, not on every issue");
+        }
     }
 
     @Test
@@ -389,6 +442,33 @@ class PreQualOperationOutcomeBuilderTest {
 
     @Test
     void build_emptyResults_returnsEmpty() {
-        assertTrue(builder.build(Collections.emptyList(), MEASURE_REPORT, true).isEmpty());
+        assertTrue(builder.build(Collections.emptyList(), MEASURE_REPORT, PATIENT_ID, true).isEmpty());
+    }
+
+    // -------------------------------------------------------------------------
+    // Serialised shape
+    // -------------------------------------------------------------------------
+
+    @Test
+    void build_serialisesTheOutcomeExtensionsAsReferenceObjects() {
+        // Proven through the serialiser, not the object model. A FHIR valueReference is an object with a
+        // `reference` member; written as the bare string "Patient/..." - as the first draft of the spec
+        // had it - nothing downstream could parse it, and HAPI cannot emit it at all.
+        Result r1 = result("msg", "Bundle.entry[0].resource.ofType(Observation).code",
+                category("inactive_code", false));
+
+        OperationOutcome oo = builder
+                .build(List.of(r1), MEASURE_REPORT, PATIENT_ID, true)
+                .orElseThrow();
+        String json = FHIR_CONTEXT.newJsonParser().encodeResourceToString(oo);
+
+        assertTrue(json.contains("\"valueReference\":{\"reference\":\"Patient/patient-1\"}"), json);
+        assertTrue(json.contains(PreQualOperationOutcomeBuilder.PQ_QUALIFYING_PATIENT_URL), json);
+
+        // And survives a round trip, which is what a downstream reader actually does with it.
+        OperationOutcome reparsed =
+                (OperationOutcome) FHIR_CONTEXT.newJsonParser().parseResource(json);
+        assertEquals(1, reparsed.getExtensionsByUrl(
+                PreQualOperationOutcomeBuilder.PQ_QUALIFYING_PATIENT_URL).size());
     }
 }
