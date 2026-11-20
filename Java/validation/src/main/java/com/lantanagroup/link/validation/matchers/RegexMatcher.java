@@ -8,7 +8,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.regex.Pattern;
+import com.google.re2j.Pattern;
 
 @Getter
 @Setter

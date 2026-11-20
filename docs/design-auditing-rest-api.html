@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Auditing Rest API endpoints</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h1 id="auditing-an-endpoint" class="content-heading">Auditing an endpoint <a href="#auditing-an-endpoint" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Auditing an endpoint"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Every REST endpoint that changes configuration records who changed what. This is how.</p>
+<p>The mechanism lives in <code>DotNet/Shared/Application/Auditing</code>. You mark an endpoint, and the
+mechanism runs it, captures what changed in the database, builds the event once the action has
+succeeded and publishes it to the
+<code>AuditableEventOccurred</code> topic, where the Audit service stores it. Which endpoints are auditable, with
+what action and resource, is decided by the
+<a href="https://keystone.lantanagroup.com/Proposals/Details/rest-api-auditing">REST API auditing ADR</a> - look
+your service up in its table rather than inventing values.</p>
+<p>It is .NET only. The Java services' ADR rows - Validation and MeasureEval - need their own producer,
+which must publish the same <code>AuditEventMessage</code> to the same topic; see the <code>Known Limits</code> section below.</p>
+<h2 id="register-the-mechanism-once-per-service" class="content-heading">Register the mechanism once per service <a href="#register-the-mechanism-once-per-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Register the mechanism once per service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>A service whose writes go through Entity Framework:</p>
+<pre><code class="language-csharp">builder.Services.AddLinkAuditing&lt;TenantDbContext&gt;();
+</code></pre>
+<p>The interceptor that captures property changes is registered by that call but <strong>attached by you</strong>,
+inside your own <code>AddDbContext</code>, alongside whichever <code>UpdateBaseEntityInterceptor</code> your service uses.
+There is no single place to do this for you: Account, Audit and Notification each keep their own copy
+of <code>UpdateBaseEntityInterceptor</code>, and Report and Submission register the shared one without ever
+attaching it, although both persist through Entity Framework.</p>
+<pre><code class="language-csharp">builder.Services.AddDbContext&lt;TenantDbContext&gt;((sp, options) =&gt;
+    options.UseSqlServer(connectionString)
+           .AddInterceptors(sp.GetRequiredService&lt;UpdateBaseEntityInterceptor&gt;())
+           .AddLinkAuditInterceptor(sp));
+</code></pre>
+<p><code>AddLinkAuditInterceptor(sp)</code> hands the registered interceptor to Entity Framework, which calls only
+the interceptors given to the options: registered but not attached, it never runs, and every event
+is published with no property changes and no error. It does nothing when <code>AddLinkAuditing</code> was not
+called, so it is safe in setup code shared with a process that does not audit - Data Acquisition's
+worker runs the same <code>RegisterEntityFramework</code> as its API, and only the API registers auditing.</p>
+<p>The exception is a service that builds its context with the shared <code>builder.AddSQLServerEF&lt;T&gt;()</code>
+helper, as QueryDispatch does: it has no <code>AddDbContext</code> of its own, so the helper calls
+<code>AddLinkAuditInterceptor</code> itself. Calling <code>AddLinkAuditing&lt;T&gt;()</code> is enough.</p>
+<p>A service that persists nothing through Entity Framework, such as Terminology, uses the overload with
+no context. No property changes are captured:</p>
+<pre><code class="language-csharp">builder.Services.AddLinkAuditing();
+</code></pre>
+<p>Either way the service must already register a <code>KafkaConnection</code>; auditing publishes to Kafka. Most
+services do. If yours does not, the service fails to start, with a message telling you the line to
+add - not on the first audited request in production. A broker that is merely down does not stop it
+starting; only a missing configuration does.</p>
+<p>A test host that builds the service by hand - a <code>WebApplicationFactory</code> subclass with its own service
+registrations - needs <code>AddLinkAuditing</code> too, usually with a fake <code>IAuditPublisher</code> so no Kafka is
+needed. Without it every request to an auditable endpoint fails, with an error naming that line.
+Faking the publisher does not take the counter out of the graph: the recorder resolves
+<code>IAuditMetrics</code> itself, to account for an event it loses. So such a host also needs <code>AddMetrics()</code> and
+a <code>ServiceInformation</code> whose <code>ServiceConfigName</code> is set, which <code>SetupServiceInformation</code> does, or a
+fake <code>IAuditMetrics</code> of its own.</p>
+<h2 id="mark-the-endpoint" class="content-heading">Mark the endpoint <a href="#mark-the-endpoint" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mark the endpoint"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>On a controller action:</p>
+<pre><code class="language-csharp">[HttpPut(&quot;{facilityId}&quot;)]
+[Auditable(AuditEventType.Update, &quot;Facility&quot;)]
+public async Task&lt;IActionResult&gt; UpdateFacility(string facilityId, ...)
+</code></pre>
+<p>On a minimal-API endpoint:</p>
+<pre><code class="language-csharp">userEndpoints.MapDelete(&quot;/user/{id}&quot;, DeleteExistingUser.Handle)
+             .Auditable(AuditEventType.SoftDelete, &quot;LinkUser&quot;);
+</code></pre>
+<p>Both publish exactly one event when the response is a success, and nothing at all when it is an error
+or the handler throws. A note is only given when the ADR's row for that endpoint specifies one, to
+keep the audit rows small:</p>
+<pre><code class="language-csharp">[Auditable(AuditEventType.Delete, &quot;HSLOC&quot;, &quot;All HSLOC codes for version {version} deleted&quot;)]
+</code></pre>
+<p>Placeholders written as <code>{name}</code> are filled from the handler's context values first - what it passed
+to <code>Set</code>, <a href="#when-the-handler-has-to-help">below</a> - and then from the route. A placeholder whose name
+neither the handler nor the route supplies is left visible in the note, so a missing value shows up
+in the audit trail instead of quietly reading as prose. A value the handler sets to <code>null</code> fills it
+with nothing. For <code>DELETE api/VendorVersion/42</code>, marked with the note
+<code>&quot;Id {id} deleted (Vendor: {Name}, Version: {Version})&quot;</code>:</p>
+<table>
+<thead>
+<tr>
+<th>The handler</th>
+<th>The note reads</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sets <code>Name</code> to <code>Epic</code> and <code>Version</code> to <code>2024</code></td>
+<td><code>Id 42 deleted (Vendor: Epic, Version: 2024)</code> - <code>{id}</code> from the route</td>
+</tr>
+<tr>
+<td>sets <code>Name</code> only</td>
+<td><code>Id 42 deleted (Vendor: Epic, Version: {Version})</code> - the missing value is visible</td>
+</tr>
+<tr>
+<td>sets <code>Name</code>, and <code>Version</code> to <code>null</code></td>
+<td><code>Id 42 deleted (Vendor: Epic, Version: )</code> - an empty value, not a missing one</td>
+</tr>
+</tbody>
+</table>
+<p>Because the handler's values come first, a handler can also replace a route value of the same name.</p>
+<p>If the record's id is not in a route value called <code>id</code>, say which one it is:</p>
+<pre><code class="language-csharp">[Auditable(AuditEventType.SoftDelete, &quot;Facility&quot;, RecordIdRouteKey = &quot;facilityId&quot;)]
+</code></pre>
+<p>The event's <code>ResourceId</code> must uniquely identify the row the request acted on, so name the row's own
+id here - <code>facilityId</code> above because a facility is that row - never the facility a child record
+belongs to. When the route does not carry the row's id at all, the handler sets <code>RecordId</code>, below.</p>
+<p>The facility is taken from a route value called <code>facilityId</code>, or, when the route has none, from a
+query string parameter of that name - Normalization's <code>OperationSequence</code> endpoints take
+<code>?facilityId=</code>. A query value is sanitised first, and a parameter given twice is not guessed at. If
+the route calls the facility something else, say what:</p>
+<pre><code class="language-csharp">[Auditable(AuditEventType.Update, &quot;SftpConfiguration&quot;, FacilityIdRouteKey = &quot;organizationId&quot;)]
+</code></pre>
+<p>Leave it out and the event's <code>FacilityId</code> is null, logged only at Debug: in production a route that
+names the facility differently fails silently.</p>
+<p>The two are looked up separately, so one route value can fill both, one, or neither:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th><code>ResourceId</code></th>
+<th><code>FacilityId</code></th>
+<th>What it needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DELETE api/Facility/softDelete/{facilityId}</code></td>
+<td>the facility</td>
+<td>the facility</td>
+<td><code>RecordIdRouteKey = &quot;facilityId&quot;</code> - the record <em>is</em> the facility</td>
+</tr>
+<tr>
+<td><code>PUT api/data-acquisition/{facilityId}/QueryPlan</code></td>
+<td>the query plan</td>
+<td>the facility</td>
+<td>nothing on the attribute; the handler sets <code>RecordId</code>, since the route carries only the facility</td>
+</tr>
+<tr>
+<td><code>DELETE api/Normalization/OperationSequence?facilityId=</code></td>
+<td>none - a bulk delete</td>
+<td>from the query string</td>
+<td>nothing</td>
+</tr>
+<tr>
+<td><code>PUT api/data-acquisition/{organizationId}/sftp-configurations/{configurationId}</code></td>
+<td>the SFTP configuration</td>
+<td>the facility</td>
+<td><code>RecordIdRouteKey = &quot;configurationId&quot;</code>, <code>FacilityIdRouteKey = &quot;organizationId&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Only an Update event carries property changes. When one request changes too many rows for them to
+be useful - Normalization's HSLOC upload moves every code to a new version, one identical entry per
+code - leave them off and say what changed in the note:</p>
+<pre><code class="language-csharp">[Auditable(AuditEventType.Update, &quot;HSLOC&quot;,
+    &quot;HSLOC updated from version {oldVersion} to {newVersion}: {updated} updated, {added} added, {deactivated} deactivated&quot;,
+    SuppressPropertyChanges = true)]
+</code></pre>
+<p>The handler fills those values with <code>Set</code>, below: the versions arrive in the form and the counts are
+only known once the upload is processed.</p>
+<p>The ADR recommends property changes on Update actions, so use it only where the entries would not
+tell a reader anything - a bulk Update, not an endpoint whose changes are merely inconvenient - and
+let the note say what changed. It is the endpoint's setting rather than the handler's because the
+handler never sees the changes: they reach the event once the action has succeeded, after the handler
+has returned.</p>
+<p>The minimal-API form takes the same settings as arguments:
+<code>.Auditable(action, resource, recordIdRouteKey: &quot;userId&quot;, facilityIdRouteKey: &quot;organizationId&quot;, suppressPropertyChanges: true)</code>. A facility that arrives in the request body is the handler's to
+set, below.</p>
+<h2 id="when-the-handler-has-to-help" class="content-heading">When the handler has to help <a href="#when-the-handler-has-to-help" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When the handler has to help"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The attribute cannot know anything that is not in the route or the endpoint's signature. Inject
+<code>IAuditContext</code> and tell it:</p>
+<pre><code class="language-csharp">public FacilityController(IAuditContext audit, ...) =&gt; _audit = audit;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Set this</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FacilityId</code></td>
+<td>the facility arrived in the request body rather than the route</td>
+</tr>
+<tr>
+<td><code>PatientId</code></td>
+<td>the request concerns a patient</td>
+</tr>
+<tr>
+<td><code>RecordId</code></td>
+<td>the route does not carry the row's own id - always on a create, whose new id only exists after the save, and on any endpoint whose id arrives in the body</td>
+</tr>
+<tr>
+<td><code>ActionOverride</code></td>
+<td>the endpoint creates on one branch and updates on another, and you know which happened</td>
+</tr>
+<tr>
+<td><code>SuppressNote</code></td>
+<td>the attribute's note only applies to one branch of the handler</td>
+</tr>
+<tr>
+<td><code>Set(name, value)</code></td>
+<td>a note template refers to <code>{name}</code></td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-csharp">//a create-or-update endpoint, saying which it did
+_audit.ActionOverride = existing is null ? AuditEventType.Create : AuditEventType.Update;
+
+//values for the note &quot;Id {id} deleted (Vendor: {Name}, Version: {Version})&quot;
+_audit.Set(&quot;Name&quot;, version.VendorName);
+_audit.Set(&quot;Version&quot;, version.Version);
+</code></pre>
+<p>A minimal-API handler takes it as a parameter, <code>[FromServices] IAuditContext audit</code>.</p>
+<p>A note that names the deleted record needs the record's values, so read them before the delete. This
+matters most when the delete is an <code>ExecuteDeleteAsync</code>, which never loads the row: without the read,
+nothing can fill the note.</p>
+<pre><code class="language-csharp">var existing = await _queries.GetAsync(id, cancellationToken);
+if (existing is not null)
+{
+    _audit.Set(&quot;Measure&quot;, existing.Measure);
+    _audit.Set(&quot;dqm&quot;, existing.DQM);
+}
+
+await _manager.DeleteAsync(id, cancellationToken);
+</code></pre>
+<p>The context is per request and shared with the interceptor, so writing to it anywhere in the handler
+is enough; order does not matter.</p>
+<p>What the handler does to the database is its own business - transactions, retry loops and all. Marking
+an endpoint auditable changes none of it.</p>
+<p>What that leaves with the handler is atomicity. A handler that saves more than once, or saves and then
+returns a non-2xx result, can leave a partial change that the event describes as if it were whole, so
+if the writes belong together, open a transaction and finish it before returning.</p>
+<h2 id="what-the-audit-trail-masks" class="content-heading">What the audit trail masks <a href="#what-the-audit-trail-masks" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What the audit trail masks"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Property changes are filtered before the event is built. Three things mask a value:</p>
+<ol>
+<li><p><strong>The shared name list</strong> - <code>Password</code>, <code>Secret</code>, <code>ClientSecret</code>, <code>Token</code>, <code>AccessToken</code>,
+<code>RefreshToken</code>, <code>ApiKey</code>, <code>PrivateKey</code>, <code>Passphrase</code>, <code>ConnectionString</code>, <code>Authentication</code>,
+<code>Credentials</code>. Matched whole, ignoring case.</p>
+</li>
+<li><p><strong>The shared patterns</strong> - <code>*Secret*</code>, <code>*Password*</code>, <code>*Token*</code>, <code>*Key</code>.</p>
+</li>
+<li><p><strong><code>[AuditMask]</code> on the property</strong> - how personal data is masked. A name or an email address
+is not a secret, so no pattern catches it:</p>
+<pre><code class="language-csharp">[AuditMask] public string ContactEmail { get; set; }
+</code></pre>
+<p>Nothing shared catches personal data, so mark it with <code>[AuditMask]</code> in the same change that makes
+its endpoints auditable: an Update endpoint whose entity holds a name or an email address otherwise
+publishes them as they are.</p>
+</li>
+</ol>
+<p>A value one of them catches is <strong>masked, not omitted</strong>. The change still appears in the event, under the
+property's name, with <code>[redacted]</code> as both its old and its new value, so a reader of the audit trail
+can see that it changed and when, but never from what or to what. The mask is the same on both
+sides, so it does not say whether the value was set, changed or cleared either. A value assigned
+again unchanged is not reported, and neither is a JSON column replaced with an equal one: the stored
+forms are compared in memory to find out, and neither is kept.</p>
+<p>A service adds its own entries at registration, and <strong>cannot remove a shared one</strong> - <code>Remove</code> and
+<code>Clear</code> throw. The ADR's three Data Acquisition rows on credentials need no line of the service's
+own. The ADR's notes say to omit these values; the mechanism masks them instead, which tells a reader
+that the credentials changed without saying what they changed to.</p>
+<ul>
+<li><strong>The query config PUT</strong> and <strong>the AuthenticationConfig PUT</strong>. Data Acquisition stores an
+<code>AuthenticationConfiguration</code> as a JSON column named <code>Authentication</code> on <code>FhirQueryConfiguration</code>
+and <code>FhirListConfiguration</code>. <code>Authentication</code> is in the shared name list, and both endpoints write
+that column. It is one value, so the mask says the authentication settings changed, not which
+field.</li>
+<li><strong>The SFTP credentials PUT</strong>. The credentials are kept in the secret manager, not through Entity
+Framework, so the interceptor never sees them and the event carries no property changes.</li>
+</ul>
+<p>When a service does need its own entry, it adds it at registration:</p>
+<pre><code class="language-csharp">builder.Services.AddLinkAuditing&lt;MyServiceDbContext&gt;(o =&gt;
+{
+    o.MaskedPropertyNames.Add(&quot;SessionCookie&quot;);       //a sensitive name nothing shared catches
+});
+</code></pre>
+<p>Mask only what must not leave the service. A query plan's <code>InitialQueries</code> and
+<code>SupplementalQueries</code> are large, but they are what a query plan update changes, and the ADR asks for
+its property changes.</p>
+<p>Each service logs what it masks once at startup, at Information, so the answer to &quot;was that supposed
+to be masked?&quot; is in the service's own log. This is the line Account will write once its personal
+data is marked <code>[AuditMask]</code>; until then it reads <code>attributes=[]</code>:</p>
+<pre><code>Audit masking for Account: names=[Password, Secret, ...] patterns=[*Secret*, *Password*, *Token*, *Key] attributes=[LinkUser.Email, LinkUser.FirstName, ...] skipped timestamps=[ModifyDate, ModifiedDate, ...]
+</code></pre>
+<p><code>attributes</code> lists every mapped property marked <code>[AuditMask]</code>, as <code>Entity.Property</code>, read from the
+model of the context passed to <code>AddLinkAuditing&lt;TContext&gt;()</code>; a service registered without a context
+has none. If the model cannot be built, it reads <code>attributes=[unreadable]</code> with a warning, rather than
+an empty list that would look like nothing is marked.</p>
+<p>Modify timestamps are skipped as well, from a separate list: <code>ModifyDate</code>, <code>ModifiedDate</code>, <code>ModifiedOn</code>,
+<code>LastModifiedOn</code>, <code>UpdatedAt</code>, <code>LastUpdatedDate</code> and <code>LastUpdated</code>. A service's
+<code>UpdateBaseEntityInterceptor</code> writes one on every save, so without this every Update event would
+carry it, and a save that changed nothing would look like an edit. They are noise rather than
+secrets, which is why they are skipped rather than masked. If your entity's timestamp has another
+name, add it the same way: <code>o.TimestampPropertyNames.Add(&quot;StampedAt&quot;)</code>.</p>
+<h2 id="known-limits" class="content-heading">Known limits <a href="#known-limits" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known limits"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>What the shared audit mechanism does not do, and the rules that follow from it. Read this alongside
+<a href="auditing-an-endpoint.md">Auditing an endpoint</a> before converting a service - several of these change
+how a handler has to be written.</p>
+<p><strong>The mechanism undoes nothing.</strong> It watches an action and describes it; it does not change what the
+action does to the database. A handler that fails after saving keeps its save, and gets no event,
+because the action did not succeed. Atomicity is the handler's, exactly as it is outside an audited
+request: if several writes belong together, open a transaction and finish it before returning.</p>
+<p>Two shapes to look for when adding <code>[Auditable]</code> to an endpoint, because both can leave a partial
+change that no event describes:</p>
+<ul>
+<li>a loop that saves per item - read once, write once instead;</li>
+<li>a save followed by work that can fail. The ordering this codebase uses is to do failable external
+work <em>before</em> the save: Tenant's vendor deletes check Normalization over HTTP first, and Tenant's
+facility PUT calls DMRP before the host save.</li>
+</ul>
+<p><strong>Work outside the database is not undone either.</strong> A Quartz job deleted, a secret written to the
+secret manager or a message produced to Kafka before the handler fails stays done - Quartz keeps its
+own store and cannot enlist in a database transaction at all. Nothing about auditing changes that.</p>
+<p><strong>A change counts only once the database has kept it.</strong> The interceptor holds what a save would
+change until the save succeeds, or, inside a handler's transaction, until that transaction commits. A
+failed save, a rollback, or a transaction disposed without a commit contributes nothing, so a retried
+unit of work is described once, not once per attempt. One consequence: because the event is built
+once the action has returned and its result has executed, a transaction the handler still
+holds open at that point has not committed, so the event carries no property changes from saves
+made inside it - and if it later rolls back, the audit trail describes a change that never
+happened. A handler must finish its transaction before it returns.</p>
+<p><strong>Only audited requests are captured.</strong> Entity Framework runs the interceptor on every save of the
+context it is attached to, Kafka listeners and Quartz jobs included, but it captures only once the
+filter has marked the request as audited. A save made anywhere else costs one check and records
+nothing.</p>
+<p><strong>Only tracked changes are seen.</strong> The interceptor reads the change tracker, so an <code>AsNoTracking</code>
+load, an <code>Update()</code> on a detached instance, and <code>ExecuteUpdateAsync</code>/<code>ExecuteDeleteAsync</code> all produce
+no property changes - the event is still published, it just describes nothing. If an endpoint uses
+<code>ExecuteDeleteAsync</code> and the note needs the record's values, load the row first.</p>
+<p><strong>Property changes describe updates only.</strong> The ADR recommends them on Update actions and says
+nothing of the others. The mechanism leaves them off the others, for the reason the ADR gives for
+leaving out notes - the size of each record - so only an event whose action is <code>Update</code> carries
+them: the action it reports, after any <code>ActionOverride</code>. The interceptor captures modified entities
+and nothing else, so a Create event has no new values to carry and a Delete no old ones. A soft
+delete or a restore <em>is</em> saved as a modification, but its event carries no <code>IsDeleted</code> entries
+either: the action already says what happened, and on an endpoint that soft-deletes every schedule
+a facility has they would number one per row. A PUT that changed nothing still publishes an Update
+event with no property changes at all - the request succeeded, so it is recorded. A note is the
+place for a value any other action must keep.</p>
+<p><strong>A service registered without a context captures nothing.</strong> <code>AddLinkAuditing()</code> with no context
+attaches no interceptor, so every event it publishes has no property
+changes - Terminology's two Update rows can never carry the property changes the ADR recommends. A
+note, such as the number of codes replaced, is the useful fallback for a row served this way.</p>
+<p><strong>JSON columns are one value.</strong> A column mapped as JSON, a collection stored as one column through a
+value converter (QueryDispatch's <code>DispatchSchedules</code>), and a collection mapped with no converter at
+all, which Entity Framework stores as a JSON column of its own (Data Acquisition's
+<code>FhirQuery.QueryParameters</code>), all show up as a single blob-to-blob change in the stored form - the
+JSON - not field by field. A value replaced with an equal one, such as a new list holding the same
+items, is not reported. Everything else is described so that the same value always reads the same
+whatever the host's culture: dates and times in ISO-8601, decimals and floating point with a point,
+binary as base64. Normalization's <code>OperationJson</code> is a good
+example of when that is enough: a whole operation definition is a few hundred characters, and the
+before and after show exactly which setting moved. Where a blob is large enough to swamp the event,
+mask it by name with <code>o.MaskedPropertyNames.Add(...)</code>, and decide that per service. A masked JSON
+column is masked whole: the event says the column changed, never which field inside it -
+Data Acquisition's <code>Authentication</code> reads the same whether the client id or the secret moved.</p>
+<p><strong>Property changes say what changed, not which row.</strong> Each entry is a property name with its old
+and new value; no entity or row is attached, and there is no limit on how many one event carries. An
+Update endpoint that changes many rows - Normalization's HSLOC upload, which moves every code to the
+new version - records one identical entry per row, which a reader cannot tell apart, and enough of
+them can pass Kafka's message size limit (1 MB by default), at which point every attempt fails and
+the event is abandoned. Check how many rows a bulk endpoint can touch before marking it, and where
+the entries would tell a reader nothing, set <code>SuppressPropertyChanges</code> and let a note give the
+counts instead.</p>
+<p><strong>A transaction lasts as long as the handler holds it.</strong> Anything slow done while one is open - a
+call to another service, Quartz work - holds the connection and any row locks already taken for that
+long. Keep calls that need not be part of the write before the first save, or out of the endpoint.
+Tenant's facility PUT is the shape to copy: DMRP is called before the host save, and the Quartz
+update after it.</p>
+<p><strong><code>ResourceId</code> uniquely identifies the row the request acted on.</strong> It is taken from the handler's
+<code>IAuditContext.RecordId</code> first, then the route key the attribute names - and nothing else. So a route
+key must name the row's own id, never the facility it belongs to, and a handler whose route does not
+carry that id sets <code>RecordId</code> itself. Nothing guesses it from what was saved: the first row a save
+touches may be a child (a location condition rather than its configuration) or one of several, and a
+wrong id looks exactly like a right one, where a missing one is visible.</p>
+<p>A bulk endpoint (&quot;delete every plan for this facility&quot;) has no single record, and the field is null by
+design. But an endpoint that <em>does</em> act on one record and names the wrong route key also gets null,
+silently in production. The factory logs that at Debug, so turn Debug on for
+<code>LantanaGroup.Link.Shared.Application.Auditing</code> while testing a new endpoint. It logs a missing
+<code>FacilityId</code> the same way, for the same reason: many endpoints concern no facility, but a route that
+names the facility differently, without <code>FacilityIdRouteKey</code> saying so, loses it just as quietly.</p>
+<p><strong><code>ServiceName</code> is the host's.</strong> It comes from <code>ServiceInformation.ServiceConfigName</code>, so DMRP events
+read <code>Tenant</code> - DMRP runs inside Tenant's process.</p>
+<p><strong>A minimal-API handler returning a plain value is recorded early.</strong> Both filters publish only once
+the handler's result has executed, so a response that fails to serialise leaves behind no event
+claiming success. The minimal-API filter does that by returning a result that executes the handler's
+own, which covers every <code>IResult</code> - everything <code>Results</code> and <code>TypedResults</code> produce. A handler that
+returns a plain value, or nothing at all, has its response built by the request delegate instead, in
+a way the filter cannot reproduce, so those are still recorded on the way out. No audited endpoint
+returns either today; return an <code>IResult</code>.</p>
+<p><strong>An event can still be lost.</strong> The filter publishes only after the action has succeeded, its changes
+are committed and its result has executed, so a broker outage cannot roll back a change the user was
+already told had succeeded, and no event describes a response that failed to serialise. The
+cost is that a publish failing after that point loses the event. The request waits at most
+<code>AuditOptions.Publish.ResponseTimeout</code> for the broker; past that it returns and delivery continues in
+the background, and an event the producer finally gives up on is counted on the
+<code>audit_publish_failed</code> counter and written to the log in full at Error. In full means the whole
+event, the caller's email and any <code>PatientId</code> included, so a log sink less protected than the audit
+store ends up holding that for every event that never reached the store. Two narrower failures are
+accounted the same way and on the same counter, but without the event body: an event that cannot be
+assembled at all - a note template naming a placeholder nothing fills - and a publisher that fails
+outright instead of accounting for itself, which the Kafka publisher does not do but a later one
+could. Neither is allowed to reach the caller, whose change has already been made. The transactional
+outbox feature removes this by writing the event to the database the request already wrote to and
+shipping it from there, at which point audit events become never-lost.</p>
+<p><strong>An event can also arrive twice.</strong> A produce that comes back <code>PossiblyPersisted</code> is retried on
+purpose: the broker may already hold the event, but not retrying could lose it with nothing counted,
+and a duplicate row does less harm than a missing one. The event carries no id of its own and the
+Audit service stores whatever arrives, so a duplicate is indistinguishable from two identical
+requests made in the same second. Read two matching rows with that in mind.</p>
+<p><strong>Java services are not covered.</strong> The mechanism is .NET: Validation's and MeasureEval's ADR rows
+need a producer of their own, publishing the same <code>AuditEventMessage</code> to <code>AuditableEventOccurred</code>.
+Nothing on the topic enforces this mechanism's rules, so that producer must follow them itself, or the
+Audit service stores Java events that read differently from the .NET ones:</p>
+<ul>
+<li><code>Action</code> in the format the ADR's open wire-format question settles. Today that is a number; a Java
+serializer's default, the name, is dead-lettered.</li>
+<li>Secrets and personal data masked as <code>[redacted]</code> on both sides.</li>
+<li><code>ResourceId</code> the id of the row acted on, never the facility.</li>
+<li>Property changes on Updates only.</li>
+</ul>
+<h2 id="checking-it-works" class="content-heading">Checking it works <a href="#checking-it-works" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Checking it works"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li><strong>The event</strong> - <code>GET api/audit</code> in the Audit service, filtered by resource and resourceId.</li>
+<li><strong>The actor</strong> - <code>User</code> is the caller's email claim. A token with no email claim records <code>null</code>; no
+placeholder is invented. Note that <code>CreateSystemToken</code> currently mints the configured Link admin
+address on every service-to-service call, so those calls record that address until LEGLINK-1359
+decides otherwise.</li>
+<li><strong>The record</strong> - confirm <code>ResourceId</code> on the stored event is the id of the row the request acted
+on, and null only on a bulk endpoint. Turn on Debug for <code>LantanaGroup.Link.Shared.Application.Auditing</code>
+while testing: a missing <code>ResourceId</code> or <code>FacilityId</code> is logged there, naming the keys it looked for.</li>
+<li><strong>The facility</strong> - confirm <code>FacilityId</code> on the stored event is set, on every endpoint whose route or
+query carries one.</li>
+<li><strong>The property changes</strong> - on an Update, confirm each changed property is there with its old and
+new value; on every other action, and on an endpoint with <code>SuppressPropertyChanges</code>, confirm there
+are none. An Update with none at all usually means an untracked write (<code>AsNoTracking</code>,
+<code>ExecuteUpdateAsync</code>) - see the <code>Known Limits</code> section.</li>
+<li><strong>The masking</strong> - read the raw Kafka message, not the stored row, and confirm the property is
+there with <code>[redacted]</code> on both sides and its value appears nowhere in the message.</li>
+<li><strong>The failure path</strong> - stop Kafka and make the request. It still succeeds, after at most the
+publish response timeout (3 seconds by default), and the log says delivery continues in the
+background. If Kafka comes back within the producer's message timeout (librdkafka's default is
+5 minutes) the event arrives late and nothing is counted. Only if it stays down past that does
+<code>audit_publish_failed</code> increment, so a QA check of the counter has to wait that long.</li>
+</ul>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nauditing_rest_api_79433D88["Design: Auditing Rest API endpoints"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

@@ -480,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auditing-rest-api.html">Auditing Rest API endpoints</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
@@ -545,15 +546,15 @@ parameter is not required, in this case, because the code system is explicitly i
 </code></pre>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nValidateCodeSystemCode_20E1E2AA["Command: Validate CodeSystem Code"]
-  nValidationService_6640600D["Service: ValidationService"] -->|sends| nValidateCodeSystemCode_20E1E2AA
-  nValidateCodeSystemCode_20E1E2AA -->|handled by| nTerminologyService_2123EB9E["Service: TerminologyService"]
-  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
-    nValidateCodeSystemCode_20E1E2AA
-    nValidationService_6640600D
+nValidateCodeSystemCode_61CDFCC5["Command: Validate CodeSystem Code"]
+  nValidationService_1B59FB2["Service: ValidationService"] -->|sends| nValidateCodeSystemCode_61CDFCC5
+  nValidateCodeSystemCode_61CDFCC5 -->|handled by| nTerminologyService_604ADC01["Service: TerminologyService"]
+  subgraph nCompliance_7C830199_domain["Domain: Compliance"]
+    nValidateCodeSystemCode_61CDFCC5
+    nValidationService_1B59FB2
   end
-  subgraph nKnowledgeArtifactManagement_6717624D_domain["Domain: Knowledge Artifact Management"]
-    nTerminologyService_2123EB9E
+  subgraph nKnowledgeArtifactManagement_35853541_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_604ADC01
   end
 </pre></div>
 
@@ -563,15 +564,15 @@ nValidateCodeSystemCode_20E1E2AA["Command: Validate CodeSystem Code"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nValidateCodeSystemCode_20E1E2AA["Command: Validate CodeSystem Code"]
-  nValidationService_6640600D["Service: ValidationService"] -->|sends| nValidateCodeSystemCode_20E1E2AA
-  nValidateCodeSystemCode_20E1E2AA -->|handled by| nTerminologyService_2123EB9E["Service: TerminologyService"]
-  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
-    nValidateCodeSystemCode_20E1E2AA
-    nValidationService_6640600D
+nValidateCodeSystemCode_61CDFCC5["Command: Validate CodeSystem Code"]
+  nValidationService_1B59FB2["Service: ValidationService"] -->|sends| nValidateCodeSystemCode_61CDFCC5
+  nValidateCodeSystemCode_61CDFCC5 -->|handled by| nTerminologyService_604ADC01["Service: TerminologyService"]
+  subgraph nCompliance_7C830199_domain["Domain: Compliance"]
+    nValidateCodeSystemCode_61CDFCC5
+    nValidationService_1B59FB2
   end
-  subgraph nKnowledgeArtifactManagement_6717624D_domain["Domain: Knowledge Artifact Management"]
-    nTerminologyService_2123EB9E
+  subgraph nKnowledgeArtifactManagement_35853541_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_604ADC01
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

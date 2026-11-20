@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Automation;
 using LantanaGroup.Automation.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -120,7 +121,7 @@ public sealed class PatientReplacementManager : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "FHIR patient replacement {OperationId} failed for patient '{PatientId}'.", operation.Id, operation.PatientId);
+            _logger.LogError(ex, "FHIR patient replacement {OperationId} failed for patient '{PatientId}'.", operation.Id, operation.PatientId.SanitizeForLog());
             operation.Fail(ex.Message);
         }
     }

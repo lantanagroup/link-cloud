@@ -46,6 +46,11 @@ public class BlobStorageService {
         containerClient.getBlobClient(blobName).upload(data, true);
     }
 
+    /** Deletes a blob if it exists; returns whether one was deleted. */
+    public boolean deleteIfExists(String blobName) {
+        return containerClient.getBlobClient(blobName).deleteIfExists();
+    }
+
     /**
      * Appends a single NDJSON line (one serialized FHIR resource) to an existing patient NDJSON append
      * blob. The blob is created upstream by the Report service's aggregation as an append blob, so this

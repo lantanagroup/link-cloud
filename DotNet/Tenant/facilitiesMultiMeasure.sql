@@ -57,7 +57,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Facilities]') AND [c].[name] = N'MRPCreatedDate');
-    IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [Facilities] DROP CONSTRAINT [' + @var0 + '];');
+    DECLARE @dropConstraint0 nvarchar(max) = N'ALTER TABLE [Facilities] DROP CONSTRAINT ' + QUOTENAME(@var0) + N';';
+    IF @var0 IS NOT NULL EXEC(@dropConstraint0);
     ALTER TABLE [Facilities] DROP COLUMN [MRPCreatedDate];
 END;
 GO
@@ -72,7 +73,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Facilities]') AND [c].[name] = N'MRPModifyDate');
-    IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [Facilities] DROP CONSTRAINT [' + @var1 + '];');
+    DECLARE @dropConstraint1 nvarchar(max) = N'ALTER TABLE [Facilities] DROP CONSTRAINT ' + QUOTENAME(@var1) + N';';
+    IF @var1 IS NOT NULL EXEC(@dropConstraint1);
     ALTER TABLE [Facilities] DROP COLUMN [MRPModifyDate];
 END;
 GO
@@ -87,7 +89,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Facilities]') AND [c].[name] = N'MonthlyReportingPlans');
-    IF @var2 IS NOT NULL EXEC(N'ALTER TABLE [Facilities] DROP CONSTRAINT [' + @var2 + '];');
+    DECLARE @dropConstraint2 nvarchar(max) = N'ALTER TABLE [Facilities] DROP CONSTRAINT ' + QUOTENAME(@var2) + N';';
+    IF @var2 IS NOT NULL EXEC(@dropConstraint2);
     ALTER TABLE [Facilities] DROP COLUMN [MonthlyReportingPlans];
 END;
 GO
@@ -102,7 +105,8 @@ BEGIN
     FROM [sys].[default_constraints] [d]
     INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
     WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Facilities]') AND [c].[name] = N'ScheduledTasks');
-    IF @var3 IS NOT NULL EXEC(N'ALTER TABLE [Facilities] DROP CONSTRAINT [' + @var3 + '];');
+    DECLARE @dropConstraint3 nvarchar(max) = N'ALTER TABLE [Facilities] DROP CONSTRAINT ' + QUOTENAME(@var3) + N';';
+    IF @var3 IS NOT NULL EXEC(@dropConstraint3);
     ALTER TABLE [Facilities] DROP COLUMN [ScheduledTasks];
 END;
 GO

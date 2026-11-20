@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Options;
 
+using LantanaGroup.Link.Shared.Application.Services.Security;
+
 namespace Automation.UI.Services.TestRail;
 
 /// <summary>
@@ -54,8 +56,8 @@ public sealed class TestRailStartupCheckService(
         {
             logger.LogWarning(
                 "TestRail connection check failed for {BaseUrl}: {Error}. Runs are unaffected; publishing will retry on each run.",
-                opts.BaseUrl,
-                ex.Message);
+                opts.BaseUrl.SanitizeForLog(),
+                ex.Message.SanitizeForLog());
         }
     }
 
@@ -73,7 +75,7 @@ public sealed class TestRailStartupCheckService(
                 "{Setting} is not set. Suites in project {ProjectId}: {Suites}.",
                 setting,
                 projectId,
-                ListSuites(suites));
+                ListSuites(suites).SanitizeForLog());
             return;
         }
 
@@ -86,13 +88,13 @@ public sealed class TestRailStartupCheckService(
             logger.LogWarning(
                 "{Setting} {Suite} is not a suite in project {ProjectId}. Suites in the project: {Suites}.",
                 setting,
-                TestRailStartupReport.Describe(suiteId, suiteName),
+                TestRailStartupReport.Describe(suiteId, suiteName).SanitizeForLog(),
                 projectId,
-                ListSuites(suites));
+                ListSuites(suites).SanitizeForLog());
             return;
         }
 
-        logger.LogInformation("{Setting} is suite {SuiteId} ({SuiteName}).", setting, found.Id, found.Name);
+        logger.LogInformation("{Setting} is suite {SuiteId} ({SuiteName}).", setting, found.Id, found.Name.SanitizeForLog());
     }
 
     internal static string ListSuites(IReadOnlyList<TestRailNamedItem> suites)
