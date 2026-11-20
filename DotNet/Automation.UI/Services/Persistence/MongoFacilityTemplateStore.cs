@@ -67,6 +67,8 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
         string? search,
         string? vendor,
         string? kind,
+        string sortBy = "name",
+        string sortDir = "asc",
         CancellationToken ct = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
@@ -74,10 +76,38 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
 
         var filter = BuildFilter(search, vendor, kind);
 
+        var sortBuilder = Builders<FacilityTemplateDocument>.Sort;
+        var descending = string.Equals(
+            sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+        SortDefinition<FacilityTemplateDocument> primarySort =
+            sortBy.ToLowerInvariant() switch
+            {
+                "vendor" => descending
+                    ? sortBuilder.Descending(d => d.VendorName)
+                    : sortBuilder.Ascending(d => d.VendorName),
+
+                "kind" => descending
+                    ? sortBuilder.Descending(d => d.IsSystem)
+                    : sortBuilder.Ascending(d => d.IsSystem),
+
+                _ => descending
+                    ? sortBuilder.Descending(d => d.Name)
+                    : sortBuilder.Ascending(d => d.Name)
+            };
+
+        var sort = sortBy.Equals("name", StringComparison.OrdinalIgnoreCase)
+            ? sortBuilder.Combine(
+                primarySort,
+                sortBuilder.Ascending(d => d.Id))
+    :       sortBuilder.Combine(
+                primarySort,
+                sortBuilder.Ascending(d => d.Name),
+                sortBuilder.Ascending(d => d.Id));
+
         var docs = await _collection
             .Find(filter)
-            .SortBy(d => d.Name)
-            .ThenBy(d => d.Id)
+            .Sort(sort)
             .Skip(skip)
             .Limit(take)
             .ToListAsync(ct);

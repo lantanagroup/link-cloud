@@ -15,12 +15,14 @@ public class FacilityTemplatesController(
 
     [HttpGet]
     public async Task<IActionResult> Index(
-    int page = 1,
-    int pageSize = 25,
-    string? search = null,
-    string? vendor = null,
-    string? kind = null,
-    CancellationToken ct = default)
+        int page = 1,
+        int pageSize = 25,
+        string? search = null,
+        string? vendor = null,
+        string? kind = null,
+        string sortBy = "name",
+        string sortDir = "asc",
+        CancellationToken ct = default)
     {
         page = Math.Max(1, page);
 
@@ -30,6 +32,18 @@ public class FacilityTemplatesController(
         search = search?.Trim();
         vendor = vendor?.Trim();
         kind = kind?.Trim();
+
+        sortBy = sortBy?.ToLowerInvariant() switch
+        {
+            "vendor" => "vendor",
+            "kind" => "kind",
+            _ => "name"
+        };
+
+        sortDir = string.Equals(sortDir, "desc",
+            StringComparison.OrdinalIgnoreCase)
+            ? "desc"
+            : "asc";
 
         var totalCount = await store.CountFilteredAsync(
             search, vendor, kind, ct);
@@ -48,6 +62,8 @@ public class FacilityTemplatesController(
             search,
             vendor,
             kind,
+            sortBy,
+            sortDir,
             ct);
 
         ViewBag.CurrentPage = page;
@@ -58,6 +74,8 @@ public class FacilityTemplatesController(
         ViewBag.Search = search;
         ViewBag.Vendor = vendor;
         ViewBag.Kind = kind;
+        ViewBag.SortBy = sortBy;
+        ViewBag.SortDir = sortDir;
 
         ViewBag.QueryPlanTemplates =
             await queryPlanTemplateStore.GetAllAsync(ct);

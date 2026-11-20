@@ -12,6 +12,16 @@
     var search = (string?)ViewBag.Search ?? "";
     var vendor = (string?)ViewBag.Vendor ?? "";
     var kind = (string?)ViewBag.Kind ?? "";
+    var sortBy = (string?)ViewBag.SortBy ?? "name";
+    var sortDir = (string?)ViewBag.SortDir ?? "asc";
+
+    string NextSortDir(string column) =>
+        sortBy == column && sortDir == "asc" ? "desc" : "asc";
+
+    string SortIndicator(string column) =>
+        sortBy == column
+            ? (sortDir == "asc" ? " ▲" : " ▼")
+            : "";
     var firstRecord = totalCount == 0 ? 0 : (currentPage - 1) * pageSize + 1;
     var lastRecord = Math.Min((long)currentPage * pageSize, totalCount);
     string PieceName<T>(IEnumerable<T> items, Guid? id, Func<T, Guid> idOf, Func<T, string> nameOf) where T : class
@@ -91,6 +101,8 @@
 
             <input type="hidden" name="pageSize" value="@pageSize" />
             <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+            <input type="hidden" name="sortDir" value="@sortDir" />
 
             <button type="submit" class="btn btn-sm btn-primary">
                 Apply Filters
@@ -99,6 +111,8 @@
             <a asp-controller="FacilityTemplates"
                asp-action="Index"
                asp-route-pageSize="@pageSize"
+               asp-route-sortBy="@sortBy"
+               asp-route-sortDir="@sortDir"
                class="btn btn-sm btn-outline-secondary">
                 Clear
             </a>
@@ -121,10 +135,49 @@
                                    id="facilitySelectAll"
                                    aria-label="Select all deletable templates on this page" />
                         </th>
-                        <th data-sort="name">Name</th>
-                        <th data-sort="vendor">Vendor</th>
+                        <th>
+                            <a asp-action="Index"
+                               asp-route-page="1"
+                               asp-route-pageSize="@pageSize"
+                               asp-route-search="@search"
+                               asp-route-vendor="@vendor"
+                               asp-route-kind="@kind"
+                               asp-route-sortBy="name"
+                               asp-route-sortDir="@NextSortDir("name")"
+                               class="text-decoration-none">
+                                Name @SortIndicator("name")
+                            </a>
+                        </th>
+
+                        <th>
+                            <a asp-action="Index"
+                               asp-route-page="1"
+                               asp-route-pageSize="@pageSize"
+                               asp-route-search="@search"
+                               asp-route-vendor="@vendor"
+                               asp-route-kind="@kind"
+                               asp-route-sortBy="vendor"
+                               asp-route-sortDir="@NextSortDir("vendor")"
+                               class="text-decoration-none">
+                                Vendor @SortIndicator("vendor")
+                            </a>
+                        </th>
+
                         <th>Pieces</th>
-                        <th data-sort="type">Kind</th>
+
+                        <th>
+                            <a asp-action="Index"
+                               asp-route-page="1"
+                               asp-route-pageSize="@pageSize"
+                               asp-route-search="@search"
+                               asp-route-vendor="@vendor"
+                               asp-route-kind="@kind"
+                               asp-route-sortBy="kind"
+                               asp-route-sortDir="@NextSortDir("kind")"
+                               class="text-decoration-none">
+                                Kind @SortIndicator("kind")
+                            </a>
+                        </th>
                         <th style="width:220px"></th>
                     </tr>
                 </thead>
@@ -240,6 +293,8 @@
                     <input type="hidden" name="search" value="@search" />
                     <input type="hidden" name="vendor" value="@vendor" />
                     <input type="hidden" name="kind" value="@kind" />
+                    <input type="hidden" name="sortBy" value="@sortBy" />
+                    <input type="hidden" name="sortDir" value="@sortDir" />
                 </form>
 
                 <nav aria-label="Facility template pagination">
@@ -254,6 +309,8 @@
                                asp-route-search="@search"
                                asp-route-vendor="@vendor"
                                asp-route-kind="@kind"
+                               asp-route-sortBy="@sortBy"
+                               asp-route-sortDir="@sortDir"
                                aria-label="Previous">
                                 Previous
                             </a>
@@ -274,6 +331,8 @@
                                asp-route-search="@search"
                                asp-route-vendor="@vendor"
                                asp-route-kind="@kind"
+                               asp-route-sortBy="@sortBy"
+                               asp-route-sortDir="@sortDir"
                                aria-label="Next">
                                 Next
                             </a>

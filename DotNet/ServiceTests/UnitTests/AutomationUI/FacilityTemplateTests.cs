@@ -159,6 +159,8 @@ public class FacilityTemplateTests
             string? search,
             string? vendor,
             string? kind,
+            string sortBy = "name",
+            string sortDir = "asc",
             CancellationToken ct = default) =>
             System.Threading.Tasks.Task.FromResult(
                 MatchesFilters(search, vendor, kind)

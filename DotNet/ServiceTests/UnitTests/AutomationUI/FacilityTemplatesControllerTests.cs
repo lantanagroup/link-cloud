@@ -308,6 +308,41 @@ public class FacilityTemplatesControllerTests
         (await _store.GetByIdAsync(template.Id)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task GetFilteredPage_sorts_by_name_descending()
+    {
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Alpha"
+        });
+
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Zulu"
+        });
+
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bravo"
+        });
+
+        var results = await _store.GetFilteredPageAsync(
+            0,
+            10,
+            null,
+            null,
+            null,
+            "name",
+            "desc");
+
+        results.Select(t => t.Name)
+            .Should()
+            .Equal("Zulu", "Bravo", "Alpha");
+    }
+
     private sealed class FakeFacilityTemplateStore : IFacilityTemplateStore
     {
         private readonly Dictionary<Guid, FacilityTemplate> _templates = [];
@@ -349,13 +384,40 @@ public class FacilityTemplatesControllerTests
             string? search,
             string? vendor,
             string? kind,
-            CancellationToken ct = default) =>
-            Task.FromResult(FilterTemplates(search, vendor, kind)
-                .OrderBy(t => t.Name)
-                .ThenBy(t => t.Id)
+            string sortBy = "name",
+            string sortDir = "asc",
+            CancellationToken ct = default)
+        {
+            var filtered = FilterTemplates(search, vendor, kind);
+
+            var descending = string.Equals(
+                sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+            IOrderedEnumerable<FacilityTemplate> sorted =
+                sortBy.ToLowerInvariant() switch
+                {
+                    "vendor" => descending
+                        ? filtered.OrderByDescending(t => t.VendorName)
+                        : filtered.OrderBy(t => t.VendorName),
+
+                    "kind" => descending
+                        ? filtered.OrderByDescending(t => t.IsSystem)
+                        : filtered.OrderBy(t => t.IsSystem),
+
+                    _ => descending
+                        ? filtered.OrderByDescending(t => t.Name)
+                        : filtered.OrderBy(t => t.Name)
+                };
+
+            var ordered = sortBy.Equals("name", StringComparison.OrdinalIgnoreCase)
+                ? sorted.ThenBy(t => t.Id)
+                : sorted.ThenBy(t => t.Name).ThenBy(t => t.Id);
+
+            return Task.FromResult(ordered
                 .Skip(skip)
                 .Take(take)
                 .ToList());
+        }
 
         private IEnumerable<FacilityTemplate> FilterTemplates(
             string? search,
