@@ -103,17 +103,11 @@ namespace LantanaGroup.Link.Report.Services
             {
                 HttpHeaders = new()
                 {
-                    ContentType = "application/x-ndjson"
+                    ContentType = FhirNdjsonWriter.ContentType
                 }
             };
             using Stream stream = await blobClient.OpenWriteAsync(true, blobOptions, cancellationToken);
-            ReadOnlyMemory<byte> lineFeed = new([0x0a]);
-
-            foreach (var resource in resources)
-            {
-                await JsonSerializer.SerializeAsync(stream, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
-                await stream.WriteAsync(lineFeed, cancellationToken);
-            }
+            await FhirNdjsonWriter.WriteAsync(stream, resources, cancellationToken);
 
             return blobClient.Uri;
         }
