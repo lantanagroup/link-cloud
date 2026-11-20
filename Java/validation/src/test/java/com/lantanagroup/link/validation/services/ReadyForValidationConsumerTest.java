@@ -16,6 +16,7 @@ import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ShadowCompareEvent;
+import com.lantanagroup.link.validation.records.ShadowFindingDto;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
@@ -69,6 +70,7 @@ public class ReadyForValidationConsumerTest {
     @Mock private RubricExecutionService rubricExecutionService;
     @Mock private LegacyResultMapper legacyResultMapper;
     @Mock private KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
+    @Mock private ShadowFindingsStore shadowFindingsStore;
 
     private static final String RUBRIC_ID = "measure-report-submission-v1";
 
@@ -108,6 +110,7 @@ public class ReadyForValidationConsumerTest {
                 legacyResultMapper,
                 objectMapper,
                 shadowCompareEventTemplate,
+                shadowFindingsStore,
                 false,
                 RUBRIC_ID,
                 false,
@@ -129,6 +132,7 @@ public class ReadyForValidationConsumerTest {
                 legacyResultMapper,
                 objectMapper,
                 shadowCompareEventTemplate,
+                shadowFindingsStore,
                 false,
                 RUBRIC_ID,
                 false,
@@ -150,6 +154,7 @@ public class ReadyForValidationConsumerTest {
                 legacyResultMapper,
                 objectMapper,
                 shadowCompareEventTemplate,
+                shadowFindingsStore,
                 true,
                 RUBRIC_ID,
                 false,
@@ -171,6 +176,7 @@ public class ReadyForValidationConsumerTest {
                 legacyResultMapper,
                 objectMapper,
                 shadowCompareEventTemplate,
+                shadowFindingsStore,
                 false,
                 RUBRIC_ID,
                 true,
@@ -192,6 +198,7 @@ public class ReadyForValidationConsumerTest {
                 legacyResultMapper,
                 objectMapper,
                 shadowCompareEventTemplate,
+                shadowFindingsStore,
                 true,
                 RUBRIC_ID,
                 true,
@@ -487,7 +494,7 @@ public class ReadyForValidationConsumerTest {
                 fhirContext, reportClient, validationService, realCategorizationService, resultService,
                 categoryCountService, validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
                 preQualificationConfig, preQualOperationOutcomeBuilder, rubricExecutionService,
-                legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, recoverer);
+                legacyResultMapper, objectMapper, shadowCompareEventTemplate, shadowFindingsStore, false, RUBRIC_ID, false, recoverer);
 
         Result inactiveResult = new Result();
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
@@ -1052,5 +1059,94 @@ public class ReadyForValidationConsumerTest {
         when(shadowCompareEventTemplate.send(any(ProducerRecord.class))).thenReturn(failed);
 
         assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
+    }
+
+    // -------------------------------------------------------------------------
+    // Shadow findings claim check
+    // -------------------------------------------------------------------------
+
+    private static final String FINDINGS_BLOB = "shadow-compare/facility-1/report-1/patient-1/x.json";
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_shadowEnabledWithBlobStorage_sendsTheBlobNameInsteadOfTheFindings() throws Exception {
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+        when(shadowFindingsStore.store(eq(FACILITY_ID), eq(REPORT_ID), eq(PATIENT_ID), anyList())).thenReturn(FINDINGS_BLOB);
+        ArgumentCaptor<ProducerRecord<String, ShadowCompareEvent>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
+        when(shadowCompareEventTemplate.send(captor.capture())).thenReturn(CompletableFuture.completedFuture(null));
+
+        consumerWithShadowEnabled.process(buildRecord(null));
+
+        ArgumentCaptor<List<ShadowFindingDto>> stored = ArgumentCaptor.forClass(List.class);
+        verify(shadowFindingsStore).store(eq(FACILITY_ID), eq(REPORT_ID), eq(PATIENT_ID), stored.capture());
+        assertEquals(1, stored.getValue().size());
+        ShadowCompareEvent event = captor.getValue().value();
+        assertEquals(FINDINGS_BLOB, event.getAuthoritativeResultBlobName());
+        assertNull(event.getAuthoritativeResult(), "the findings travel in the blob, not on the event");
+        verify(shadowFindingsStore, never()).delete(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_shadowEnabledWithoutBlobStorage_sendsTheFindingsOnTheEvent() throws Exception {
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+        // The store answers null when no blob storage is configured.
+        when(shadowFindingsStore.store(any(), any(), any(), anyList())).thenReturn(null);
+        ArgumentCaptor<ProducerRecord<String, ShadowCompareEvent>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
+        when(shadowCompareEventTemplate.send(captor.capture())).thenReturn(CompletableFuture.completedFuture(null));
+
+        consumerWithShadowEnabled.process(buildRecord(null));
+
+        ShadowCompareEvent event = captor.getValue().value();
+        assertNull(event.getAuthoritativeResultBlobName());
+        assertEquals(1, event.getAuthoritativeResult().size());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_findingsUploadFails_skipsTheShadowButStillSendsValidationComplete() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        when(shadowFindingsStore.store(any(), any(), any(), anyList())).thenThrow(new RuntimeException("ABS down"));
+        ArgumentCaptor<ProducerRecord<String, ValidationComplete>> vcCaptor = ArgumentCaptor.forClass(ProducerRecord.class);
+        CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
+        when(validationCompleteTemplate.send(vcCaptor.capture())).thenReturn(future);
+
+        assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
+
+        assertEquals(PATIENT_ID, vcCaptor.getValue().value().getPatientId());
+        verifyNoInteractions(shadowCompareEventTemplate);
+    }
+
+    @Test
+    void process_shadowSendThrowsSynchronously_deletesTheFindingsBlob() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        when(shadowFindingsStore.store(any(), any(), any(), anyList())).thenReturn(FINDINGS_BLOB);
+        when(shadowCompareEventTemplate.send(any(ProducerRecord.class))).thenThrow(new RuntimeException("broker unavailable"));
+
+        assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
+
+        verify(shadowFindingsStore).delete(FINDINGS_BLOB);
+    }
+
+    @Test
+    void process_shadowSendFailsAsynchronously_keepsTheFindingsBlob() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        when(shadowFindingsStore.store(any(), any(), any(), anyList())).thenReturn(FINDINGS_BLOB);
+        CompletableFuture<SendResult<String, ShadowCompareEvent>> failed = new CompletableFuture<>();
+        // As at delivery.timeout.ms: the broker may have appended the event and only the acknowledgement was lost.
+        failed.completeExceptionally(new org.apache.kafka.common.errors.TimeoutException("Expiring 1 record(s)"));
+        when(shadowCompareEventTemplate.send(any(ProducerRecord.class))).thenReturn(failed);
+
+        assertDoesNotThrow(() -> consumerWithShadowEnabled.process(buildRecord(null)));
+
+        // An appended event could still point at the blob, so it is left for the lifecycle rule.
+        verify(shadowFindingsStore, never()).delete(any());
     }
 }
