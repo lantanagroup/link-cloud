@@ -15,6 +15,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -572,7 +573,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                     catch (Exception ex)
                     {
                         // A DMRP outage here must not fail the step save.
-                        _logger.LogError(ex, "Measure reporting auto-enroll failed for facility {FacilityId}.", facility.FacilityId);
+                        _logger.LogError(ex, "Measure reporting auto-enroll failed for facility {FacilityId}.", facility.FacilityId.SanitizeForLog());
                     }
                 }
                 break;
@@ -760,7 +761,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
         if (result is null)
         {
-            _logger.LogWarning("Step fhir for facility {FacilityId}: Tenant has no facility record; FHIR configuration not written.", facilityId);
+            _logger.LogWarning("Step fhir for facility {FacilityId}: Tenant has no facility record; FHIR configuration not written.", facilityId.SanitizeForLog());
             return false;
         }
 
@@ -830,7 +831,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "QueryPlan auto-seed failed for facility {FacilityId}, vendor {Vendor}.", facilityId, vendor);
+            _logger.LogError(ex, "QueryPlan auto-seed failed for facility {FacilityId}, vendor {Vendor}.", facilityId.SanitizeForLog(), vendor);
         }
     }
 }

@@ -5,6 +5,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Concurrency;
 
@@ -69,7 +70,7 @@ internal sealed class SqlFacilityWriteLock : IFacilityWriteLock
         if (result < 0)
         {
             _logger.LogWarning("sp_getapplock returned {Result} for {Resource} after {TimeoutMs}ms.",
-                result, resource, _settings.TimeoutMs);
+                result, resource.SanitizeForLog(), _settings.TimeoutMs);
 
             await DiscardAsync(transaction, cancellationToken);
             throw new FacilityWriteLockTimeoutException(facilityId, _settings.TimeoutMs);

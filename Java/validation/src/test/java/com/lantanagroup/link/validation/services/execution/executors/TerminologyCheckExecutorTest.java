@@ -16,8 +16,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -112,6 +114,24 @@ class TerminologyCheckExecutorTest {
 
         assertThat(findings).isEmpty();
         verify(chain, never()).validateCode(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a nested-quantifier whitelist cannot exhaust the worker on a long nonmatching system")
+    void pathologicalWhitelistCompletesAndStillValidatesTheCoding() {
+        String system = "a".repeat(100_000) + "!";
+        IValidationSupport.CodeValidationResult result = mock(IValidationSupport.CodeValidationResult.class);
+        when(result.isOk()).thenReturn(true);
+        when(chain.validateCode(any(), any(), eq(system), eq("1234-5"), any(), any())).thenReturn(result);
+        var context = contextWithCoding(system, "1234-5");
+        // Keep HAPI's lazy model discovery outside the regex execution deadline.
+        FHIR_CONTEXT.newTerser().getAllPopulatedChildElementsOfType(context.getResource(), Coding.class);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+                assertThat(executor.execute(check("{\"valueSetWhitelistRegex\":\"(a+)+$\"}"),
+                        context)).isEmpty());
+
+        verify(chain).validateCode(any(), any(), eq(system), eq("1234-5"), any(), any());
     }
 
     @Test

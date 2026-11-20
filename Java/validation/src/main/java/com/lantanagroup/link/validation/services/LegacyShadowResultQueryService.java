@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.LegacyShadowFinding;
 import com.lantanagroup.link.validation.entities.LegacyShadowResult;
 import com.lantanagroup.link.validation.models.LegacyShadowResultDto;
@@ -79,7 +80,7 @@ public class LegacyShadowResultQueryService {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {
             });
         } catch (Exception e) {
-            log.warn("Failed to parse legacy shadow finding category ids for finding {}", findingId, e);
+            log.warn("Failed to parse legacy shadow finding category ids for finding {}", LogUtils.sanitize(findingId), e);
             return List.of();
         }
     }
