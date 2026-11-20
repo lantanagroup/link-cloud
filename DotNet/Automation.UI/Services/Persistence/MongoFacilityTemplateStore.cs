@@ -61,6 +61,7 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
             cancellationToken: ct);
     }
 
+
     public async Task<List<FacilityTemplate>> GetFilteredPageAsync(
         int skip,
         int take,
@@ -96,23 +97,39 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
                     : sortBuilder.Ascending(d => d.Name)
             };
 
-        var sort = sortBy.Equals("name", StringComparison.OrdinalIgnoreCase)
-            ? sortBuilder.Combine(
-                primarySort,
-                sortBuilder.Ascending(d => d.Id))
-    :       sortBuilder.Combine(
-                primarySort,
-                sortBuilder.Ascending(d => d.Name),
-                sortBuilder.Ascending(d => d.Id));
-
+        // Cosmos DB for MongoDB RU does not support multi-field
+        // sorting without a corresponding composite index.
+        // Fetch all matching documents before applying deterministic
+        // ordering and pagination in memory.
         var docs = await _collection
             .Find(filter)
-            .Sort(sort)
-            .Skip(skip)
-            .Limit(take)
+            .Sort(primarySort)
             .ToListAsync(ct);
 
-        return docs.Select(ToModel).ToList();
+        IOrderedEnumerable<FacilityTemplateDocument> ordered =
+            sortBy.ToLowerInvariant() switch
+            {
+                "vendor" => descending
+                    ? docs.OrderByDescending(d => d.VendorName, StringComparer.Ordinal)
+                    : docs.OrderBy(d => d.VendorName, StringComparer.Ordinal),
+
+                "kind" => descending
+                    ? docs.OrderByDescending(d => d.IsSystem)
+                    : docs.OrderBy(d => d.IsSystem),
+
+                _ => descending
+                    ? docs.OrderByDescending(d => d.Name, StringComparer.Ordinal)
+                    : docs.OrderBy(d => d.Name, StringComparer.Ordinal)
+            };
+
+        var page = ordered
+            .ThenBy(d => d.Name, StringComparer.Ordinal)
+            .ThenBy(d => d.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToList();
+
+        return page.Select(ToModel).ToList();
     }
 
     private static FilterDefinition<FacilityTemplateDocument> BuildFilter(
