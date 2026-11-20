@@ -46,6 +46,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
     private final ObjectMapper objectMapper;
     private final LegacyShadowResultPersister legacyShadowResultPersister;
     private final ShadowComparator shadowComparator;
+    private final ShadowFindingsStore shadowFindingsStore;
     private final String rubricId;
 
     public ShadowValidationConsumer(
@@ -59,6 +60,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
             ObjectMapper objectMapper,
             LegacyShadowResultPersister legacyShadowResultPersister,
             ShadowComparator shadowComparator,
+            ShadowFindingsStore shadowFindingsStore,
             @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
             @Qualifier("deadLetterPublishingRecoverer")  ConsumerRecordRecoverer recoverer) {
         super(recoverer);
@@ -72,6 +74,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
         this.objectMapper = objectMapper;
         this.legacyShadowResultPersister = legacyShadowResultPersister;
         this.shadowComparator = shadowComparator;
+        this.shadowFindingsStore = shadowFindingsStore;
         this.rubricId = rubricId;
     }
 
@@ -79,6 +82,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
     protected void process(ConsumerRecord<String, ShadowCompareEvent> record) {
         ShadowCompareEvent event = record.value();
         try {
+            List<ShadowFindingDto> authoritativeResult = resolveAuthoritativeResult(event);
             Bundle bundle = resolveBundle(event.getPayloadUri(), event.getFacilityId(),
                     event.getPatientId(), event.getReportId());
 
@@ -97,7 +101,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
                 legacyShadowResultPersister.persist(event.getRequestId(), event.getCorrelationId(),
                         event.getFacilityId(), event.getPatientId(), event.getReportId(), legacyResults,
                         requestedAt, completedAt);
-                newResults = toResults(event.getAuthoritativeResult());
+                newResults = toResults(authoritativeResult);
                 legacyValid = ValidationVerdict.legacyValid(legacyResults);
                 legacyUncategorized = ValidationVerdict.uncategorizedCount(legacyResults);
                 rubricValid = event.getAuthoritativeValid();
@@ -109,11 +113,11 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
                 BridgeOutcome outcome = legacyResultMapper.toResults(envelope, event.getFacilityId(),
                         event.getPatientId(), event.getReportId());
                 newResults = outcome.results();
-                legacyResults = toResults(event.getAuthoritativeResult());
+                legacyResults = toResults(authoritativeResult);
                 legacyValid = event.getAuthoritativeValid();
                 // counted from the event: the results rebuilt from it carry no categories
-                legacyUncategorized = event.getAuthoritativeResult() == null ? 0
-                        : event.getAuthoritativeResult().stream()
+                legacyUncategorized = authoritativeResult == null ? 0
+                        : authoritativeResult.stream()
                                 .filter(f -> f != null && (f.getCategoryIds() == null || f.getCategoryIds().isEmpty()))
                                 .count();
                 // As the primary consumer decides it: by the rubric status, or unknown when there is none.
@@ -126,7 +130,21 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
         } catch (Exception e) {
             _logger.warn("Shadow comparison failed for report {}; skipping",
                     LogUtils.sanitize(event.getReportId()), e);
+        } finally {
+            // Nothing is retried here, so the blob is never needed again, whether or not the comparison succeeded.
+            shadowFindingsStore.delete(event.getAuthoritativeResultBlobName());
         }
+    }
+
+    /**
+     * The primary engine's findings: from the claim-check blob when the event names one, otherwise from the event
+     * itself (no blob storage, or an event published before the claim check).
+     */
+    private List<ShadowFindingDto> resolveAuthoritativeResult(ShadowCompareEvent event) {
+        if (event.getAuthoritativeResultBlobName() != null) {
+            return shadowFindingsStore.load(event.getAuthoritativeResultBlobName());
+        }
+        return event.getAuthoritativeResult();
     }
 
     private Bundle resolveBundle(String payloadUri, String facilityId, String patientId, String reportId) {

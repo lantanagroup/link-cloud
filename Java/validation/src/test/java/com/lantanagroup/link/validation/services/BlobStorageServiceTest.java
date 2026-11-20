@@ -107,4 +107,14 @@ class BlobStorageServiceTest {
         verify(appendBlobClient).appendBlock(any(InputStream.class), anyLong());
         verifyNoMoreInteractions(appendBlobClient);
     }
+
+    @Test
+    void deleteIfExists_deletesTheNamedBlob() {
+        when(containerClient.getBlobClient(BLOB_NAME)).thenReturn(blobClient);
+        when(blobClient.deleteIfExists()).thenReturn(true);
+
+        assertEquals(true, service.deleteIfExists(BLOB_NAME));
+
+        verify(blobClient).deleteIfExists();
+    }
 }
