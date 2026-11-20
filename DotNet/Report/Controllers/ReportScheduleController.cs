@@ -1,8 +1,12 @@
-﻿using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Application;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
+using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -26,13 +30,15 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly ILogger<ReportScheduleController> _logger;
         private readonly IDatabase _database;
         private readonly IReportScheduledManager _reportScheduledManager;
+        private readonly ReportManifestProducer _reportManifestProducer;
 
         public ReportScheduleController(ILogger<ReportScheduleController> logger, IDatabase database,
-            IReportScheduledManager reportScheduledManager)
+            IReportScheduledManager reportScheduledManager, ReportManifestProducer reportManifestProducer)
         {
             _logger = logger;
             _database = database;
             _reportScheduledManager = reportScheduledManager;
+            _reportManifestProducer = reportManifestProducer;
         }
 
         /// <summary>
@@ -384,5 +390,120 @@ namespace LantanaGroup.Link.Report.Controllers
 
             return result == null ? NotFound() : Ok(result);
         }
+
+        /// <summary>
+        /// Generates the report manifest on demand and returns it. Nothing is uploaded to blob
+        /// storage and nothing is submitted. Unlike the scheduled manifest, this does not wait for
+        /// every patient to finish: a patient still in a non-terminal status is included as it
+        /// stands and flagged with an <c>incomplete</c> warning in the manifest's OperationOutcome.
+        /// Each call creates new resource ids and timestamps, so two downloads never match exactly.
+        /// </summary>
+        /// <param name="id">The report schedule id.</param>
+        /// <param name="format">
+        /// <c>ndjson</c> (the default) returns one resource per line as <c>application/x-ndjson</c>,
+        /// serialized exactly like the uploaded manifest.ndjson. <c>json</c> returns a FHIR
+        /// <c>collection</c> Bundle as <c>application/fhir+json</c>.
+        /// </param>
+        /// <param name="force">
+        /// Generate even though the reporting period has not closed. The census may still change,
+        /// and the OperationOutcome carries a warning saying so. Without it such a request gets 409.
+        /// </param>
+        [HttpGet("{id}/manifest")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK, FhirNdjsonWriter.ContentType)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK, FhirJsonContentType)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
+        public async Task<IActionResult> GetManifest(
+            string id,
+            [FromQuery] string? format = null,
+            [FromQuery] bool force = false)
+        {
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid Id format");
+
+            var sanitizedFormat = string.IsNullOrWhiteSpace(format)
+                ? ManifestFormatNdjson
+                : HtmlInputSanitizer.Sanitize(format).Trim().ToLowerInvariant();
+
+            if (sanitizedFormat != ManifestFormatNdjson && sanitizedFormat != ManifestFormatJson)
+                return BadRequest($"Unsupported format. Use '{ManifestFormatNdjson}' or '{ManifestFormatJson}'.");
+
+            var cancellationToken = HttpContext.RequestAborted;
+
+            var schedule = (await _reportScheduledManager.FindAsync(
+                    x => x.Id == parsedId && (!x.IsDeleted.HasValue || x.IsDeleted == false),
+                    cancellationToken))
+                .FirstOrDefault();
+
+            if (schedule == null)
+                return NotFound();
+
+            if (!schedule.EndOfReportPeriodJobHasRun && !force)
+            {
+                return Problem(
+                    detail: "The reporting period has not closed, so the patient census may still change. Pass force=true to generate the manifest anyway.",
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
+            List<Hl7.Fhir.Model.Resource> resources;
+            try
+            {
+                resources = await _reportManifestProducer.Generate(schedule, ManifestGenerationMode.AdHoc, cancellationToken);
+            }
+            catch (FacilityConfigNotFoundException ex)
+            {
+                _logger.LogWarning(new EventId(ReportConstants.LoggingIds.GetItem, "GetManifest"), ex,
+                    "No facility config for report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                return Problem(detail: "The schedule's facility has no configuration in Tenant.",
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (TenantUnavailableException ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetManifest"), ex,
+                    "Tenant could not be reached while generating the manifest for report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                return Problem(detail: "The facility configuration could not be retrieved from Tenant.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetManifest"), ex,
+                    "An exception occurred while generating the manifest for report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                throw;
+            }
+
+            var incompleteCount = resources.OfType<Hl7.Fhir.Model.OperationOutcome>()
+                .SelectMany(o => o.Issue)
+                .Count(i => i.Code == Hl7.Fhir.Model.OperationOutcome.IssueType.Incomplete);
+
+            _logger.LogInformation(new EventId(ReportConstants.LoggingIds.GetItem, "GetManifest"),
+                "Ad-hoc manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId}, Format = {Format}, IncompleteEntries = {IncompleteEntries}, Forced = {Forced})",
+                schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog(), sanitizedFormat, incompleteCount,
+                force && !schedule.EndOfReportPeriodJobHasRun);
+
+            if (sanitizedFormat == ManifestFormatJson)
+            {
+                Response.ContentType = FhirJsonContentType;
+                await JsonSerializer.SerializeAsync(Response.Body, ReportManifestProducer.ToBundle(resources),
+                    LinkFhirSerializerOptions.ForFhirLenientSerialization, cancellationToken);
+            }
+            else
+            {
+                Response.ContentType = FhirNdjsonWriter.ContentType;
+                await FhirNdjsonWriter.WriteAsync(Response.Body, resources, cancellationToken);
+            }
+
+            return new EmptyResult();
+        }
+
+        private const string ManifestFormatNdjson = "ndjson";
+        private const string ManifestFormatJson = "json";
+        private const string FhirJsonContentType = "application/fhir+json";
     }
 }

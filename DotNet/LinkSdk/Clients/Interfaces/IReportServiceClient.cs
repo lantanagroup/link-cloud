@@ -19,6 +19,24 @@ public interface IReportServiceClient
     Task<LinkApiResponse> RestoreScheduleAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SetReportsDeletedStatusForFacilityAsync(string facilityId, bool deleted, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Generates a schedule's manifest on demand (<c>GET /schedules/{id}/manifest</c>). Nothing is
+    /// uploaded or submitted. Patients still in flight are included and flagged in the manifest's
+    /// OperationOutcome.
+    /// </summary>
+    /// <param name="reportScheduleId">The report schedule id.</param>
+    /// <param name="format">NDJSON (the default) or a FHIR JSON Bundle.</param>
+    /// <param name="force">Generate even though the reporting period has not closed; otherwise that is a 409.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>
+    /// The manifest as text, exactly as the service sent it: NDJSON lines or a Bundle document, as
+    /// <see cref="LinkApiResponse{T}.ContentType"/> reports. It is not deserialized, because this
+    /// client's JSON settings cannot read FHIR and NDJSON is not a single JSON document. Parse it with
+    /// the FHIR serializer if you need resources. On failure, <see cref="LinkApiResponse{T}.RawBody"/>
+    /// holds the Problem Details.
+    /// </returns>
+    Task<LinkApiResponse<string>> GetScheduleManifestAsync(string reportScheduleId, ReportManifestFormat format = ReportManifestFormat.Ndjson, bool force = false, CancellationToken cancellationToken = default);
+
     // --- Entries ---
     Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByIdAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByScheduleAsync(string reportId, CancellationToken cancellationToken = default);
