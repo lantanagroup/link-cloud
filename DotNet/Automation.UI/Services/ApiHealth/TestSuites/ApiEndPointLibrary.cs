@@ -231,7 +231,8 @@ public static class ApiEndPointLibrary
             [DataAcquisitionSteps.SftpLogsGet200] = new EndpointMeta("Lists sFTP acquisition logs.", $"GET {api}/sftp-logs"),
             [DataAcquisitionSteps.SftpLogGet400] = new EndpointMeta("Rejects an sFTP log id that is not a guid.", $"GET {api}/sftp-logs/{{logId}}"),
             [DataAcquisitionSteps.SftpLogPost400] = new EndpointMeta("Rejects an empty sFTP log body before a row is inserted.", $"POST {api}/sftp-logs"),
-            [DataAcquisitionSteps.SftpLogReset400] = new EndpointMeta("Rejects an sFTP log reset whose id is not a guid.", $"POST {api}/sftp-logs/{{logId}}/reset")
+            [DataAcquisitionSteps.SftpLogReset400] = new EndpointMeta("Rejects an sFTP log reset whose id is not a guid.", $"POST {api}/sftp-logs/{{logId}}/reset"),
+            [DataAcquisitionSteps.AntiforgeryTokenGet200] = new EndpointMeta("Returns a browser antiforgery token and the header name that carries it. The token value is not stored on the step result.", $"GET {api}/antiforgery-token")
         };
     }
 
@@ -593,6 +594,7 @@ public static class ApiEndPointLibrary
         public const string SftpLogGet400 = "SftpLog GET → 400";
         public const string SftpLogPost400 = "SftpLog POST → 400";
         public const string SftpLogReset400 = "SftpLogReset POST → 400";
+        public const string AntiforgeryTokenGet200 = "AntiforgeryToken GET → 200";
     }
 
     public static class NormalizationSteps

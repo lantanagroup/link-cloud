@@ -232,4 +232,11 @@ public interface IDataAcquisitionServiceClient
 
     /// <summary>Resets one sFTP log: <c>POST /api/data-acquisition/sftp-logs/{logId}/reset</c>.</summary>
     Task<LinkApiResponse> ResetSftpLogAsync(string logId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the browser antiforgery token: <c>GET /api/data-acquisition/antiforgery-token</c>.
+    /// The token is on <see cref="AntiforgeryTokenApiModel.Token"/> so the caller can check it is present.
+    /// It is removed from <see cref="LinkApiResponse{T}.RawBody"/>, which step results and logs keep.
+    /// </summary>
+    Task<LinkApiResponse<AntiforgeryTokenApiModel>> GetAntiforgeryTokenAsync(CancellationToken cancellationToken = default);
 }
