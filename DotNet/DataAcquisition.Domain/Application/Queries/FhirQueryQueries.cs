@@ -52,7 +52,7 @@ namespace DataAcquisition.Domain.Application.Queries
                 query = query.Where(x => x.DataAcquisitionLog.FhirQueries.Any(y => y.FhirQueryResourceTypes.Any(z => z.ResourceType.Equals(resourceType))));
             }
 
-            return new FhirQueryResultModel { Queries = await query.ToListAsync() };
+            return new FhirQueryResultModel { Queries = await query.ToListAsync(cancellationToken) };
         }
     }
 }

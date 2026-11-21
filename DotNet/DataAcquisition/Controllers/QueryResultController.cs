@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,7 +45,7 @@ public class FhirQueriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet]
     public async Task<ActionResult<QueryResultsModel>> GetQueries(
-        [FromRoute] string facilityId, [FromQuery] string correlationId, [FromQuery] string patientId, [FromQuery] string resourceType, CancellationToken cancellationToken = default)
+        [FromRoute] string facilityId, [FromQuery] string? correlationId, [FromQuery] string? patientId, [FromQuery] string? resourceType, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
         {
@@ -55,7 +56,8 @@ public class FhirQueriesController : ControllerBase
         {
             var results = await _fhirQueryQueries.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
 
-            if (results.Queries.Count == 0)
+            // Queries is unset when the read produced no model. That is not-found, same as an empty list.
+            if (results?.Queries is not { Count: > 0 })
             {
                 return NotFound();
             }
@@ -64,7 +66,9 @@ public class FhirQueriesController : ControllerBase
         }
         catch (Exception ex)
         {
-            var sanitizedCorrelationId = correlationId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "").Trim();
+            // correlationId is optional. Calling Replace on a null value threw NullReferenceException
+            // and hid the exception from the read.
+            var sanitizedCorrelationId = HtmlInputSanitizer.SanitizeAndRemove(correlationId ?? string.Empty);
             _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get FHIR Query Results"), ex, "An exception occurred while attempting to retrieve FHIR Query Results for correlationId {correlationId}", sanitizedCorrelationId);
             throw;
         }
