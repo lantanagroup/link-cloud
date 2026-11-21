@@ -106,6 +106,15 @@ public class DataAcquisitionTestSuiteTests
             .Should().ContainSingle().Which.Args[0].Should().Be(facilityId);
         client.Calls(nameof(IDataAcquisitionServiceClient.SearchAcquisitionLogsByPatientAsync))
             .Should().ContainSingle().Which.Args[0].Should().Be(facilityId);
+        client.Calls(nameof(IDataAcquisitionServiceClient.GetAntiforgeryTokenAsync))
+            .Should().ContainSingle();
+
+        var antiforgery = results.Should().ContainSingle(item => item.EndpointName == StepNames.AntiforgeryTokenGet200).Subject;
+        antiforgery.ResponseBody.Should().Contain("X-Link-AntiForgery");
+        antiforgery.ResponseBody.Should().NotContain(RecordingAntiforgeryToken);
+        (antiforgery.ErrorMessage ?? string.Empty).Should().NotContain(RecordingAntiforgeryToken);
+        results.Should().OnlyContain(item =>
+            item.ResponseBody == null || !item.ResponseBody.Contains(RecordingAntiforgeryToken, StringComparison.Ordinal));
 
         foreach (var call in client.Calls(nameof(IDataAcquisitionServiceClient.UpdateOrganizationLocationConfigurationAsync))
                      .Concat(client.Calls(nameof(IDataAcquisitionServiceClient.UpdateOrganizationLocationConfigurationByIdAsync))))
@@ -132,6 +141,20 @@ public class DataAcquisitionTestSuiteTests
 
         results.Should().ContainSingle(item => item.EndpointName == StepNames.OrgLocationConfigDelete202)
             .Which.Passed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_fails_the_antiforgery_step_when_the_token_or_header_name_is_missing()
+    {
+        var suite = CreateSuite(out var client, createdConfigId: CreatedConfigId);
+        client.ReturnEmptyAntiforgeryToken = true;
+
+        var results = await suite.ExecuteAsync();
+
+        var antiforgery = results.Should().ContainSingle(item => item.EndpointName == StepNames.AntiforgeryTokenGet200).Subject;
+        antiforgery.Passed.Should().BeFalse();
+        antiforgery.ErrorMessage.Should().Contain("non-empty token and headerName");
+        antiforgery.ResponseBody.Should().NotContain(RecordingAntiforgeryToken);
     }
 
     private static DataAcquisitionTestSuite CreateSuite(out RecordingDataAcquisitionClient client, int createdConfigId = CreatedConfigId)
@@ -224,14 +247,19 @@ public class DataAcquisitionTestSuiteTests
         (StepNames.SftpLogsGet200, 200, "GET"),
         (StepNames.SftpLogGet400, 400, "GET"),
         (StepNames.SftpLogPost400, 400, "POST"),
-        (StepNames.SftpLogReset400, 400, "POST")
+        (StepNames.SftpLogReset400, 400, "POST"),
+        (StepNames.AntiforgeryTokenGet200, 200, "GET")
     ];
+
+    private const string RecordingAntiforgeryToken = "api-health-probe-token";
 
     public class RecordingDataAcquisitionClient : DispatchProxy
     {
         private readonly List<RecordedCall> _calls = [];
 
         public int ReturnedConfigId { get; set; } = CreatedConfigId;
+
+        public bool ReturnEmptyAntiforgeryToken { get; set; }
 
         public IReadOnlyList<RecordedCall> Calls(string name) =>
             _calls.Where(call => call.Name == name).ToList();
@@ -244,9 +272,17 @@ public class DataAcquisitionTestSuiteTests
 
             var responseType = method.ReturnType.GetGenericArguments()[0];
             var status = StatusFor(method.Name, callArgs);
-            object? body = method.Name == nameof(IDataAcquisitionServiceClient.CreateOrganizationLocationConfigurationAsync)
-                ? new OrganizationLocationConfigurationApiModel { ConfigId = ReturnedConfigId }
-                : null;
+            object? body = method.Name switch
+            {
+                nameof(IDataAcquisitionServiceClient.CreateOrganizationLocationConfigurationAsync) =>
+                    new OrganizationLocationConfigurationApiModel { ConfigId = ReturnedConfigId },
+                nameof(IDataAcquisitionServiceClient.GetAntiforgeryTokenAsync) => new AntiforgeryTokenApiModel
+                {
+                    Token = ReturnEmptyAntiforgeryToken ? "" : RecordingAntiforgeryToken,
+                    HeaderName = ReturnEmptyAntiforgeryToken ? "" : "X-Link-AntiForgery"
+                },
+                _ => null
+            };
             var response = CreateResponse(responseType, status, body);
             return typeof(Task).GetMethod(nameof(Task.FromResult))!
                 .MakeGenericMethod(responseType)
