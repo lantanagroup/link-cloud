@@ -143,18 +143,23 @@ public class DataAcquisitionTestSuiteTests
             .Which.Passed.Should().BeTrue();
     }
 
-    [Fact]
-    public async Task ExecuteAsync_fails_the_antiforgery_step_when_the_token_or_header_name_is_missing()
+    [Theory]
+    [InlineData("", "X-Link-AntiForgery")]
+    [InlineData(RecordingAntiforgeryToken, "")]
+    public async Task ExecuteAsync_fails_the_antiforgery_step_when_the_token_or_header_name_is_missing(
+        string token, string headerName)
     {
         var suite = CreateSuite(out var client, createdConfigId: CreatedConfigId);
-        client.ReturnEmptyAntiforgeryToken = true;
+        client.AntiforgeryToken = token;
+        client.AntiforgeryHeaderName = headerName;
 
         var results = await suite.ExecuteAsync();
 
         var antiforgery = results.Should().ContainSingle(item => item.EndpointName == StepNames.AntiforgeryTokenGet200).Subject;
         antiforgery.Passed.Should().BeFalse();
         antiforgery.ErrorMessage.Should().Contain("non-empty token and headerName");
-        antiforgery.ResponseBody.Should().NotContain(RecordingAntiforgeryToken);
+        (antiforgery.ResponseBody ?? string.Empty).Should().NotContain(RecordingAntiforgeryToken);
+        antiforgery.ErrorMessage.Should().NotContain(RecordingAntiforgeryToken);
     }
 
     private static DataAcquisitionTestSuite CreateSuite(out RecordingDataAcquisitionClient client, int createdConfigId = CreatedConfigId)
@@ -259,7 +264,9 @@ public class DataAcquisitionTestSuiteTests
 
         public int ReturnedConfigId { get; set; } = CreatedConfigId;
 
-        public bool ReturnEmptyAntiforgeryToken { get; set; }
+        public string? AntiforgeryToken { get; set; }
+
+        public string? AntiforgeryHeaderName { get; set; }
 
         public IReadOnlyList<RecordedCall> Calls(string name) =>
             _calls.Where(call => call.Name == name).ToList();
@@ -278,8 +285,8 @@ public class DataAcquisitionTestSuiteTests
                     new OrganizationLocationConfigurationApiModel { ConfigId = ReturnedConfigId },
                 nameof(IDataAcquisitionServiceClient.GetAntiforgeryTokenAsync) => new AntiforgeryTokenApiModel
                 {
-                    Token = ReturnEmptyAntiforgeryToken ? "" : RecordingAntiforgeryToken,
-                    HeaderName = ReturnEmptyAntiforgeryToken ? "" : "X-Link-AntiForgery"
+                    Token = AntiforgeryToken ?? RecordingAntiforgeryToken,
+                    HeaderName = AntiforgeryHeaderName ?? "X-Link-AntiForgery"
                 },
                 _ => null
             };
