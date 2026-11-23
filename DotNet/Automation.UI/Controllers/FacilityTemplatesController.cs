@@ -1,7 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace Automation.UI.Controllers;
 
@@ -30,9 +29,17 @@ public class FacilityTemplatesController(
         if (pageSize is not (10 or 25 or 50 or 100))
             pageSize = 25;
 
-        search = search?.Sanitize().Trim();
-        vendor = vendor?.Sanitize().Trim();
-        kind = kind?.Sanitize().Trim();
+        const int maxFilterLength = 200;
+
+        search = search?.Trim();
+        vendor = vendor?.Trim();
+        kind = kind?.Trim();
+
+        if (search is { Length: > maxFilterLength })
+            search = search[..maxFilterLength];
+
+        if (vendor is { Length: > maxFilterLength })
+            vendor = vendor[..maxFilterLength];
 
         kind = kind?.ToLowerInvariant() switch
         {

@@ -452,6 +452,65 @@ public class FacilityTemplatesControllerTests
         ((int)controller.ViewBag.PageSize).Should().Be(expectedTake);
     }
 
+
+    [Fact]
+    public async Task Index_preserves_special_characters_in_search()
+    {
+        var controller = CreateController();
+
+        var result = await controller.Index(
+            search: "  A & B's Template  ");
+
+        result.Should().BeOfType<ViewResult>();
+
+        _store.LastSearch.Should().Be("A & B's Template");
+        ((string?)controller.ViewBag.Search)
+            .Should().Be("A & B's Template");
+    }
+
+    [Fact]
+    public async Task Index_limits_search_and_vendor_length()
+    {
+        var controller = CreateController();
+
+        var result = await controller.Index(
+            search: new string('A', 250),
+            vendor: new string('B', 250));
+
+        result.Should().BeOfType<ViewResult>();
+
+        _store.LastSearch.Should().HaveLength(200);
+        _store.LastVendor.Should().HaveLength(200);
+    }
+
+    [Theory]
+    [InlineData("epic")]
+    [InlineData("EPIC")]
+    [InlineData("EpIc")]
+    public async Task GetFilteredPage_filters_vendor_case_insensitively(
+        string vendor)
+    {
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Epic Template",
+            VendorName = "Epic"
+        });
+
+        _store.Add(new FacilityTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Cerner Template",
+            VendorName = "Cerner"
+        });
+
+        var results = await _store.GetFilteredPageAsync(
+            0, 10, null, vendor, null);
+
+        results.Should().ContainSingle()
+            .Which.Name.Should().Be("Epic Template");
+    }
+
     private sealed class FakeFacilityTemplateStore : IFacilityTemplateStore
     {
         private readonly Dictionary<Guid, FacilityTemplate> _templates = [];
@@ -554,7 +613,7 @@ public class FacilityTemplatesControllerTests
                  t.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)) &&
 
                 (string.IsNullOrWhiteSpace(vendor) ||
-                 string.Equals(t.VendorName, vendor.Trim(), StringComparison.Ordinal)) &&
+                 string.Equals(t.VendorName, vendor.Trim(), StringComparison.OrdinalIgnoreCase)) &&
 
                 (string.IsNullOrWhiteSpace(kind) ||
                  (kind.Equals("System", StringComparison.OrdinalIgnoreCase) && t.IsSystem) ||

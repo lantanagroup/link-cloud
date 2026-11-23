@@ -23,31 +23,6 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
         return docs.Select(ToModel).ToList();
     }
 
-    public async Task<long> CountAsync(CancellationToken ct = default)
-    {
-        return await _collection.CountDocumentsAsync(
-            FilterDefinition<FacilityTemplateDocument>.Empty,
-            cancellationToken: ct);
-    }
-
-    public async Task<List<FacilityTemplate>> GetPageAsync(
-        int skip,
-        int take,
-        CancellationToken ct = default)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(skip);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
-
-        var docs = await _collection
-            .Find(FilterDefinition<FacilityTemplateDocument>.Empty)
-            .SortBy(d => d.Name)
-            .Skip(skip)
-            .Limit(take)
-            .ToListAsync(ct);
-
-        return docs.Select(ToModel).ToList();
-    }
-
     public async Task<long> CountFilteredAsync(
     string? search,
     string? vendor,
@@ -60,8 +35,6 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
             filter,
             cancellationToken: ct);
     }
-
-
     public async Task<List<FacilityTemplate>> GetFilteredPageAsync(
         int skip,
         int take,
@@ -77,59 +50,71 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
 
         var filter = BuildFilter(search, vendor, kind);
 
-        var sortBuilder = Builders<FacilityTemplateDocument>.Sort;
+        // Retrieve only fields required for sorting and pagination.
+        // Avoid database-side sorting on VendorName or IsSystem,
+        // which may not be indexed in Cosmos DB for MongoDB RU.
+        var lightweightDocs = await _collection
+            .Find(filter)
+            .Project(d => new
+            {
+                d.Id,
+                d.Name,
+                d.VendorName,
+                d.IsSystem
+            })
+            .ToListAsync(ct);
+
         var descending = string.Equals(
             sortDir, "desc", StringComparison.OrdinalIgnoreCase);
 
-        SortDefinition<FacilityTemplateDocument> primarySort =
-            sortBy.ToLowerInvariant() switch
-            {
-                "vendor" => descending
-                    ? sortBuilder.Descending(d => d.VendorName)
-                    : sortBuilder.Ascending(d => d.VendorName),
+        var normalizedSortBy = sortBy.ToLowerInvariant();
 
-                "kind" => descending
-                    ? sortBuilder.Descending(d => d.IsSystem)
-                    : sortBuilder.Ascending(d => d.IsSystem),
+        var ordered = normalizedSortBy switch
+        {
+            "vendor" => descending
+                ? lightweightDocs.OrderByDescending(
+                    d => d.VendorName, StringComparer.Ordinal)
+                : lightweightDocs.OrderBy(
+                    d => d.VendorName, StringComparer.Ordinal),
 
-                _ => descending
-                    ? sortBuilder.Descending(d => d.Name)
-                    : sortBuilder.Ascending(d => d.Name)
-            };
+            "kind" => descending
+                ? lightweightDocs.OrderByDescending(d => d.IsSystem)
+                : lightweightDocs.OrderBy(d => d.IsSystem),
 
-        // Cosmos DB for MongoDB RU does not support multi-field
-        // sorting without a corresponding composite index.
-        // Fetch all matching documents before applying deterministic
-        // ordering and pagination in memory.
-        var docs = await _collection
-            .Find(filter)
-            .Sort(primarySort)
-            .ToListAsync(ct);
+            _ => descending
+                ? lightweightDocs.OrderByDescending(
+                    d => d.Name, StringComparer.Ordinal)
+                : lightweightDocs.OrderBy(
+                    d => d.Name, StringComparer.Ordinal)
+        };
 
-        IOrderedEnumerable<FacilityTemplateDocument> ordered =
-            sortBy.ToLowerInvariant() switch
-            {
-                "vendor" => descending
-                    ? docs.OrderByDescending(d => d.VendorName, StringComparer.Ordinal)
-                    : docs.OrderBy(d => d.VendorName, StringComparer.Ordinal),
-
-                "kind" => descending
-                    ? docs.OrderByDescending(d => d.IsSystem)
-                    : docs.OrderBy(d => d.IsSystem),
-
-                _ => descending
-                    ? docs.OrderByDescending(d => d.Name, StringComparer.Ordinal)
-                    : docs.OrderBy(d => d.Name, StringComparer.Ordinal)
-            };
-
-        var page = ordered
+        var pageIds = ordered
             .ThenBy(d => d.Name, StringComparer.Ordinal)
             .ThenBy(d => d.Id)
             .Skip(skip)
             .Take(take)
+            .Select(d => d.Id)
             .ToList();
 
-        return page.Select(ToModel).ToList();
+        if (pageIds.Count == 0)
+            return [];
+
+        // Load full documents only for the selected page.
+        var pageFilter = Builders<FacilityTemplateDocument>
+            .Filter.In(d => d.Id, pageIds);
+
+        var pageDocs = await _collection
+            .Find(pageFilter)
+            .ToListAsync(ct);
+
+        // MongoDB's $in query does not guarantee result ordering.
+        // Restore the exact order selected during pagination.
+        var docsById = pageDocs.ToDictionary(d => d.Id);
+
+        return pageIds
+            .Where(id => docsById.ContainsKey(id))
+            .Select(id => ToModel(docsById[id]))
+            .ToList();
     }
 
     private static FilterDefinition<FacilityTemplateDocument> BuildFilter(
@@ -150,7 +135,10 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
 
         if (!string.IsNullOrWhiteSpace(vendor))
         {
-            filters.Add(builder.Eq(d => d.VendorName, vendor.Trim()));
+            filters.Add(builder.Regex(
+                d => d.VendorName,
+                new MongoDB.Bson.BsonRegularExpression(
+                    $"^{Regex.Escape(vendor.Trim())}$", "i")));
         }
 
         if (string.Equals(kind, "System", StringComparison.OrdinalIgnoreCase))

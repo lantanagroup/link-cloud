@@ -54,6 +54,9 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
     public MongoSnapshotStore CreateStore() =>
         new(Database, NullLogger<MongoSnapshotStore>.Instance);
 
+    public MongoFacilityTemplateStore CreateFacilityTemplateStore() =>
+    new(Database);
+
     public MongoIndexManager CreateIndexManager() =>
         new(Database, NullLogger<MongoIndexManager>.Instance);
 
@@ -130,6 +133,7 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
         await DropCollectionIfExistsAsync("automation_snapshots");
         await DropCollectionIfExistsAsync("automation_logs");
         await DropCollectionIfExistsAsync("automation_log_sequences");
+        await DropCollectionIfExistsAsync(MongoFacilityTemplateStore.CollectionName);
     }
 
     private async Task DropCollectionIfExistsAsync(string collectionName)
