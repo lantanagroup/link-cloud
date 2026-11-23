@@ -271,7 +271,7 @@ spec — those belong on `MockController`.
 
 | Symptom | Cause |
 |---|---|
-| `$(NSwagExe_Net80)` not found | `dotnet restore` has not run; `NSwag.MSBuild` provides it |
+| `$(NSwagExe_Net100)` not found | `dotnet restore` has not run; `NSwag.MSBuild` provides it |
 | Build succeeds but generated types are missing | Check `namespace` in `nswag.json` |
 | Docker build cannot find the spec | `.dockerignore` is excluding `Contracts/*.yaml` |
 | DTOs suddenly carry Newtonsoft attributes | `jsonLibrary` in `nswag.json` is no longer `SystemTextJson` |
