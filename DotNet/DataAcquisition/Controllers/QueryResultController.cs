@@ -54,9 +54,12 @@ public class FhirQueriesController : ControllerBase
 
         try
         {
-            correlationId = SanitizeQuery(correlationId);
-            patientId = SanitizeQuery(patientId);
-            resourceType = SanitizeQuery(resourceType);
+            if (!TrySanitizeFilter(ref correlationId)
+                || !TrySanitizeFilter(ref patientId)
+                || !TrySanitizeFilter(ref resourceType))
+            {
+                return BadRequest("A query parameter contains characters that are not allowed.");
+            }
 
             var results = await _fhirQueryQueries.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
 
@@ -78,8 +81,24 @@ public class FhirQueriesController : ControllerBase
         }
     }
 
-    // Null stays null so an omitted filter is not treated as a value. SanitizeAndRemove is the
-    // same filter used by the acquisition log search.
-    private static string? SanitizeQuery(string? value) =>
-        value is null ? null : HtmlInputSanitizer.SanitizeAndRemove(value);
+    // Null and empty stay as they are, so an omitted filter is not treated as a value.
+    // Sanitize strips markup and keeps characters such as '/' that a patient reference uses.
+    // A supplied value that sanitizes to empty is rejected: GetFhirQueriesAsync treats empty
+    // as no filter and would return every query for the facility.
+    private static bool TrySanitizeFilter(ref string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return true;
+        }
+
+        var sanitized = HtmlInputSanitizer.Sanitize(value);
+        if (sanitized.Length == 0)
+        {
+            return false;
+        }
+
+        value = sanitized;
+        return true;
+    }
 }

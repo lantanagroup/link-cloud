@@ -97,7 +97,7 @@ public class FhirQueriesControllerTests
     }
 
     [Fact]
-    public async Task GetQueries_SanitizesQueryParameters_AndLeavesOmittedFiltersNull()
+    public async Task GetQueries_PreservesPatientReference_AndLeavesOmittedFiltersNull()
     {
         var queries = new Mock<IFhirQueryQueries>();
         queries
@@ -126,14 +126,39 @@ public class FhirQueriesControllerTests
             Mock.Of<IFhirQueryManager>(),
             queries.Object);
 
-        await controller.GetQueries("facility-1", "corr!id", null, "Obs!ervation", CancellationToken.None);
+        await controller.GetQueries("facility-1", "!", "Patient/123", null, CancellationToken.None);
 
         queries.Verify(q => q.GetFhirQueriesAsync(
             "facility-1",
-            "corrid",
+            "!",
+            "Patient/123",
             null,
-            "Observation",
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetQueries_RejectsFilterThatSanitizesToEmpty()
+    {
+        var queries = new Mock<IFhirQueryQueries>();
+        var controller = new FhirQueriesController(
+            Mock.Of<ILogger<FhirQueriesController>>(),
+            Mock.Of<IFhirQueryManager>(),
+            queries.Object);
+
+        var result = await controller.GetQueries(
+            "facility-1",
+            "<script>alert(1)</script>",
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        queries.Verify(q => q.GetFhirQueriesAsync(
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static FhirQueriesController CreateController(FhirQueryResultModel result)
