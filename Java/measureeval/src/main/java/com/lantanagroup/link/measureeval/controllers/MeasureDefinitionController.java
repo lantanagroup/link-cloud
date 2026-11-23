@@ -23,6 +23,7 @@ import org.hl7.fhir.r4.model.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.WebDataBinder;
@@ -116,7 +117,8 @@ public class MeasureDefinitionController {
         return entity;
     }
 
-    @GetMapping("/{id}/{library-id}/$cql")
+    // CQL is returned as plain text so a browser never renders a library's content as HTML.
+    @GetMapping(value = "/{id}/{library-id}/$cql", produces = MediaType.TEXT_PLAIN_VALUE)
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Get the CQL for a measure definition's library", tags = {"Measure Definitions"})
     @Parameter(name = "id", description = "The ID of the measure definition", required = true)

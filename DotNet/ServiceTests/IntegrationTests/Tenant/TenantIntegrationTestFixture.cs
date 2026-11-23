@@ -8,15 +8,12 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Config;
-using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
@@ -169,18 +166,6 @@ namespace IntegrationTests.Tenant
             //   <string, object>              -> ReportScheduledJob
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
             builder.Services.AddTransient<IKafkaProducerFactory<string, object>, StubKafkaProducerFactory<string, object>>();
-
-            // Add AutoMapper
-            builder.Services.AddAutoMapper(cfg =>
-            {
-                cfg.CreateMap<Facility, FacilityModel>();
-                cfg.CreateMap<PagedConfigModel<Facility>, PagedFacilityConfigDto>();
-                cfg.CreateMap<ScheduledReportModel, TenantScheduledReportConfig>();
-
-                cfg.CreateMap<FacilityModel, Facility>();
-                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<Facility>>();
-                cfg.CreateMap<TenantScheduledReportConfig, ScheduledReportModel>();
-            });
 
             _host = builder.Build();
 

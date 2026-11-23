@@ -38,7 +38,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
-		<PackageReference Include="AutoMapper" />
 		<PackageReference Include="Azure.Identity" />
 		<PackageReference Include="Azure.Storage.Blobs" />
 		<PackageReference Include="Confluent.Kafka" />

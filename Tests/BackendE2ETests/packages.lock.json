@@ -86,19 +86,15 @@
       },
       "AngleSharp": {
         "type": "Transitive",
-        "resolved": "0.17.1",
-        "contentHash": "5MPI4bbixlwxb0W/smOMeIR+QlxMy5/5jD+WnIAw4pBC+7AhLPe5bS3cLgQMJyvd6q0A48sG+uYOt/ep406GLA==",
-        "dependencies": {
-          "System.Buffers": "4.5.1",
-          "System.Text.Encoding.CodePages": "6.0.0"
-        }
+        "resolved": "1.7.2",
+        "contentHash": "r1rb5Qo/0KPzmP0nbSiXPDVfh4Ctu0B+y1RyyUq73g4sgAmEW7q10RDyTq2ZsILwtO9O2LAvMrUles7eD4zz1g=="
       },
       "AngleSharp.Css": {
         "type": "Transitive",
-        "resolved": "0.17.0",
-        "contentHash": "bg0AcugmX6BFEi/DHG61QrwRU8iuiX4H8LZehdIzYdqOM/dgb3BsCTzNIcc1XADn4+xfQEdVwJYTSwUxroL4vg==",
+        "resolved": "1.0.2",
+        "contentHash": "XeBxh0h/73+MWFsGfeMwiK7xbzAK3YeHFdUIrMH1P90amIrDFD/vUDIrPlF3CixqaMH5MRIUvT6Ux+2zvhJ3SA==",
         "dependencies": {
-          "AngleSharp": "[0.17.0, 0.18.0)"
+          "AngleSharp": "[1.5.0, 2.0.0)"
         }
       },
       "AspNetCore.HealthChecks.UI.Core": {
@@ -163,8 +159,8 @@
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
-        "resolved": "2.4.0",
-        "contentHash": "SwXsAV3sMvAU/Nn31pbjhWurYSjJ+/giI/0n6tCrYoupEK34iIHCuk3STAd9fx8yudM85KkLSVdn951vTng/vQ=="
+        "resolved": "2.7.0",
+        "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
       },
       "Castle.Core": {
         "type": "Transitive",
@@ -2267,7 +2263,6 @@
           "AppAny.Quartz.EntityFrameworkCore.Migrations": "[0.5.2, )",
           "AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer": "[0.5.2, )",
           "AspNetCore.HealthChecks.Kafka": "[8.0.1, )",
-          "AutoMapper": "[13.0.1, )",
           "Azure.Data.AppConfiguration": "[1.9.0, )",
           "Azure.Identity": "[1.21.0, )",
           "Azure.Monitor.OpenTelemetry.AspNetCore": "[1.4.0, )",
@@ -2281,7 +2276,7 @@
           "FluentValidation.AspNetCore": "[11.3.1, )",
           "Google.Protobuf": "[3.35.0, )",
           "Hl7.Fhir.R4": "[6.2.0, )",
-          "HtmlSanitizer": "[9.0.892, )",
+          "HtmlSanitizer": "[9.2.1039, )",
           "Link.Authorization": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[8.0.27, )",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[8.0.27, )",
@@ -2331,7 +2326,7 @@
         "dependencies": {
           "LinqKit": "[1.3.11, )",
           "PemUtils": "[3.0.0.82, )",
-          "SSH.NET": "[2024.2.0, )",
+          "SSH.NET": "[2026.0.1, )",
           "Serilog.AspNetCore": "[8.0.3, )",
           "Serilog.Enrichers.Span": "[3.1.0, )",
           "Serilog.Exceptions": "[8.4.0, )",
@@ -2398,7 +2393,6 @@
         "type": "Project",
         "dependencies": {
           "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
-          "AutoMapper": "[13.0.1, )",
           "Azure.Identity": "[1.21.0, )",
           "Azure.Storage.Blobs": "[12.29.0, )",
           "Confluent.Kafka": "[2.14.2, )",
@@ -2426,7 +2420,6 @@
           "AppAny.Quartz.EntityFrameworkCore.Migrations": "[0.5.2, )",
           "AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer": "[0.5.2, )",
           "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
-          "AutoMapper": "[13.0.1, )",
           "Azure.Identity": "[1.21.0, )",
           "CompareNETObjects": "[4.84.0, )",
           "Confluent.Kafka": "[2.14.2, )",
@@ -2485,15 +2478,6 @@
         "contentHash": "1Ub3Wvvbz7CMuFNWgLEc9qqQibiMoovDML/WHrwr5J83RPgtI20giCR92s/ipLgu7IIuqw+W/y7WpIeHqAICxg==",
         "dependencies": {
           "AspNetCore.HealthChecks.UI.Core": "9.0.0"
-        }
-      },
-      "AutoMapper": {
-        "type": "CentralTransitive",
-        "requested": "[13.0.1, )",
-        "resolved": "13.0.1",
-        "contentHash": "/Fx1SbJ16qS7dU4i604Sle+U9VLX+WSNVJggk6MupKVkYvvBm4XqYaeFuf67diHefHKHs50uQIS2YEDFhPCakQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Options": "6.0.0"
         }
       },
       "Azure.Data.AppConfiguration": {
@@ -2683,12 +2667,12 @@
       },
       "HtmlSanitizer": {
         "type": "CentralTransitive",
-        "requested": "[9.0.892, )",
-        "resolved": "9.0.892",
-        "contentHash": "zdkMmpNCjTkxna8Y+jmPIFm2st+HjHrf32yNElFYwe7L4GmDm+mdKR6TzDyf6ewJ0RUUz84D4IkHNgrwGi4VbQ==",
+        "requested": "[9.2.1039, )",
+        "resolved": "9.2.1039",
+        "contentHash": "PKxy1hYknAij8YlHCC2a9GSqzUd4bh3IvY+abJBvOH1FKcZpbyafEHtdFcXQBt12Y7hNPkNEOP6Qa7uKNSs/yA==",
         "dependencies": {
-          "AngleSharp": "[0.17.1]",
-          "AngleSharp.Css": "[0.17.0]"
+          "AngleSharp": "1.7.2",
+          "AngleSharp.Css": "1.0.2"
         }
       },
       "LantanaGroup.Thetis.Generation.Abstractions": {
@@ -3272,11 +3256,12 @@
       },
       "SSH.NET": {
         "type": "CentralTransitive",
-        "requested": "[2024.2.0, )",
-        "resolved": "2024.2.0",
-        "contentHash": "9r+4UF2P51lTztpd+H7SJywk7WgmlWB//Cm2o96c6uGVZU5r58ys2/cD9pCgTk0zCdSkfflWL1WtqQ9I4IVO9Q==",
+        "requested": "[2026.0.1, )",
+        "resolved": "2026.0.1",
+        "contentHash": "74/nnq/n7EZLGLsUTt4aEE+/iet3B6ahi2iFfXgRXb6rNAvxsxLwbhLZ6lzITfAEB1vkmuAI3gXxOp2HcUMa2g==",
         "dependencies": {
-          "BouncyCastle.Cryptography": "2.4.0"
+          "BouncyCastle.Cryptography": "2.7.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.3"
         }
       },
       "StackExchange.Redis": {

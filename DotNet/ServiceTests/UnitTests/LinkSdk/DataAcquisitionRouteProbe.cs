@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,8 +13,8 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.LinkSdk;
 
 /// <summary>
-/// An in-process TestServer with every Data Acquisition controller mapped, which reports the action a request
-/// routes to and answers 204 without running it.
+/// An in-process TestServer with every Data Acquisition controller mapped, plus the antiforgery-token
+/// minimal API, which reports the action a request routes to and answers 204 without running it.
 /// </summary>
 /// <remarks>
 /// No socket is opened. The /api/data alias is deliberately not installed: a request still on the old prefix
@@ -47,7 +48,11 @@ public sealed class DataAcquisitionRouteProbe : IAsyncLifetime
                         context.Response.StatusCode = StatusCodes.Status204NoContent;
                         return Task.CompletedTask;
                     });
-                    app.UseEndpoints(endpoints => endpoints.MapControllers());
+                    app.UseEndpoints(endpoints =>
+                    {
+                        endpoints.MapControllers();
+                        endpoints.MapGet("/api/data-acquisition/antiforgery-token", () => Results.NoContent());
+                    });
                 });
             })
             .StartAsync();
@@ -92,12 +97,19 @@ public sealed class DataAcquisitionRouteProbe : IAsyncLifetime
     private static string? DescribeMatchedAction(HttpContext context)
     {
         // A wrong HTTP method routes to a 405 rejection endpoint, which carries no action descriptor.
-        var action = context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
-        if (action is null || action.ControllerTypeInfo.Assembly != typeof(QueryPlanConfigController).Assembly)
+        var endpoint = context.GetEndpoint();
+        var action = endpoint?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        if (action is not null && action.ControllerTypeInfo.Assembly == typeof(QueryPlanConfigController).Assembly)
         {
-            return null;
+            return $"{action.ControllerName}.{action.ActionName}";
         }
 
-        return $"{action.ControllerName}.{action.ActionName}";
+        if (endpoint is RouteEndpoint route
+            && string.Equals(route.RoutePattern.RawText, "/api/data-acquisition/antiforgery-token", StringComparison.Ordinal))
+        {
+            return "AntiforgeryToken.Get";
+        }
+
+        return null;
     }
 }
