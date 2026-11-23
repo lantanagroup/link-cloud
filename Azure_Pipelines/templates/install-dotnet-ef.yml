@@ -1,0 +1,62 @@
+# Installs the dotnet-ef tool that matches the EF Core version of the commit being scripted.
+#
+# The schema jobs check out current_release before this runs, and that tag can be a .NET 8
+# release (EF Core 8) or a .NET 10 one (EF Core 10). A fixed tool version would only fit one
+# of them, so the version is read from the checked-out sources instead, and both SDKs are
+# installed so either release builds.
+
+parameters:
+- name: projectDir
+  type: string
+
+steps:
+- task: UseDotNet@2
+  displayName: Use .NET 8 SDK
+  inputs:
+    packageType: sdk
+    version: 8.x
+
+- task: UseDotNet@2
+  displayName: Use .NET 10 SDK
+  inputs:
+    packageType: sdk
+    version: 10.x
+
+- task: Bash@3
+  displayName: Install dotnet-ef (matching the release)
+  inputs:
+    targetType: inline
+    workingDirectory: ${{ parameters.projectDir }}
+    script: |
+      set -euo pipefail
+
+      # A project-level version (VersionOverride) wins over Directory.Packages.props, the same order
+      # NuGet uses. Releases from before central package management (v0.6.0 and older) set it in
+      # Shared.csproj instead, as a wildcard such as 8.*, which dotnet tool install also accepts.
+      design='Microsoft.EntityFrameworkCore.Design'
+      root='$(Build.SourcesDirectory)'
+
+      # Prints the first version given for the package in the files named, or nothing.
+      find_version() {
+        sed -n -E "s/.*Include=\"$design\" (Version|VersionOverride)=\"([^\"]+)\".*/\2/p" "$@" 2>/dev/null \
+          | sed -n 1p || true
+      }
+
+      version=$(find_version ./*.csproj)
+      if [ -z "$version" ]; then
+        version=$(find_version "$root/Directory.Packages.props")
+      fi
+      if [ -z "$version" ]; then
+        version=$(find_version "$root/DotNet/Shared/Shared.csproj")
+      fi
+      if [ -z "$version" ]; then
+        echo "##vso[task.logissue type=error]No $design version found for" \
+          "${{ parameters.projectDir }} at $(git rev-parse HEAD)."
+        exit 1
+      fi
+
+      echo "Installing dotnet-ef $version for ${{ parameters.projectDir }}"
+      dotnet new tool-manifest --force
+      dotnet tool install dotnet-ef --version "$version"
+      dotnet tool restore
+      dotnet tool run dotnet-ef --version
