@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-amd64 AS base
 USER 1001
 WORKDIR /app
 
@@ -10,7 +10,7 @@ ENV \
     LC_ALL=en_US.UTF-8 \
     LANG=en_US.UTF-8
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_XMLDOC_MODE=skip
