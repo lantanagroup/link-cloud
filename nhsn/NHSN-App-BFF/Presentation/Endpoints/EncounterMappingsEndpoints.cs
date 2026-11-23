@@ -19,12 +19,8 @@ public class EncounterMappingsEndpoints : IApi
             .WithName("GetEncounterMappings")
             .Produces<IReadOnlyList<EncounterMapping>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "The facility's local Encounter code-to-CPT/SNOMED mappings.";
-                operation.Description = "Empty until the facility has saved any mappings.";
-                return operation;
-            });
+            .WithSummary("The facility's local Encounter code-to-CPT/SNOMED mappings.")
+            .WithDescription("Empty until the facility has saved any mappings.");
 
         group.MapPut("/", async (
                 IReadOnlyList<EncounterMapping> mappings,
@@ -37,11 +33,7 @@ public class EncounterMappingsEndpoints : IApi
             .WithName("SaveEncounterMappings")
             .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Replace the facility's Encounter code mappings.";
-                operation.Description = "Replaces the whole set for the facility — not an append.";
-                return operation;
-            });
+            .WithSummary("Replace the facility's Encounter code mappings.")
+            .WithDescription("Replaces the whole set for the facility — not an append.");
     }
 }

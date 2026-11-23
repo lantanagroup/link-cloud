@@ -21,17 +21,12 @@ public class OnboardingEndpoints : IApi
             .Produces<DraftEnvelopeResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status500InternalServerError)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Get the assembled onboarding draft for the authenticated facility.";
-                operation.Description =
-                    "Assembles FacilityDraft from Link, the facility row, the draft row and the BFF's tables. " +
-                    "Returns 200 even when a downstream is unreachable: the response carries a per-section " +
-                    "status in `sources`, and a step renders an error only when its own source failed. " +
-                    "A section reported Unavailable is not the same as a section that read successfully " +
-                    "and is empty.";
-                return operation;
-            });
+            .WithSummary("Get the assembled onboarding draft for the authenticated facility.")
+            .WithDescription("Assembles FacilityDraft from Link, the facility row, the draft row and the BFF's tables. " +
+                "Returns 200 even when a downstream is unreachable: the response carries a per-section " +
+                "status in `sources`, and a step renders an error only when its own source failed. " +
+                "A section reported Unavailable is not the same as a section that read successfully " +
+                "and is empty.");
 
         group.MapPut("/", async (
                 FacilityDraftResponse draft,
@@ -46,16 +41,11 @@ public class OnboardingEndpoints : IApi
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status502BadGateway)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Save the onboarding draft for the authenticated facility.";
-                operation.Description =
-                    "Takes the whole FacilityDraft but writes only the section for currentStepId, " +
-                    "which must be the step whose data the payload carries, sent before the " +
-                    "transition is applied. Workflow state is always saved. 409 means another save " +
-                    "for this facility is in flight; retry.";
-                return operation;
-            });
+            .WithSummary("Save the onboarding draft for the authenticated facility.")
+            .WithDescription("Takes the whole FacilityDraft but writes only the section for currentStepId, " +
+                "which must be the step whose data the payload carries, sent before the " +
+                "transition is applied. Workflow state is always saved. 409 means another save " +
+                "for this facility is in flight; retry.");
 
         group.MapPost("/import", async (
                 IFormFile? file,
@@ -80,19 +70,14 @@ public class OnboardingEndpoints : IApi
             .Produces<ImportResult>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Validate an uploaded manual-upload import sheet.";
-                operation.Description =
-                    "Parses the uploaded workbook and validates every recognized cell. Returns " +
-                    "accepted=false with per-cell errors rather than a 4xx when the file parses " +
-                    "but a value fails validation — that is a form-completion problem, not a " +
-                    "request problem. A fully valid sheet is saved immediately, in this same call; " +
-                    "any section that fails at save time (a cross-service precondition or a " +
-                    "downstream validator the sheet's own format checks can't catch) is reported " +
-                    "back as an additional per-cell error rather than failing the request.";
-                return operation;
-            });
+            .WithSummary("Validate an uploaded manual-upload import sheet.")
+            .WithDescription("Parses the uploaded workbook and validates every recognized cell. Returns " +
+                "accepted=false with per-cell errors rather than a 4xx when the file parses " +
+                "but a value fails validation — that is a form-completion problem, not a " +
+                "request problem. A fully valid sheet is saved immediately, in this same call; " +
+                "any section that fails at save time (a cross-service precondition or a " +
+                "downstream validator the sheet's own format checks can't catch) is reported " +
+                "back as an additional per-cell error rather than failing the request.");
 
         group.MapGet("/export", async (
                 IPackageZipDownloadService packageService,
@@ -113,20 +98,15 @@ public class OnboardingEndpoints : IApi
                 };
             })
             .WithName("ExportOnboardingDraft")
-            .Produces(StatusCodes.Status200OK, contentType: "application/zip")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/zip")
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Download the manual-upload import package for the facility's vendor.";
-                operation.Description =
-                    "A zip named {facilityId}_import_sheet.zip holding the vendor's import sheet, its " +
-                    "census instructions and its JWKS instructions, plus the org-resolution guidance " +
-                    "for Epic. Every entry is a byte-for-byte copy of the deployed static asset. " +
-                    "400 when the facility has not chosen a vendor yet.";
-                return operation;
-            });
+            .WithSummary("Download the manual-upload import package for the facility's vendor.")
+            .WithDescription("A zip named {facilityId}_import_sheet.zip holding the vendor's import sheet, its " +
+                "census instructions and its JWKS instructions, plus the org-resolution guidance " +
+                "for Epic. Every entry is a byte-for-byte copy of the deployed static asset. " +
+                "400 when the facility has not chosen a vendor yet.");
 
         group.MapPost("/completion", async (
                 IOnboardingCompletionService completionService,
@@ -138,18 +118,13 @@ public class OnboardingEndpoints : IApi
             .WithName("CompleteOnboarding")
             .Produces<CommitResultResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Finalizes the facility's enrollment.";
-                operation.Description =
-                    "The completion fan-out: arms the facility's Census acquisition job and confirms " +
-                    "every other Link service onboarding touches holds the configuration this facility " +
-                    "saved. Always returns 200 with a per-service status, even when a stage is " +
-                    "pending or failed — the facility is marked onboarded only once every stage " +
-                    "reports committed; a failed attempt leaves the prior configuration untouched " +
-                    "and can be retried.";
-                return operation;
-            });
+            .WithSummary("Finalizes the facility's enrollment.")
+            .WithDescription("The completion fan-out: arms the facility's Census acquisition job and confirms " +
+                "every other Link service onboarding touches holds the configuration this facility " +
+                "saved. Always returns 200 with a per-service status, even when a stage is " +
+                "pending or failed — the facility is marked onboarded only once every stage " +
+                "reports committed; a failed attempt leaves the prior configuration untouched " +
+                "and can be retried.");
 
         group.MapGet("/completion", async (
                 IOnboardingCompletionService completionService,
@@ -158,11 +133,7 @@ public class OnboardingEndpoints : IApi
             .WithName("GetOnboardingCompletionState")
             .Produces<CommitResultResponse?>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "The facility's last completion attempt.";
-                operation.Description = "Null before Complete Enrollment has been clicked.";
-                return operation;
-            });
+            .WithSummary("The facility's last completion attempt.")
+            .WithDescription("Null before Complete Enrollment has been clicked.");
     }
 }

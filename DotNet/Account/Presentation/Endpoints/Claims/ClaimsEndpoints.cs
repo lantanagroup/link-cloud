@@ -4,7 +4,6 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Presentation.Endpoints.Claims.Handlers;
 using Link.Authorization.Permissions;
 using Link.Authorization.Policies;
-using Microsoft.OpenApi;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
 {
@@ -21,10 +20,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
         {
             var roleEndpoints = app.MapGroup("/api/account/")
                 .RequireAuthorization([PolicyNames.IsLinkAdmin])
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Tags = new HashSet<OpenApiTagReference> { new("Claim") }
-                });
+                .WithTags("Claim");
 
             roleEndpoints.MapGet("/claims", GetClaims.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
@@ -34,11 +30,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Get all claims",
-                    Description = "Retrieves a list all claims that are assignable."
-                });
+                .WithSummary("Get all claims")
+                .WithDescription("Retrieves a list all claims that are assignable.");
 
             _logger.LogApiRegistration(nameof(ClaimsEndpoints));
         }

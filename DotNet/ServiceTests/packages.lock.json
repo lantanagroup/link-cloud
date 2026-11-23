@@ -670,8 +670,8 @@
       },
       "Microsoft.OpenApi": {
         "type": "Transitive",
-        "resolved": "2.13.0",
-        "contentHash": "wavlgBYnn7uU/ZGhFHNl0UlDOlwz+6KRduKkqdCCbfxxANaQ1rmBpETVGdwXanAM6twQOxsvI3CBEGF4OScbeQ=="
+        "resolved": "2.7.5",
+        "contentHash": "0FA67RSnRM4tcBKqiqVu/HPdZ9+QOKbmeRjxRUGTCjPU4C0bmUhd97Dso7Yild5P7nOV6GxJ2xrK0Kv/O9xp0w=="
       },
       "Microsoft.SqlServer.Server": {
         "type": "Transitive",
@@ -1111,7 +1111,6 @@
           "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
           "Azure.Identity": "[1.21.0, )",
           "Confluent.Kafka": "[2.14.2, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.Extensions.Compliance.Redaction": "[10.11.1, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.4, )",
@@ -1131,7 +1130,6 @@
           "FluentValidation.AspNetCore": "[11.3.1, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.15, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[10.0.15, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.Extensions.Caching.StackExchangeRedis": "[10.0.15, )",
           "Microsoft.Extensions.Compliance.Redaction": "[10.11.1, )",
           "Microsoft.Extensions.Telemetry": "[10.11.1, )",
@@ -1317,7 +1315,6 @@
           "Azure.Identity": "[1.21.0, )",
           "DataAcquisition.Domain": "[1.0.0, )",
           "JWT": "[10.1.1, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "[10.0.15, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )"
         }
@@ -1375,7 +1372,6 @@
           "Azure.Storage.Blobs": "[12.29.0, )",
           "ClosedXML": "[0.104.2, )",
           "LinkSdk": "[1.0.0, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
           "Serilog": "[4.3.1, )",
           "Serilog.AspNetCore": "[8.0.3, )",
@@ -1910,15 +1906,6 @@
         "contentHash": "vazYMsviWu/+efWfWiD95ZHZZ/SUf10MAfWeJ8ADK8oa5SjLO41NE7ii0eVQhHqWBBXh4s0zMQor2F8J25Oh5g==",
         "dependencies": {
           "Microsoft.EntityFrameworkCore.Relational": "10.0.15"
-        }
-      },
-      "Microsoft.AspNetCore.OpenApi": {
-        "type": "CentralTransitive",
-        "requested": "[10.0.15, )",
-        "resolved": "10.0.15",
-        "contentHash": "pptFDPMWyPDDtt68s/HsvLYeHJ0WQtntjyve6ztp/5MrLOEzdZvafYIyWSeErtexIGaB8XGYCnnUK8T/Vn4MwQ==",
-        "dependencies": {
-          "Microsoft.OpenApi": "[2.13.0, 3.0.0)"
         }
       },
       "Microsoft.Azure.AppConfiguration.AspNetCore": {

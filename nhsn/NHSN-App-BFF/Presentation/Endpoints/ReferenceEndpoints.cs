@@ -18,39 +18,25 @@ public class ReferenceEndpoints : IApi
             .WithName("GetVendorProfiles")
             .Produces<IReadOnlyList<VendorProfile>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Vendor profiles driving all vendor-specific UI behaviour.";
-                operation.Description =
-                    "Everything that differs between Epic and Cerner, served as data so no step " +
-                    "component contains a vendor name.";
-                return operation;
-            });
+            .WithSummary("Vendor profiles driving all vendor-specific UI behaviour.")
+            .WithDescription("Everything that differs between Epic and Cerner, served as data so no step " +
+                "component contains a vendor name.");
 
         group.MapGet("/timezones", (IReferenceDataService referenceData) =>
                 Results.Ok(referenceData.GetTimezones()))
             .WithName("GetTimezones")
             .Produces<IReadOnlyList<TimezoneResponse>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Selectable time zones, as IANA ids.";
-                operation.Description = "Ids match what Tenant stores, so a selection round-trips unchanged.";
-                return operation;
-            });
+            .WithSummary("Selectable time zones, as IANA ids.")
+            .WithDescription("Ids match what Tenant stores, so a selection round-trips unchanged.");
 
         group.MapGet("/hsloc-codes", async (IReferenceDataService referenceData, CancellationToken cancellationToken) =>
                 Results.Ok(await referenceData.GetHslocCodesAsync(cancellationToken)))
             .WithName("GetHslocCodes")
             .Produces<IReadOnlyList<HslocCode>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "The NHSN HSLOC reference vocabulary for the HSLOC Location Identification step.";
-                operation.Description =
-                    "The whole catalog, every time — like /encounter-codes, the UI keeps the list " +
-                    "client-side and searches/filters it in place rather than querying per keystroke.";
-                return operation;
-            });
+            .WithSummary("The NHSN HSLOC reference vocabulary for the HSLOC Location Identification step.")
+            .WithDescription("The whole catalog, every time — like /encounter-codes, the UI keeps the list " +
+                "client-side and searches/filters it in place rather than querying per keystroke.");
     }
 }

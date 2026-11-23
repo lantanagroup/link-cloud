@@ -17,16 +17,11 @@ public class FhirServerEndpoints : IApi
             })
             .WithName("TestFhirConnection")
             .Produces(StatusCodes.Status200OK)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Probe a FHIR server base URL for reachability.";
-                operation.Description =
-                    "URL-only reachability probe against Data Acquisition's connectionValidation " +
-                    "endpoint. Proves the server responds, not that Link's own credentials can pull " +
-                    "data from it — the facility-scoped probe after commit is the honest end-to-end " +
-                    "check.";
-                return operation;
-            });
+            .WithSummary("Probe a FHIR server base URL for reachability.")
+            .WithDescription("URL-only reachability probe against Data Acquisition's connectionValidation " +
+                "endpoint. Proves the server responds, not that Link's own credentials can pull " +
+                "data from it — the facility-scoped probe after commit is the honest end-to-end " +
+                "check.");
     }
 }
 
