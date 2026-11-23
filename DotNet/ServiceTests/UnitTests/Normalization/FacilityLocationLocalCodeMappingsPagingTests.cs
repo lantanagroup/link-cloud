@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -75,8 +76,8 @@ public class FacilityLocationLocalCodeMappingsPagingTests
     public async Task InvalidPageSize_ReturnsValidationProblemWithoutQuerying(string route, string query)
     {
         var queries = new Mock<IFacilityLocationLocalCodeMappingQueries>(MockBehavior.Strict);
-        using var server = CreateServer(queries);
-        using var client = server.CreateClient();
+        using var host = CreateServer(queries);
+        using var client = host.GetTestClient();
 
         using var response = await client.GetAsync($"/api/normalization/hsloc-mappings{route}?{query}");
 
@@ -102,8 +103,8 @@ public class FacilityLocationLocalCodeMappingsPagingTests
                     Records = [],
                     Metadata = new PaginationMetadata(model.PageSize!.Value, model.PageNumber ?? 1, 0)
                 });
-        using var server = CreateServer(queries);
-        using var client = server.CreateClient();
+        using var host = CreateServer(queries);
+        using var client = host.GetTestClient();
 
         using var response = await client.GetAsync($"/api/normalization/hsloc-mappings{route}?{query}");
 
@@ -114,8 +115,9 @@ public class FacilityLocationLocalCodeMappingsPagingTests
         Assert.Equal(expectedPageSize, body.RootElement.GetProperty("metadata").GetProperty("pageSize").GetInt32());
     }
 
-    private static TestServer CreateServer(Mock<IFacilityLocationLocalCodeMappingQueries> queries) => new(
-        new WebHostBuilder()
+    private static IHost CreateServer(Mock<IFacilityLocationLocalCodeMappingQueries> queries) => new HostBuilder()
+        .ConfigureWebHost(webHost => webHost
+            .UseTestServer()
             .ConfigureServices(services =>
             {
                 services.AddAuthorization(options => options.AddPolicy(PolicyNames.IsLinkAdmin,
@@ -128,5 +130,6 @@ public class FacilityLocationLocalCodeMappingsPagingTests
                     options.Filters.Add(new AllowAnonymousFilter());
                 }).AddApplicationPart(typeof(FacilityLocationLocalCodeMappingsController).Assembly);
             })
-            .Configure(app => app.UseMvc()));
+            .Configure(app => app.UseMvc()))
+        .Start();
 }

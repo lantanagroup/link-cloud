@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using Xunit;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
@@ -40,7 +41,7 @@ public class CodesControllerHttpTests
     /// carries an ampersand deliberately: it is the character that distinguishes a correct sanitizer from
     /// one that quietly destroys the value it is cleaning.
     /// </summary>
-    private static TestServer BuildServer()
+    private static IHost BuildServer()
     {
         var cache = new Mock<ICodeGroupCacheService>();
 
@@ -71,36 +72,37 @@ public class CodesControllerHttpTests
                 }
             });
 
-        var builder = new WebHostBuilder()
-            .ConfigureServices(services =>
-            {
-                services.AddLogging();
-                services.AddSingleton(cache.Object);
-                services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
-                services.AddSingleton(TerminologyTestConfig.Options());
-                services.AddSingleton<FhirService>();
-                services.AddSingleton<ICodeSearchService, CodeSearchService>();
-                services.AddControllers(options =>
-                    {
-                        options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
-                        options.OutputFormatters.Insert(0, new FhirOutputFormatter());
-                        options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
-                    })
-                    .AddApplicationPart(typeof(CodesController).Assembly);
-            })
-            .Configure(app =>
-            {
-                app.UseRouting();
-                app.UseEndpoints(endpoints => endpoints.MapControllers());
-            });
-
-        return new TestServer(builder);
+        return new HostBuilder()
+            .ConfigureWebHost(webHost => webHost
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddLogging();
+                    services.AddSingleton(cache.Object);
+                    services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
+                    services.AddSingleton(TerminologyTestConfig.Options());
+                    services.AddSingleton<FhirService>();
+                    services.AddSingleton<ICodeSearchService, CodeSearchService>();
+                    services.AddControllers(options =>
+                        {
+                            options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
+                            options.OutputFormatters.Insert(0, new FhirOutputFormatter());
+                            options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
+                        })
+                        .AddApplicationPart(typeof(CodesController).Assembly);
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapControllers());
+                }))
+            .Start();
     }
 
     private static async Task<(HttpStatusCode Status, JsonDocument Body)> GetAsync(string query)
     {
-        using var server = BuildServer();
-        using var client = server.CreateClient();
+        using var host = BuildServer();
+        using var client = host.GetTestClient();
 
         var response = await client.GetAsync($"{Endpoint}{query}");
         var body = await response.Content.ReadAsStringAsync();

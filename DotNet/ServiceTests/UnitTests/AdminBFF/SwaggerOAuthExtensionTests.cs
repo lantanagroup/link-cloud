@@ -29,7 +29,7 @@ public class SwaggerOAuthExtensionTests
 
         var scheme = options.SwaggerGeneratorOptions.SecuritySchemes["OAuth"];
         scheme.Type.Should().Be(SecuritySchemeType.OAuth2);
-        scheme.Flows.AuthorizationCode.AuthorizationUrl
+        scheme.Flows!.AuthorizationCode.AuthorizationUrl
             .Should().Be(new Uri("https://auth.example.com/authorize"));
         scheme.Flows.AuthorizationCode.TokenUrl
             .Should().Be(new Uri("https://auth.example.com/token"));

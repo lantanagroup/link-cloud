@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
@@ -30,7 +31,7 @@ public class FhirControllerSearchEscapingHttpTests
     /// The cache answers only for the exact, unescaped identifiers, as the real one does: an escaped value never
     /// matches a cached URL.
     /// </summary>
-    private static TestServer BuildServer()
+    private static IHost BuildServer()
     {
         var cache = new Mock<ICodeGroupCacheService>();
         cache.Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, ValueSetUrl + "|6.1.0", It.IsAny<string>()))
@@ -51,36 +52,37 @@ public class FhirControllerSearchEscapingHttpTests
                 Resource = new CodeSystem { Url = CodeSystemUrl }
             });
 
-        var builder = new WebHostBuilder()
-            .ConfigureServices(services =>
-            {
-                services.AddLogging();
-                services.AddAntiforgery();
-                services.AddSingleton(cache.Object);
-                services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
-                services.AddSingleton(TerminologyTestConfig.Options());
-                services.AddSingleton<FhirService>();
-                services.AddControllers(options =>
-                    {
-                        options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
-                        options.OutputFormatters.Insert(0, new FhirOutputFormatter());
-                        options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
-                    })
-                    .AddApplicationPart(typeof(FhirController).Assembly);
-            })
-            .Configure(app =>
-            {
-                app.UseRouting();
-                app.UseEndpoints(endpoints => endpoints.MapControllers());
-            });
-
-        return new TestServer(builder);
+        return new HostBuilder()
+            .ConfigureWebHost(webHost => webHost
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddLogging();
+                    services.AddAntiforgery();
+                    services.AddSingleton(cache.Object);
+                    services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
+                    services.AddSingleton(TerminologyTestConfig.Options());
+                    services.AddSingleton<FhirService>();
+                    services.AddControllers(options =>
+                        {
+                            options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
+                            options.OutputFormatters.Insert(0, new FhirOutputFormatter());
+                            options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
+                        })
+                        .AddApplicationPart(typeof(FhirController).Assembly);
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapControllers());
+                }))
+            .Start();
     }
 
     private static async Task<int> SearchTotalAsync(string resourceType, string encodedUrl)
     {
-        using var server = BuildServer();
-        using var client = server.CreateClient();
+        using var host = BuildServer();
+        using var client = host.GetTestClient();
 
         var response = await client.GetAsync($"/api/terminology/fhir/{resourceType}?url={encodedUrl}&_summary=true");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

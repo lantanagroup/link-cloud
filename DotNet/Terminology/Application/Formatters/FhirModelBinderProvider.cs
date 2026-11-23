@@ -31,8 +31,7 @@ public class FhirModelBinderProvider : IModelBinderProvider
     /// <exception cref="ArgumentNullException">Thrown if the <paramref name="context"/> is null.</exception>
     public IModelBinder GetBinder(ModelBinderProviderContext context)
     {
-        if (context == null)
-            ArgumentNullException.ThrowIfNull(nameof(context));
+        ArgumentNullException.ThrowIfNull(context);
 
         if (typeof(Resource).IsAssignableFrom(context.Metadata.ModelType))
         {

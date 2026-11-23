@@ -300,12 +300,6 @@
           "Microsoft.EntityFrameworkCore.Relational": "10.0.15"
         }
       },
-      "Microsoft.Extensions.Options": {
-        "type": "Direct",
-        "requested": "[10.0.15, )",
-        "resolved": "10.0.15",
-        "contentHash": "vF3ghTChyyX3BDqRFUurk+fn8vZySFmWHm4vIeeOQbBrjnPqWrr5ceyCb1jrGpMasYdcK9IuJskLVQZWBfNxCg=="
-      },
       "Microsoft.Extensions.Telemetry": {
         "type": "Direct",
         "requested": "[10.11.1, )",
@@ -521,18 +515,6 @@
         "requested": "[10.3.1, )",
         "resolved": "10.3.1",
         "contentHash": "kXuMIVJBDD6qMwG78VUrKy4x5Ke98HU0Q023Sf2iSBO/x45c5BuByYPAExIs9UeVsjdGGgvLWU5jK8l6MO2Z0Q=="
-      },
-      "System.Text.Encodings.Web": {
-        "type": "Direct",
-        "requested": "[10.0.3, )",
-        "resolved": "10.0.3",
-        "contentHash": "l8QNBPp92bVzl9Kw8nNtm1uYRNNhUrdulZjM4a8YK/QGNa8z9utKsC0bDoPB+Vq8LOlbD3fIyGlabtz80jT7cw=="
-      },
-      "System.Text.Json": {
-        "type": "Direct",
-        "requested": "[10.0.3, )",
-        "resolved": "10.0.3",
-        "contentHash": "NTUt9DL+maqbgrIYCAmeZUbX0NoXaueySyjW/bdOlFdSUDC1l51XnsbVEuj5tuad12vdq5Sviskp9uMVGgCNLw=="
       },
       "Workleap.Extensions.Configuration.Substitution": {
         "type": "Direct",

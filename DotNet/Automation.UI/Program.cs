@@ -315,7 +315,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
         | ForwardedHeaders.XForwardedHost;
 
     // In container/cloud proxy scenarios, allow forwarded headers from the front-end proxy.
-    options.KnownNetworks.Clear();
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 

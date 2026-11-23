@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using Xunit;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
@@ -44,7 +45,7 @@ public class FhirControllerExpansionHttpTests
     private const int DefaultPageSize = 2;
     private const int MaxPageSize = 3;
 
-    private static TestServer BuildServer()
+    private static IHost BuildServer()
     {
         var codes = new List<Code>
         {
@@ -69,35 +70,36 @@ public class FhirControllerExpansionHttpTests
         cache.Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, ValueSetId, It.IsAny<string>()))
             .Returns(valueSet);
 
-        var builder = new WebHostBuilder()
-            .ConfigureServices(services =>
-            {
-                services.AddLogging();
-                services.AddSingleton(cache.Object);
-                services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
-                services.AddSingleton(TerminologyTestConfig.Options(DefaultPageSize, MaxPageSize));
-                services.AddSingleton<FhirService>();
-                services.AddControllers(options =>
-                    {
-                        options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
-                        options.OutputFormatters.Insert(0, new FhirOutputFormatter());
-                        options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
-                    })
-                    .AddApplicationPart(typeof(FhirController).Assembly);
-            })
-            .Configure(app =>
-            {
-                app.UseRouting();
-                app.UseEndpoints(endpoints => endpoints.MapControllers());
-            });
-
-        return new TestServer(builder);
+        return new HostBuilder()
+            .ConfigureWebHost(webHost => webHost
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddLogging();
+                    services.AddSingleton(cache.Object);
+                    services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
+                    services.AddSingleton(TerminologyTestConfig.Options(DefaultPageSize, MaxPageSize));
+                    services.AddSingleton<FhirService>();
+                    services.AddControllers(options =>
+                        {
+                            options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
+                            options.OutputFormatters.Insert(0, new FhirOutputFormatter());
+                            options.ModelMetadataDetailsProviders.Add(new PreserveEmptyStringMetadataProvider());
+                        })
+                        .AddApplicationPart(typeof(FhirController).Assembly);
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapControllers());
+                }))
+            .Start();
     }
 
     private static async Task<(HttpStatusCode Status, string Body)> GetAsync(string path)
     {
-        using var server = BuildServer();
-        using var client = server.CreateClient();
+        using var host = BuildServer();
+        using var client = host.GetTestClient();
 
         var response = await client.GetAsync(path);
 

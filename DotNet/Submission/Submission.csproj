@@ -33,8 +33,6 @@
 		<PackageReference Include="Confluent.Kafka" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" />
 		<PackageReference Include="MediatR" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
 		<PackageReference Include="Quartz" />
 		<PackageReference Include="Serilog.AspNetCore" />

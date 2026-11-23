@@ -103,7 +103,6 @@ public class CacheKey : IComparable<CacheKey>
     /// </summary>
     public CacheKey(CodeGroup.CodeGroupTypes type, string url, string version, string id, List<Identifier> identifiers)
     {
-        ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(url);
         ArgumentNullException.ThrowIfNull(version);
         ArgumentNullException.ThrowIfNull(id);
