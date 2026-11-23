@@ -824,6 +824,10 @@ internal sealed class MockHttpMessageHandler : HttpMessageHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
+        // A real handler refuses a canceled token before sending. HttpClient on .NET 10 no longer checks it
+        // while buffering an already buffered response, so a mock that ignored it would let the call through.
+        cancellationToken.ThrowIfCancellationRequested();
+
         return Task.FromResult(_handler(request));
     }
 }
