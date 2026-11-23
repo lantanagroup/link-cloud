@@ -1,6 +1,6 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Handlers;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 
@@ -10,7 +10,7 @@ public static class MonitorMapping
     {
         routes.WithOpenApi(x => new OpenApiOperation(x)
         {
-            Tags = new List<OpenApiTag> { new() { Name = "System Information" } }
+            Tags = new HashSet<OpenApiTagReference> { new("System Information") }
         });
 
         routes.MapGet("/health", GetSystemHealth.Handle)

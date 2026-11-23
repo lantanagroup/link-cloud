@@ -26,7 +26,7 @@ using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using QueryDispatch.Application.Extensions;
 using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Services;
@@ -177,20 +177,10 @@ builder.Services.AddSwaggerGen(c =>
             Scheme = JwtBearerDefaults.AuthenticationScheme
         });
 
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
-            {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },
-                    new List<string>()
-                }
-            });
+        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
 
         #endregion
     }

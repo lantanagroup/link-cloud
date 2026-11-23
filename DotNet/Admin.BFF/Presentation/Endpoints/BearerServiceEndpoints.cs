@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 .RequireAuthorization([LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
-                    Tags = new List<OpenApiTag> { new() { Name = "Link Bearer Services" } }
+                    Tags = new HashSet<OpenApiTagReference> { new("Link Bearer Services") }
                 });
 
             tokenEndpoints.MapGet("/token", (Delegate)CreateToken)

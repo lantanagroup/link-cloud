@@ -4,7 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handler
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using Link.Authorization.Infrastructure;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 
@@ -14,7 +14,7 @@ public static class AggregationMapping
     {
         routes.WithOpenApi(x => new OpenApiOperation(x)
         {
-            Tags = new List<OpenApiTag> { new() { Name = "Service Aggregation" } }
+            Tags = new HashSet<OpenApiTagReference> { new("Service Aggregation") }
         });
 
         routes.MapDelete("/facility/{facilityId}", SoftDeleteFacility.Handle)

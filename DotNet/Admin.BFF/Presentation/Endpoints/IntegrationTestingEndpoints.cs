@@ -8,7 +8,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             var integrationEndpoints = app.MapGroup("/api/integration").WithOpenApi(x => new OpenApiOperation(x)
             {
-                Tags = new List<OpenApiTag> { new() { Name = "Integration" } },
+                Tags = new HashSet<OpenApiTagReference> { new("Integration") },
                 Description = _authenticationSchemaConfig.Value.EnableAnonymousAccess ?
                         "This endpoint allows anonymous access in the current configuration." :
                         "This endpoint requires authentication."

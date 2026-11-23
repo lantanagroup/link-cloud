@@ -6,7 +6,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             var authEndpoints = app.MapGroup("/api")
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
-                    Tags = new List<OpenApiTag> { new() { Name = "Auth" } }
+                    Tags = new HashSet<OpenApiTagReference> { new("Auth") }
                 });
 
             authEndpoints.MapGet("/login", Login)

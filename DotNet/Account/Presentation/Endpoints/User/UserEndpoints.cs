@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Link.Authorization.Permissions;
 using Link.Authorization.Policies;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
 {
@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 .RequireAuthorization([PolicyNames.IsLinkAdmin])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
-                    Tags = new List<OpenApiTag> { new() { Name = "User" } }
+                    Tags = new HashSet<OpenApiTagReference> { new("User") }
                 });
 
             #region Queries

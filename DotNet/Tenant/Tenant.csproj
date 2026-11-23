@@ -29,7 +29,6 @@
 		<PackageReference Include="CronExpressionDescriptor" />
 		<PackageReference Include="Grpc.AspNetCore" />
 		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" />
-		<PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
 		<PackageReference Include="Quartz" />
 		<PackageReference Include="Quartz.Extensions.DependencyInjection" />

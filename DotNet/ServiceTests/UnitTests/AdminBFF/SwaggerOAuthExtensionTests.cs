@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace UnitTests.AdminBFF;
@@ -36,9 +36,12 @@ public class SwaggerOAuthExtensionTests
         scheme.Flows.AuthorizationCode.Scopes
             .Should().ContainKeys("openid", "profile", "email");
 
-        options.SwaggerGeneratorOptions.SecurityRequirements
+        // Swashbuckle 10 builds each requirement from the document it is writing.
+        var buildRequirement = options.SwaggerGeneratorOptions.SecurityRequirements
             .Should().ContainSingle()
-            .Which.Keys.Should().ContainSingle()
+            .Subject;
+        buildRequirement(new OpenApiDocument())
+            .Keys.Should().ContainSingle()
             .Which.Reference.Id.Should().Be("OAuth");
     }
 
