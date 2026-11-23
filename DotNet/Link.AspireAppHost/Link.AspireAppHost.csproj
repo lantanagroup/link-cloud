@@ -15,11 +15,11 @@
     <!-- The app host runs with `dotnet run` or from the IDE. It does not need the Aspire CLI bundle. -->
     <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
     <UserSecretsId>link-cloud-apphost-6f3c2a91-8d4e-4b7a-9c15-2e7d0f8b4a63</UserSecretsId>
-    <!-- As every service does: packages.lock.json records the exact packages restored, transitive ones included.
-         The Aspire SDK adds its dashboard and orchestration packages for the machine's own platform
-         (Aspire.Dashboard.Sdk.win-x64 and so on), so the committed file names one platform's; restoring on
-         another rewrites those entries, which is not a change to commit. -->
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Unlike the services, no packages.lock.json: the Aspire SDK adds its dashboard and orchestration packages
+         for the restoring machine's own platform (Aspire.Dashboard.Sdk.win-x64, .linux-x64 and so on), so one
+         committed file cannot fit both Windows and Linux developers. Nothing restores in locked mode, and CI and
+         the Dockerfiles never build this project. -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
