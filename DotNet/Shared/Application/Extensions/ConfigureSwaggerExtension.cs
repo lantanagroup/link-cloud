@@ -22,7 +22,7 @@ public static class ConfigureSwaggerExtension
 
         app.UseSwagger(opts =>
         {
-            opts.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
+            opts.OpenApiVersion = OpenApiSpecVersion.OpenApi3_0;
             specAction?.Invoke(opts);
         });
 
