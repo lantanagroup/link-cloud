@@ -96,6 +96,46 @@ public class FhirQueriesControllerTests
         Assert.Equal("query failed", thrown.Message);
     }
 
+    [Fact]
+    public async Task GetQueries_SanitizesQueryParameters_AndLeavesOmittedFiltersNull()
+    {
+        var queries = new Mock<IFhirQueryQueries>();
+        queries
+            .Setup(q => q.GetFhirQueriesAsync(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FhirQueryResultModel
+            {
+                Queries = new List<FhirQuery>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        FacilityId = "facility-1",
+                        QueryType = FhirQueryType.Search,
+                        QueryParameters = new List<string>()
+                    }
+                }
+            });
+
+        var controller = new FhirQueriesController(
+            Mock.Of<ILogger<FhirQueriesController>>(),
+            Mock.Of<IFhirQueryManager>(),
+            queries.Object);
+
+        await controller.GetQueries("facility-1", "corr!id", null, "Obs!ervation", CancellationToken.None);
+
+        queries.Verify(q => q.GetFhirQueriesAsync(
+            "facility-1",
+            "corrid",
+            null,
+            "Observation",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static FhirQueriesController CreateController(FhirQueryResultModel result)
     {
         var queries = new Mock<IFhirQueryQueries>();

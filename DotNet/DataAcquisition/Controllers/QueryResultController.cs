@@ -54,6 +54,10 @@ public class FhirQueriesController : ControllerBase
 
         try
         {
+            correlationId = SanitizeQuery(correlationId);
+            patientId = SanitizeQuery(patientId);
+            resourceType = SanitizeQuery(resourceType);
+
             var results = await _fhirQueryQueries.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
 
             // Queries is unset when the read produced no model. That is not-found, same as an empty list.
@@ -73,4 +77,9 @@ public class FhirQueriesController : ControllerBase
             throw;
         }
     }
+
+    // Null stays null so an omitted filter is not treated as a value. SanitizeAndRemove is the
+    // same filter used by the acquisition log search.
+    private static string? SanitizeQuery(string? value) =>
+        value is null ? null : HtmlInputSanitizer.SanitizeAndRemove(value);
 }
