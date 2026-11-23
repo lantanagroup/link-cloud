@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             foreach (var entry in hashEntries) {
                 try
                 {
-                    DomainResource resource = JsonSerializer.Deserialize<DomainResource>((string)entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                    DomainResource resource = JsonSerializer.Deserialize<DomainResource>((string?)entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
                     resources.Add(resource);
                 }
                 catch (Exception ex) 
