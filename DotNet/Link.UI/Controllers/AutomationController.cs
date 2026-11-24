@@ -205,6 +205,33 @@ public sealed partial class AutomationController : Controller
         return Json(await _runs.LoadRunAsync(id, cancellationToken));
     }
 
+    /// <summary>
+    /// Suggested workaround for a failed run. Empty when the stored counts do not confirm a rule.
+    /// The page asks again when the run completes, because the last organization-location poll can land after the failure.
+    /// </summary>
+    [HttpGet("Runs/{id:guid}/suggested-workaround")]
+    public async Task<IActionResult> SuggestedWorkaround(Guid id, CancellationToken cancellationToken)
+    {
+        if (EngineOff() is { } off)
+            return off;
+
+        var run = await _manager!.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        var workaround = await AutomationRunDetailFiller.LoadSuggestedWorkaroundAsync(
+            _services,
+            this,
+            _logger,
+            run,
+            cancellationToken);
+        Response.Headers.CacheControl = "no-store";
+        if (workaround == null)
+            return NoContent();
+
+        return Json(workaround);
+    }
+
     private async Task<AutomationNewRunPage> BuildNewPageAsync(
         string? choice,
         string? runName,

@@ -844,6 +844,23 @@ details.au-facility-actions > summary::-webkit-details-marker {
   padding-left: 1.15rem;
 }
 .au-help-panel .au-help-body li { margin-bottom: .2rem; }
+.au-workaround-panel { margin-bottom: 0; }
+.au-workaround-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .35rem .75rem;
+  margin: 0 0 .75rem;
+}
+.au-workaround-counts div { margin: 0; }
+.au-workaround-counts dt {
+  margin: 0;
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  color: var(--au-muted);
+  font-weight: 600;
+}
+.au-workaround-counts dd { margin: 0; font-weight: 600; }
 
 /* ===================================================================
    Responsive helpers

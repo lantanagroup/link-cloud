@@ -9,6 +9,7 @@
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
         const snapshotUrl = '@Url.Action("PipelineSnapshot", "Automation")';
         const statusUrl = '@Url.Action("Status", "Automation", new { id = Model.RunId })';
+        const suggestedWorkaroundUrl = '@Url.Action("SuggestedWorkaround", "Automation", new { id = Model.RunId })';
         const logsUrl = '@Url.Action("Logs", "Automation")';
         const manifestUrl = '@Url.Action("ManifestData", "Automation")';
         const performancePanelUrl = '@Url.Action("PerformancePanel", "Automation", new { id = Model.RunId })';
@@ -1300,6 +1301,133 @@
             });
         }
 
+        var suggestedWorkaroundFetch = 0;
+
+        function revalidateSuggestedWorkaroundOnce() {
+            var fetchId = ++suggestedWorkaroundFetch;
+            fetch(suggestedWorkaroundUrl, { headers: { 'Accept': 'application/json' } })
+                .then(function (response) {
+                    if (fetchId !== suggestedWorkaroundFetch) return { stale: true };
+                    if (response.status === 204) return { model: null };
+                    if (!response.ok) return { failed: true };
+                    return response.json().then(function (model) { return { model: model }; });
+                })
+                .then(function (result) {
+                    if (!result || result.stale || result.failed || fetchId !== suggestedWorkaroundFetch) return;
+                    renderSuggestedWorkaround(result.model);
+                })
+                .catch(function () { /* one try; leave the panel already on the page */ });
+        }
+
+        function renderSuggestedWorkaround(model) {
+            var host = document.getElementById('suggestedWorkaround');
+            var body = document.getElementById('suggestedWorkaroundBody');
+            if (!host || !body) return;
+            if (!model || !model.cause) {
+                host.style.display = 'none';
+                body.replaceChildren();
+                return;
+            }
+
+            var details = host.querySelector('details');
+            var wasOpen = details ? details.open : false;
+            body.replaceChildren();
+
+            var cause = document.createElement('p');
+            cause.textContent = model.cause;
+            body.appendChild(cause);
+
+            var counts = document.createElement('dl');
+            counts.className = 'au-workaround-counts';
+            (model.counts || []).forEach(function (count) {
+                var row = document.createElement('div');
+                var label = document.createElement('dt');
+                label.textContent = count.label || '';
+                var value = document.createElement('dd');
+                value.textContent = String(count.value != null ? count.value : 0);
+                row.appendChild(label);
+                row.appendChild(value);
+                counts.appendChild(row);
+            });
+            body.appendChild(counts);
+
+            if (model.organizationMapName) {
+                var mapLine = document.createElement('p');
+                mapLine.appendChild(document.createTextNode('Organization resource map: '));
+                var mapName = document.createElement('strong');
+                mapName.textContent = model.organizationMapName;
+                mapLine.appendChild(mapName);
+                body.appendChild(mapLine);
+            }
+
+            var conditions = model.conditions || [];
+            if (conditions.length) {
+                var heading = document.createElement('p');
+                heading.textContent = 'Mapping conditions';
+                body.appendChild(heading);
+                var list = document.createElement('ul');
+                var lines = [];
+                conditions.forEach(function (condition) {
+                    var item = document.createElement('li');
+                    var priority = document.createElement('span');
+                    priority.textContent = '#' + (Number(condition.priority) || 0) + ' ';
+                    var code = document.createElement('code');
+                    code.textContent = condition.fhirPath || '';
+                    item.appendChild(priority);
+                    item.appendChild(code);
+                    list.appendChild(item);
+                    if (condition.fhirPath) lines.push(condition.fhirPath);
+                });
+                body.appendChild(list);
+                if (lines.length) {
+                    var copy = document.createElement('button');
+                    copy.type = 'button';
+                    copy.className = 'btn btn-sm btn-au-link';
+                    copy.textContent = 'Copy conditions';
+                    copy.addEventListener('click', function () { copyFailureText(lines.join('\n')); });
+                    body.appendChild(copy);
+                }
+            }
+
+            if (model.conditionsNote) {
+                var note = document.createElement('p');
+                note.textContent = model.conditionsNote;
+                body.appendChild(note);
+            }
+
+            var steps = document.createElement('ol');
+            (model.steps || []).forEach(function (step) {
+                var item = document.createElement('li');
+                item.textContent = step;
+                steps.appendChild(item);
+            });
+            body.appendChild(steps);
+
+            if (model.organizationMapsUrl) {
+                var link = document.createElement('a');
+                link.href = model.organizationMapsUrl;
+                link.className = 'btn btn-sm btn-au-link';
+                link.textContent = 'Open Organization Resource Maps';
+                body.appendChild(link);
+            }
+
+            if (details) details.open = wasOpen;
+            host.style.display = '';
+        }
+
+        function loadSuggestedWorkaroundFromPage() {
+            var source = document.getElementById('suggestedWorkaroundSource');
+            if (!source || !source.textContent) {
+                renderSuggestedWorkaround(null);
+                return;
+            }
+            try {
+                renderSuggestedWorkaround(JSON.parse(source.textContent));
+            } catch (e) {
+                renderSuggestedWorkaround(null);
+            }
+        }
+
         function applyRunStatus(run) {
             if (!run) return;
             currentRunStatus = run.status || currentRunStatus;
@@ -1326,6 +1454,8 @@
                 errorRowLive.style.display = errorText && errorText !== '-' ? '' : 'none';
             }
             renderFailureDetails(run);
+            if (isRunComplete(run.status))
+                revalidateSuggestedWorkaroundOnce();
             const retention = document.getElementById('runRetention');
             if (retention) {
                 retention.textContent = run.retentionNotice || '';
@@ -1927,6 +2057,9 @@
         }
 
         renderConfigProperties(runConfigurationJson);
+        loadSuggestedWorkaroundFromPage();
+        if (isRunComplete(currentRunStatus))
+            revalidateSuggestedWorkaroundOnce();
         loadNormalizationResults(true);
         refreshSnapshot();
         refreshLiveSimulation();
