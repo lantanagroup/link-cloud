@@ -56,7 +56,15 @@ if ! docker info --format '{{.ServerVersion}}' >/dev/null 2>&1; then
 fi
 
 config_json="$(docker compose config --format json)"
-project="$(printf '%s' "$config_json" | python -c 'import json,sys; print(json.load(sys.stdin).get("name",""))')"
+if command -v python3 >/dev/null 2>&1; then
+  py=python3
+elif command -v python >/dev/null 2>&1; then
+  py=python
+else
+  echo 'python3 is required to read the compose project name.' >&2
+  exit 1
+fi
+project="$(printf '%s' "$config_json" | "$py" -c 'import json,sys; print(json.load(sys.stdin).get("name",""))')"
 if ! printf '%s' "$project" | grep -Eq '^[a-z0-9][a-z0-9_-]*$'; then
   echo 'Could not read this compose project name. Refusing to prune images without it.' >&2
   exit 1
