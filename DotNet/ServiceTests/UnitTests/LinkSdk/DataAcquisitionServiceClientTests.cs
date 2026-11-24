@@ -486,6 +486,39 @@ public class DataAcquisitionServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetAntiforgeryTokenAsync_GetsTheTokenRouteAndOmitsTheTokenFromRawBody()
+    {
+        const string probeToken = "api-health-probe-token";
+        using var http = new FakeHttpBoundary($"{{\"token\":\"{probeToken}\",\"headerName\":\"X-Link-AntiForgery\"}}");
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.GetAntiforgeryTokenAsync();
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data-acquisition/antiforgery-token", request.Path);
+        Assert.Equal(probeToken, result.Body?.Token);
+        Assert.Equal("X-Link-AntiForgery", result.Body?.HeaderName);
+        Assert.DoesNotContain(probeToken, result.RawBody);
+        Assert.Contains("[redacted]", result.RawBody);
+        Assert.Contains("X-Link-AntiForgery", result.RawBody);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetAntiforgeryTokenAsync_DropsABodyThatCannotBeReadWithoutKeepingTheToken()
+    {
+        const string probeToken = "api-health-probe-token";
+        using var http = new FakeHttpBoundary($"not-json {probeToken}");
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.GetAntiforgeryTokenAsync();
+
+        Assert.Null(result.Body);
+        Assert.DoesNotContain(probeToken, result.RawBody ?? string.Empty);
+        Assert.Contains("omitted", result.RawBody ?? string.Empty);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task GetOrganizationLocationMappingAsync_GetsMappingById()
     {
         using var http = new FakeHttpBoundary("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");

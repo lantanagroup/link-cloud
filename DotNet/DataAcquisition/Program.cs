@@ -203,11 +203,17 @@ static void SetupMiddleware(WebApplication app)
 
     // Antiforgery token endpoint for browser-based callers (Admin.UI via YARP proxy).
     // Returns the request token in the response body and sets the cookie token automatically.
-    app.MapGet("/api/data-acquisition/antiforgery-token", (IAntiforgery antiforgery, HttpContext context) =>
+    // A parameterless RequireAuthorization() is the default authenticated-user policy. With
+    // Authentication:EnableAnonymousAccess the host registers no authentication scheme, so that
+    // challenge fails with 500 before this handler runs. The controllers stay reachable in that
+    // mode because their IsLinkAdmin policy is an allow-all assertion. Match that here.
+    var antiforgeryToken = app.MapGet("/api/data-acquisition/antiforgery-token", (IAntiforgery antiforgery, HttpContext context) =>
     {
         var tokens = antiforgery.GetAndStoreTokens(context);
         return Results.Ok(new { token = tokens.RequestToken, headerName = "X-Link-AntiForgery" });
-    }).RequireAuthorization();
+    });
+    if (!allowAnonymousAccess)
+        antiforgeryToken.RequireAuthorization();
 
     //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions

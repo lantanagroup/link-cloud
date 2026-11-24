@@ -315,4 +315,11 @@ public interface IDataAcquisitionServiceClient
 
     /// <summary>Clears query-configuration authentication: <c>DELETE /api/data-acquisition/{facilityId}/fhirQueryConfiguration/authentication</c>.</summary>
     Task<LinkApiResponse> DeleteAuthenticationConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the browser antiforgery token: <c>GET /api/data-acquisition/antiforgery-token</c>.
+    /// The token is on <see cref="AntiforgeryTokenApiModel.Token"/> so the caller can check it is present.
+    /// It is removed from <see cref="LinkApiResponse{T}.RawBody"/>, which step results and logs keep.
+    /// </summary>
+    Task<LinkApiResponse<AntiforgeryTokenApiModel>> GetAntiforgeryTokenAsync(CancellationToken cancellationToken = default);
 }

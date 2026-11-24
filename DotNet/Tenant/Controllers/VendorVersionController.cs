@@ -1,4 +1,3 @@
-using AutoMapper;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Enums;

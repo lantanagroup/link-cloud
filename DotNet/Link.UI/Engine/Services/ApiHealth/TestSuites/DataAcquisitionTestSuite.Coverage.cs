@@ -1,5 +1,6 @@
 using Automation.UI.Models.ApiHealth;
 using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.DataAcquisitionSteps;
 
@@ -255,6 +256,47 @@ public sealed partial class DataAcquisitionTestSuite
 
         await AddStepAsync(state, StepNames.SftpLogReset400, 400, () =>
             _client.ResetSftpLogAsync(InvalidGuidProbe, ct));
+    }
+
+    private async Task AppendAntiforgeryTokenAsync(CoverageState state)
+    {
+        AntiforgeryTokenApiModel? payload = null;
+        var result = await RunStepAsync(StepNames.AntiforgeryTokenGet200, 200, async () =>
+        {
+            var response = await _client.GetAntiforgeryTokenAsync(state.CancellationToken);
+            payload = response.Body;
+            if (response.StatusCode == 200 && !HasAntiforgeryPayload(payload))
+                throw new InvalidOperationException("Antiforgery token response did not include a non-empty token and headerName.");
+
+            return response;
+        }, state.CancellationToken);
+
+        if (result.Passed)
+            result.ResponseBody = $"HTTP 200 included a non-empty token and headerName '{payload?.HeaderName}'.";
+
+        OmitAntiforgeryToken(result, payload?.Token);
+        if (payload is not null)
+            payload.Token = null;
+
+        state.Results.Add(result);
+    }
+
+    private static bool HasAntiforgeryPayload(AntiforgeryTokenApiModel? body) =>
+        !string.IsNullOrWhiteSpace(body?.Token) && !string.IsNullOrWhiteSpace(body.HeaderName);
+
+    private static void OmitAntiforgeryToken(ApiTestRunResult result, string? token)
+    {
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        if (result.ResponseBody?.Contains(token, StringComparison.Ordinal) == true)
+            result.ResponseBody = "Antiforgery token response was omitted from the step result.";
+
+        if (result.ErrorMessage?.Contains(token, StringComparison.Ordinal) == true)
+            result.ErrorMessage = "Antiforgery token response did not match the expected shape. The token value was omitted.";
+
+        if (result.RequestBody?.Contains(token, StringComparison.Ordinal) == true)
+            result.RequestBody = "No request body was sent (GET).";
     }
 
     private async Task AddStepAsync(

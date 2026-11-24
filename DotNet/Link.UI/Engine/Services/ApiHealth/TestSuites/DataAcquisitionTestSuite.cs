@@ -139,6 +139,8 @@ public sealed partial class DataAcquisitionTestSuite : ServiceTestSuiteBase
 
         try
         {
+            await AppendAntiforgeryTokenAsync(coverage);
+
             var seededFacilityId = _seedContext.Current?.Report?.FacilityId;
             var seededReportId = _seedContext.Current?.Report?.ScheduleId;
             long? seededLogId = null;

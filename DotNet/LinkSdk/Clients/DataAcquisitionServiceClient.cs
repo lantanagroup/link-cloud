@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -842,4 +844,72 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         DateTimeKind.Local => value.ToUniversalTime(),
         _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
     };
+
+    /// <summary>
+    /// Reads the browser antiforgery token: <c>GET /api/data-acquisition/antiforgery-token</c>.
+    /// </summary>
+    public async Task<LinkApiResponse<AntiforgeryTokenApiModel>> GetAntiforgeryTokenAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var response = await SendAsync<AntiforgeryTokenApiModel>(() =>
+            Request("data-acquisition/antiforgery-token").GetAsync(cancellationToken: cancellationToken));
+
+        return new LinkApiResponse<AntiforgeryTokenApiModel>
+        {
+            StatusCode = response.StatusCode,
+            Body = response.Body,
+            ContentType = response.ContentType,
+            RawBody = RedactAntiforgeryToken(response.RawBody),
+            RequestUrl = response.RequestUrl,
+            RequestMethod = response.RequestMethod,
+            RequestBody = response.RequestBody,
+            TraceId = response.TraceId
+        };
+    }
+
+    /// <summary>
+    /// Replaces a token property value. A body that cannot be read as JSON is dropped, so a token
+    /// that arrived in an unexpected shape is not kept on the response callers display.
+    /// </summary>
+    private static string? RedactAntiforgeryToken(string? rawBody)
+    {
+        if (string.IsNullOrEmpty(rawBody))
+            return rawBody;
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawBody);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return OmittedAntiforgeryBody;
+
+            using var stream = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(stream))
+            {
+                writer.WriteStartObject();
+                foreach (var property in document.RootElement.EnumerateObject())
+                {
+                    if (property.Name.Equals("token", StringComparison.OrdinalIgnoreCase)
+                        && property.Value.ValueKind == JsonValueKind.String)
+                    {
+                        writer.WriteString(property.Name, "[redacted]");
+                    }
+                    else
+                    {
+                        property.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+        catch (JsonException)
+        {
+            return OmittedAntiforgeryBody;
+        }
+    }
+
+    private const string OmittedAntiforgeryBody =
+        "Response body was omitted so the antiforgery token is not stored.";
 }
