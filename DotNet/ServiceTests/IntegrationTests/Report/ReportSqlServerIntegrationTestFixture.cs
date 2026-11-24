@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using Link.LocalDev;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using Microsoft.Data.SqlClient;
@@ -34,7 +35,7 @@ namespace IntegrationTests.Report;
 /// </remarks>
 public class ReportSqlServerIntegrationTestFixture : IAsyncLifetime
 {
-    private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04";
+    private static readonly string SqlServerImage = DevStackImages.SqlServer.Reference;
 
     // Points the fixture at an existing SQL Server instead of a Testcontainer, which drops startup from
     // ~30s to ~2s for the inner-dev loop. Mirrors the DataAcquisition fixture's switch.

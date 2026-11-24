@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Blobs;
+using Link.LocalDev;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;
@@ -37,7 +38,7 @@ namespace IntegrationTests.Report
     public class ReportIntegrationTestFixture : IAsyncLifetime, IDisposable
     {
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
-            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .WithImage(DevStackImages.Azurite.Reference)
             .WithCommand("--skipApiVersionCheck")
             .Build();
 

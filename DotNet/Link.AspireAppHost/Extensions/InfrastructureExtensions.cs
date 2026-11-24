@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Link.LocalDev;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MongoDB.Bson;
@@ -101,24 +102,30 @@ internal static class InfrastructureExtensions
         // SQL Server's password is generated on the first run and kept in this AppHost's user secrets.
         // Clients reach it on the port Docker publishes, not through Aspire's proxy: under load the
         // proxy has been seen to stop accepting connections and not recover.
+        var sqlImage = DevStackImages.SqlServer;
         var sql = builder.AddSqlServer("sql", port: Ports.SqlServer)
+            .WithImage(sqlImage.Repository, sqlImage.Tag)
+            .WithImageRegistry(string.IsNullOrEmpty(sqlImage.Registry) ? null : sqlImage.Registry)
             .WithEndpoint("tcp", endpoint => endpoint.IsProxied = false)
             .WithDataVolume("link-aspire-sql");
 
         var kafka = builder.AddLinkKafka();
 
-        var mongo = builder.AddContainer("mongo", "mongo", "6-jammy")
+        var mongoImage = DevStackImages.Mongo;
+        var mongo = builder.AddContainer("mongo", mongoImage.ContainerImage, mongoImage.Tag)
             .WithArgs("--replSet", "rs0", "--bind_ip_all")
             .WithEndpoint(port: Ports.Mongo, targetPort: 27017, name: "tcp", isProxied: false)
             .WithVolume("link-aspire-mongo", "/data/db")
             .WithHealthCheck(AddMongoReplicaSetCheck(builder));
 
         // Redis is a cache, so nothing is kept between runs.
-        var redis = builder.AddContainer("redis", "redis", "6.2-alpine")
+        var redisImage = DevStackImages.Redis;
+        var redis = builder.AddContainer("redis", redisImage.ContainerImage, redisImage.Tag)
             .WithArgs("redis-server", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru")
             .WithEndpoint(port: Ports.Redis, targetPort: 6379, name: "tcp", isProxied: false);
 
-        var azurite = builder.AddContainer("azurite", "mcr.microsoft.com/azure-storage/azurite", "3.35.0")
+        var azuriteImage = DevStackImages.Azurite;
+        var azurite = builder.AddContainer("azurite", azuriteImage.ContainerImage, azuriteImage.Tag)
             .WithArgs("azurite-blob", "--skipApiVersionCheck", "--blobHost", "0.0.0.0", "-l", "/data")
             .WithEndpoint(port: Ports.AzuriteBlob, targetPort: 10000, name: "blob", isProxied: false)
             .WithVolume("link-aspire-azurite", "/data")

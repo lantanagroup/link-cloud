@@ -79,6 +79,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\LocalDev\DevStackImages.cs" Link="LocalDev\DevStackImages.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Resources\AllergyIntolerance.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

@@ -501,8 +501,9 @@ or a red one on failure, which stays until dismissed.
   (`docker volume rm link-aspire-sql`, or `link-aspire-keycloak`), which loses its data, and start
   again. The SFTP password is set on the container each start, so it is not affected.
 - **Data.** SQL Server, MongoDB, Azurite, Kafka, Keycloak and the SFTP server keep their data in Docker
-  volumes (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time. Submitted
-  reports are also written to `%TEMP%\link-aspire\submission`.
+  volumes (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time. The container
+  tags for SQL Server, MongoDB, Redis and Azurite are the `x-dev-images` block in `docker-compose.yml`, which
+  this host reads on startup. Submitted reports are also written to `%TEMP%\link-aspire\submission`.
   - **Kafka keeps its consumer groups' committed offsets, as compose does.** Most Link consumers start
     a new group at the latest message, so with nothing kept, every run's groups were new. A message
     sent before its consumer joined was then lost; Report replaying a stored report at startup lost

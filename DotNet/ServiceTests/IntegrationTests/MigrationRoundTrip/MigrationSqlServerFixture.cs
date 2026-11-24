@@ -1,3 +1,4 @@
+using Link.LocalDev;
 using Microsoft.Data.SqlClient;
 using Testcontainers.MsSql;
 using Task = System.Threading.Tasks.Task;
@@ -10,7 +11,7 @@ namespace IntegrationTests.MigrationRoundTrip;
 /// </summary>
 public sealed class MigrationSqlServerFixture : IAsyncLifetime
 {
-    private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04";
+    private static readonly string SqlServerImage = DevStackImages.SqlServer.Reference;
 
     private readonly MsSqlContainer? _sqlContainer;
     private string _serverConnectionString = "";
