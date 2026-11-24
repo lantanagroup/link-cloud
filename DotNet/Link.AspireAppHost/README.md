@@ -90,7 +90,7 @@ Validation wait for it.
 ### Prerequisites
 
 - Docker Desktop, running
-- The .NET 8 SDK. Every package comes from nuget.org, so no feed sign-in or token is needed
+- The .NET 10 SDK. Every package comes from nuget.org, so no feed sign-in or token is needed
 - Maven on `PATH`, and a JDK 21
 - Node and npm on `PATH`, for the Admin UI and the NHSN App UI
 - Only if you turn the NHSN App on (it is off by default): the NHSN design system's package file, `nhsn-react-core-2.4.1.tgz`, which

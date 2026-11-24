@@ -4,7 +4,7 @@ This system is a high-performing, big-data platform intended to support collecti
 
 Link Cloud is an open-source, event-driven microservices platform for FHIR-based public health reporting. It ingests clinical data from EHRs, normalizes it, evaluates measures (CQL), validates, and submits results downstream. Services span three runtimes that all share one Kafka bus, one set of databases, and one local docker-compose stack:
 
-- **.NET 8** services under `DotNet/` (most services) — ASP.NET minimal APIs, EF Core or MongoDB, Kafka via Confluent.Kafka.
+- **.NET 10** services under `DotNet/` (most services) — ASP.NET minimal APIs, EF Core or MongoDB, Kafka via Confluent.Kafka.
 - **Java 17 / Spring Boot 3** services under `Java/` (`measureeval`, `validation`, plus a `shared` lib and the HAPI FHIR test server).
 - **Angular** Admin UI under `Web/Admin.UI/`.
 

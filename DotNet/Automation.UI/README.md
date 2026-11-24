@@ -941,7 +941,7 @@ Port mapping: host `5256` -- container `5257`.
 
 ## 14. Notes
 
-- Targets `.NET 8`.
+- Targets `.NET 10`.
 - MVC + Razor views + SignalR (not Razor Pages `PageModel` routing, despite the workspace
   characteristics hint -- the project uses classic MVC controllers and `@Html.PartialAsync`).
 - `RunHub.SubscribeRun(runId)` groups clients for per-run log streaming;

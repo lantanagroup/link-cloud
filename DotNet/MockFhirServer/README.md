@@ -1,6 +1,6 @@
 ﻿# MockFhirServer
 
-`MockFhirServer` is a lightweight .NET 8 Minimal API that acts as a drop-in replacement for
+`MockFhirServer` is a lightweight .NET 10 Minimal API that acts as a drop-in replacement for
 a real FHIR R4 server (e.g. HAPI) during local development and integration testing. Instead
 of storing or proxying real patient data, it generates synthetic FHIR R4 resources on the fly
 using the deterministic data-generation engine from the `Automation` library, then discards
