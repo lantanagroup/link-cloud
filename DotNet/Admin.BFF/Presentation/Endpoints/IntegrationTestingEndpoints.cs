@@ -41,10 +41,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
 
             var integrationEndpoints = app.MapGroup("/api/integration")
-                .WithTags("Integration")
-                .WithDescription(_authenticationSchemaConfig.Value.EnableAnonymousAccess ?
-                    "This endpoint allows anonymous access in the current configuration." :
-                    "This endpoint requires authentication.");
+                .WithTags("Integration");
 
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {

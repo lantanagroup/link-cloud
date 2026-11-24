@@ -85,6 +85,19 @@ public class EnumDescriptionSchemaFilterTests
         Assert.Equal(2, Assert.IsType<JsonArray>(extension.Node).Count);
     }
 
+    [Fact]
+    public void ASchemaReferenceIsLeftAlone()
+    {
+        // Swashbuckle can hand the filter a reference to a schema rather than the schema itself. A reference
+        // cannot be changed, so the filter must skip it rather than throw.
+        var reference = new OpenApiSchemaReference(nameof(SampleStatus));
+
+        new EnumDescriptionSchemaFilter().Apply(reference, Context(typeof(SampleStatus)));
+
+        Assert.Null(reference.Description);
+        Assert.Null(reference.Extensions);
+    }
+
     #endregion
 
     #region Documentation parsing
