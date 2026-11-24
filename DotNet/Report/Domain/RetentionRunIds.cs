@@ -4,8 +4,8 @@ namespace LantanaGroup.Link.Report.Domain;
 
 /// <summary>
 /// The id of one scheduled retention run, derived from the firing it ran for. A run recovered on another
-/// Report instance gets the same id as the run it replaces, so their cleanups group together in the cleanup
-/// history.
+/// Report instance usually gets the same id as the run it replaces, so their cleanups group together in the
+/// cleanup history. A recovered catch-up run does not; see dev-docs/retention-schedule.md.
 /// </summary>
 /// <remarks>
 /// The id only groups cleanups. It is predictable and must never decide access; nothing about a cleanup's

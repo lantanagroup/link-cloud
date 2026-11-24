@@ -96,24 +96,33 @@ interface.
 
 **Cluster recovery.** An instance dies partway through a run. Quartz notices its check-ins have
 stopped and re-runs the job on another instance with `Recovering` set. The re-run's own scheduled
-time is the recovery instant, but Quartz writes the original firing's time into the job data map
-under `SchedulerConstants.FailedJobOriginalTriggerFiretime`, formatted with the invariant culture.
-The job reads it back, so `ScheduledFireTimeUtc` is the time the interrupted run was due. If the
-value is missing or cannot be parsed, the job falls back to the recovery instant.
+time is the recovery instant, but Quartz writes the time the interrupted run fired into the job
+data map under `SchedulerConstants.FailedJobOriginalTriggerFiretime`, formatted with the invariant
+culture, to the second. The job reads it back, so for an ordinary firing `ScheduledFireTimeUtc` is
+the time the interrupted run was due. If the value is missing or cannot be parsed, the job falls
+back to the recovery instant.
 
 Quartz 3.18.1 never writes `FailedJobOriginalTriggerScheduledFiretime`, although the constant
 exists, so the job does not read it.
 
 **Misfire.** Every instance is down at the cron time, so nothing fires. The trigger's misfire
-policy is fire-once-now: when an instance comes back it runs the job once, not once per missed day.
-Quartz does that by moving the trigger's next fire time to the recovery instant, so the firing
-reports that instant as its scheduled time, and `Recovering` is false. Nothing records the missed
-cron time. `DmrpNightlyJob` has the same behavior and describes it in its remarks.
+policy is fire-once-now: when an instance comes back it runs the job once, not once per missed day,
+and `Recovering` is false. Quartz 3.18 keeps the missed time in the `MISFIRE_ORIG_FIRE_TIME` column
+of `quartz.QRTZ_TRIGGERS`, so that firing normally reports the earliest missed cron time as its
+scheduled time. Quartz overwrites the column each time it reschedules a missed firing, so if every
+instance goes down again before the catch-up fires, the run reports the rescheduled time instead. On
+a store without the column (Report's tables before the `AddQuartzMisfireOrigFireTime` migration) the
+firing reports the recovery instant.
 
-For retention this is acceptable, because the check ages reports against the date it runs, not
+Neither affects retention, because the check ages reports against the date it runs, not
 against 02:00. The check therefore takes its cutoff from the clock, not from
-`ScheduledFireTimeUtc`, and uses the fire time only for the run id, where a recovered run must match
-the run it replaces.
+`ScheduledFireTimeUtc`, and uses the fire time only for the run id.
+
+A cluster recovery gets the same run id as the run it replaces only when that run started within the
+second of its scheduled time, as an ordinary cron firing does. The original time Quartz passes to the
+recovery is when the interrupted run actually fired, to the second. A recovered catch-up run, or one
+that started a second or more late, therefore gets a different id, and that run's cleanups appear
+under two run ids in the cleanup history. Nothing else depends on the id.
 
 ## Failures
 
