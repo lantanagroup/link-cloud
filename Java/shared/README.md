@@ -16,8 +16,7 @@ local
 
 `com.lantanagroup.link.shared.audit` lets a controller method emit the `AuditableEventOccurred` event the .NET
 services send. A marked method that returns 2xx publishes one event after the response is complete; any other status
-or an exception publishes nothing, and a failed publish never fails the request. Design and wire contract:
-[`docs/superpowers/specs/2026-11-23-java-audit-mechanism-design.md`](../../docs/superpowers/specs/2026-11-23-java-audit-mechanism-design.md).
+or an exception publishes nothing, and a failed publish never fails the request.
 
 **Adopting it.** The shared jar registers `AuditAutoConfiguration` itself. A service sets one property in its
 `application.yml`, or the application fails to start once any method is marked:
