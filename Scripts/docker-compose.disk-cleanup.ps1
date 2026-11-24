@@ -44,13 +44,10 @@ function Test-ComposeProjectName([string]$Name) {
     return $Name -match '^[a-z0-9][a-z0-9_-]*$'
 }
 
+# Plain function on purpose. An advanced function binds -v to -Verbose and drops it,
+# so `down -v` would not remove volumes.
 function Invoke-RepoCompose {
-    param(
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [string[]]$ComposeArgs
-    )
-
-    & docker compose -f $ComposeFile -p $project @ComposeArgs
+    & docker compose -f $ComposeFile -p $project @args
 }
 
 function Get-ComposeProjectName {
