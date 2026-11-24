@@ -20,7 +20,7 @@
     <description>Project/folder of Java modules/services for Link</description>
 
     <properties>
-        <cqf-fhir.version>4.5.1</cqf-fhir.version>
+        <cqf-fhir.version>4.9.0</cqf-fhir.version>
         <hapi-fhir.version>8.12.1</hapi-fhir.version>
         <kotlin.version>2.1.20</kotlin.version>
         <jacoco.version>0.8.12</jacoco.version>

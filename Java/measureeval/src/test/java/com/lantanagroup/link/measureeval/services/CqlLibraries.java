@@ -190,4 +190,71 @@ public class CqlLibraries {
             define function "Measure Observation"(Encounter "Encounter"):
               24""";
 
+    /**
+     * Rebuilds a MedicationRequest field by field down to Timing.Repeat, the shape the NHSN ACH 3.0.0 SDE uses.
+     * Copying the list-valued enumeration elements (dayOfWeek, when) crashed clinical-reasoning before 4.9.0.
+     */
+    public static final String COHORT_WITH_REBUILT_MEDICATION_REQUEST_SDE = """
+            library CohortLibraryWithRebuiltMedicationRequestSDE version '1.0.0'
+
+            using FHIR version '4.0.1'
+
+            context Patient
+
+            define "Initial Population":
+              ["Encounter"] E
+                where E.status.value = 'finished'
+
+            define "SDE Medication Request":
+              ["MedicationRequest"] M
+                where exists "Initial Population"
+                return MedicationRequestResource(M)
+
+            define function MedicationRequestRepeat(repeat FHIR.Timing.Repeat):
+              repeat r
+              return FHIR.Timing.Repeat{
+                bounds: r.bounds,
+                count: r.count,
+                countMax: r.countMax,
+                "duration": r."duration",
+                durationMax: r.durationMax,
+                durationUnit: r.durationUnit,
+                frequency: r.frequency,
+                frequencyMax: r.frequencyMax,
+                period: r.period,
+                periodMax: r.periodMax,
+                periodUnit: r.periodUnit,
+                dayOfWeek: r.dayOfWeek,
+                timeOfDay: r.timeOfDay,
+                "when": r."when",
+                offset: r.offset
+              }
+
+            define function MedicationRequestTiming(timing FHIR.Timing):
+              timing t
+              return FHIR.Timing{
+                event: t.event,
+                repeat: MedicationRequestRepeat(t.repeat),
+                code: t.code
+              }
+
+            define function MedicationRequestDosageInstruction(dosageInstruction List<FHIR.Dosage>):
+              dosageInstruction dI
+              return FHIR.Dosage{
+                text: dI.text,
+                timing: MedicationRequestTiming(dI.timing)
+              }
+
+            define function MedicationRequestResource(medicationRequest MedicationRequest):
+              medicationRequest m
+              return MedicationRequest{
+                id: FHIR.id {value: 'TST-' + m.id.value},
+                status: m.status,
+                intent: m.intent,
+                medication: m.medication,
+                subject: m.subject,
+                authoredOn: m.authoredOn,
+                dosageInstruction: MedicationRequestDosageInstruction(m.dosageInstruction)
+              }""";
+
 }

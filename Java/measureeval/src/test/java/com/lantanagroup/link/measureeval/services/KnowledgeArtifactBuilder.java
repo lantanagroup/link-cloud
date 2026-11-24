@@ -503,6 +503,55 @@ public class KnowledgeArtifactBuilder {
     }
 
     /**
+     * Nested utility class for a cohort measure whose SDE rebuilds MedicationRequest down to Timing.Repeat.
+     */
+    static class CohortMeasureWithRebuiltMedicationRequestSDE {
+        private static final String MEASURE_ID = "CohortMeasureWithRebuiltMedicationRequestSDE";
+        private static final String LIBRARY_ID = "CohortLibraryWithRebuiltMedicationRequestSDE";
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
+
+        /**
+         * Builds the Encounter-basis cohort {@link Measure} with an "SDE Medication Request" SDE.
+         *
+         * @return A {@link Measure} with an initial population and one SDE.
+         */
+        public static Measure measure() {
+            return MeasureBuilder.buildSingleSde(MEASURE_ID,
+                                                 MEASURE_URL,
+                                                 LIBRARY_URL,
+                                                 "outcome",
+                                                 "cohort",
+                                                 "sde-medication-request",
+                                                 "SDE Medication Request",
+                                                 "SDE Medication Request",
+                                                 MeasurePopulationGroup.initialPopulation());
+        }
+
+        /**
+         * Builds the {@link Library} holding the CQL that rebuilds the MedicationRequest.
+         *
+         * @return A {@link Library} with the CQL content.
+         */
+        public static Library library() {
+            return LibraryBuilder.build(LIBRARY_ID,
+                                        "1.0.0",
+                                        LIBRARY_ID,
+                                        LIBRARY_URL,
+                                        CqlLibraries.COHORT_WITH_REBUILT_MEDICATION_REQUEST_SDE);
+        }
+
+        /**
+         * Builds a {@link Bundle} containing the measure and library.
+         *
+         * @return A {@link Bundle} with the measure and library.
+         */
+        public static Bundle bundle() {
+            return BundleBuilder.build(library(), measure());
+        }
+    }
+
+    /**
      * Utility class for building {@link Measure} resources.
      */
     static class MeasureBuilder {
