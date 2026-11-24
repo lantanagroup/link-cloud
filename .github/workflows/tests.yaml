@@ -821,6 +821,7 @@ jobs:
             echo "Pull attempt $i failed, retrying in 15s..."
             sleep 15
           done
+          docker image inspect "$image" >/dev/null
 
       - name: Pull SQL Server Docker image
         run: |
@@ -859,6 +860,7 @@ jobs:
             echo "Pull attempt $i failed, retrying in 15s..."
             sleep 15
           done
+          docker image inspect "$image" >/dev/null
 
       - name: Restore dependencies
         run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj

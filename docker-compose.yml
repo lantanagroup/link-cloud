@@ -34,7 +34,8 @@
 ## nhsn-app-ui: 8090
 
 # Local SQL Server, MongoDB, Redis and Azurite tags. ServiceTests and the Aspire AppHost
-# read this block (DotNet/LocalDev/DevStackImages.cs). Change a tag here only.
+# read this block (DotNet/LocalDev/DevStackImages.cs). The .NET test job's pre-pull steps
+# read the sql and azurite lines from it too. Change a tag here only.
 x-dev-images:
   sql: &dev-sql-image mcr.microsoft.com/mssql/server:2022-CU28-ubuntu-22.04
   mongo: &dev-mongo-image mongo:6-jammy
