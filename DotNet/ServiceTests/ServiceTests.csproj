@@ -195,6 +195,13 @@
     </None>
   </ItemGroup>
 
+  <!-- The audit event fixtures are shared with the Java tests, so both runtimes check the same JSON. -->
+  <ItemGroup>
+    <None Include="..\..\Java\shared\src\test\resources\audit\*.json" Link="Resources\Audit\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="IntegrationTests\DataAcquisition\Controllers\" />
   </ItemGroup>
