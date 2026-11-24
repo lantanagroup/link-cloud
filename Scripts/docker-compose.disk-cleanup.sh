@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Opt-in disk cleanup for this repository's docker compose project.
 #
-# Always:
+# Always, bound to this repository's compose file and project name
+# (-f and -p, so COMPOSE_FILE and COMPOSE_PROJECT_NAME cannot redirect it):
 #   docker compose down -v --remove-orphans
 #   docker image prune of dangling images labeled for this compose project
 #
@@ -55,7 +56,9 @@ if ! docker info --format '{{.ServerVersion}}' >/dev/null 2>&1; then
   exit 1
 fi
 
-config_json="$(docker compose config --format json)"
+# -f does not override COMPOSE_PROJECT_NAME, and COMPOSE_FILE can point compose at
+# another project. Read this repository's name with both unset, then pin it.
+config_json="$(env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME docker compose -f "$COMPOSE_FILE" config --format json)"
 # Same probe as .githooks/pre-commit. command -v is not enough: on Windows the
 # Microsoft Store python3 alias is on PATH and exits non-zero.
 py=""
@@ -80,14 +83,14 @@ echo "Compose project: $project"
 echo "Compose file: $COMPOSE_FILE"
 echo
 echo 'Containers:'
-docker compose ps --all
+docker compose -f "$COMPOSE_FILE" -p "$project" ps --all
 echo
 echo 'Volumes labeled for this project:'
 docker volume ls --filter "label=com.docker.compose.project=$project"
 
 echo
-echo 'docker compose down -v --remove-orphans'
-docker compose down -v --remove-orphans
+echo "docker compose -f $COMPOSE_FILE -p $project down -v --remove-orphans"
+docker compose -f "$COMPOSE_FILE" -p "$project" down -v --remove-orphans
 
 echo
 echo "docker image prune --force --filter dangling=true --filter label=com.docker.compose.project=$project"

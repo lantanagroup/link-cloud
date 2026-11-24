@@ -1,6 +1,7 @@
 # Opt-in disk cleanup for this repository's docker compose project.
 #
-# Always:
+# Always, bound to this repository's compose file and project name
+# (-f and -p, so COMPOSE_FILE and COMPOSE_PROJECT_NAME cannot redirect it):
 #   docker compose down -v --remove-orphans
 #   docker image prune of dangling images labeled for this compose project
 #
@@ -43,8 +44,41 @@ function Test-ComposeProjectName([string]$Name) {
     return $Name -match '^[a-z0-9][a-z0-9_-]*$'
 }
 
+function Invoke-RepoCompose {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$ComposeArgs
+    )
+
+    & docker compose -f $ComposeFile -p $project @ComposeArgs
+}
+
 function Get-ComposeProjectName {
-    $configJson = & docker compose config --format json
+    # -f does not override COMPOSE_PROJECT_NAME, and COMPOSE_FILE can point compose
+    # at another project. Read this repository's name with both unset, then pin it.
+    $previousFile = $env:COMPOSE_FILE
+    $previousProject = $env:COMPOSE_PROJECT_NAME
+    try {
+        Remove-Item Env:COMPOSE_FILE -ErrorAction SilentlyContinue
+        Remove-Item Env:COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
+        $configJson = & docker compose -f $ComposeFile config --format json
+    }
+    finally {
+        if ($null -eq $previousFile) {
+            Remove-Item Env:COMPOSE_FILE -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:COMPOSE_FILE = $previousFile
+        }
+
+        if ($null -eq $previousProject) {
+            Remove-Item Env:COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:COMPOSE_PROJECT_NAME = $previousProject
+        }
+    }
+
     if ($LASTEXITCODE -ne 0 -or -not $configJson) {
         return $null
     }
@@ -77,14 +111,14 @@ Write-Host "Compose project: $project"
 Write-Host "Compose file: $ComposeFile"
 Write-Host ''
 Write-Host 'Containers:'
-& docker compose ps --all
+Invoke-RepoCompose ps --all
 Write-Host ''
 Write-Host 'Volumes labeled for this project:'
 & docker volume ls --filter "label=com.docker.compose.project=$project"
 
 Write-Host ''
-Write-Host 'docker compose down -v --remove-orphans'
-& docker compose down -v --remove-orphans
+Write-Host "docker compose -f $ComposeFile -p $project down -v --remove-orphans"
+Invoke-RepoCompose down -v --remove-orphans
 if ($LASTEXITCODE -ne 0) {
     Write-Error "docker compose down failed with exit code $LASTEXITCODE. Image and build-cache prune were not run."
     exit $LASTEXITCODE

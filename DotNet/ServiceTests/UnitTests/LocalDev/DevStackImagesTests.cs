@@ -118,6 +118,11 @@ public class DevStackImagesTests
                 value = value[(anchorEnd + 1)..].Trim();
             }
 
+            if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+            {
+                value = value[1..^1];
+            }
+
             if (key is "sql" or "mongo" or "redis" or "azurite")
             {
                 found[key] = value;
