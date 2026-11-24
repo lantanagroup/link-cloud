@@ -37,6 +37,13 @@ variables:
   value: 'DotNet/Admin.BFF'
 
 steps:
+  # Pin the SDK the Dockerfiles build with; otherwise the hosted agent's newest SDK is used.
+  - task: UseDotNet@2
+    displayName: 'Use .NET 10 SDK'
+    inputs:
+      packageType: 'sdk'
+      version: '10.x'
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
