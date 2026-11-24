@@ -56,12 +56,18 @@ if ! docker info --format '{{.ServerVersion}}' >/dev/null 2>&1; then
 fi
 
 config_json="$(docker compose config --format json)"
-if command -v python3 >/dev/null 2>&1; then
-  py=python3
-elif command -v python >/dev/null 2>&1; then
-  py=python
-else
-  echo 'python3 is required to read the compose project name.' >&2
+# Same probe as .githooks/pre-commit. command -v is not enough: on Windows the
+# Microsoft Store python3 alias is on PATH and exits non-zero.
+py=""
+for candidate in python3 python py; do
+  if command -v "$candidate" >/dev/null 2>&1 &&
+     "$candidate" -c "import sys" >/dev/null 2>&1; then
+    py="$candidate"
+    break
+  fi
+done
+if [ -z "$py" ]; then
+  echo 'python3, python, or py is required to read the compose project name.' >&2
   exit 1
 fi
 project="$(printf '%s' "$config_json" | "$py" -c 'import json,sys; print(json.load(sys.stdin).get("name",""))')"
