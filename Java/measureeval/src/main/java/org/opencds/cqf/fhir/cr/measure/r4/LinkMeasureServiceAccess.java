@@ -6,7 +6,7 @@ import org.hl7.fhir.r4.model.Parameters;
 import org.opencds.cqf.fhir.cr.measure.common.MeasureReference;
 
 /**
- * Exposes {@link R4MultiMeasureService#evaluateSingleMeasureCaptureDef}, which cqf-fhir 4.15 and later make
+ * Exposes {@link R4MultiMeasureService#evaluateSingleMeasureCaptureDef}, which cqf-fhir 4.6.0 and later make
  * package-private ({@code @VisibleForTesting}). MeasureEvaluator needs the captured MeasureDef and CQL
  * results for its debug output, and no public cqf-fhir API returns them.
  *
