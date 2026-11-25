@@ -8,6 +8,7 @@ import com.lantanagroup.link.measureeval.models.MeasureEvaluationResult;
 import com.lantanagroup.link.measureeval.repositories.LinkInMemoryFhirRepository;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.Getter;
 import org.cqframework.cql.cql2elm.LibraryBuilder;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -18,6 +19,7 @@ import org.opencds.cqf.cql.engine.debug.DebugLibraryResultEntry;
 import org.opencds.cqf.cql.engine.debug.DebugLocator;
 import org.opencds.cqf.cql.engine.debug.DebugResult;
 import org.opencds.cqf.cql.engine.debug.DebugResultEntry;
+import org.opencds.cqf.cql.engine.execution.CqlEngine;
 import org.opencds.cqf.cql.engine.execution.EvaluationResult;
 import org.opencds.cqf.cql.engine.execution.ExpressionResult;
 import org.opencds.cqf.cql.engine.execution.Variable;
@@ -25,18 +27,21 @@ import org.opencds.cqf.cql.engine.execution.trace.ExpressionDefTraceFrame;
 import org.opencds.cqf.cql.engine.execution.trace.SubExpressionTraceFrame;
 import org.opencds.cqf.cql.engine.execution.trace.Trace;
 import org.opencds.cqf.cql.engine.execution.trace.TraceFrame;
+import org.opencds.cqf.cql.engine.runtime.Value;
 import org.opencds.cqf.fhir.cql.EvaluationSettings;
 import org.opencds.cqf.fhir.cql.engine.retrieve.RetrieveSettings;
 import org.opencds.cqf.fhir.cql.engine.terminology.TerminologySettings;
 import org.opencds.cqf.fhir.cr.measure.MeasureEvaluationOptions;
+import org.opencds.cqf.fhir.cr.measure.common.CqlEvaluationResult;
 import org.opencds.cqf.fhir.cr.measure.common.EvaluationResultFormatter;
 import org.opencds.cqf.fhir.cr.measure.common.GroupDef;
 import org.opencds.cqf.fhir.cr.measure.common.MeasureDef;
 import org.opencds.cqf.fhir.cr.measure.common.MeasurePeriodValidator;
+import org.opencds.cqf.fhir.cr.measure.common.MeasureReference;
 import org.opencds.cqf.fhir.cr.measure.common.PopulationDef;
+import org.opencds.cqf.fhir.cr.measure.r4.LinkMeasureServiceAccess;
 import org.opencds.cqf.fhir.cr.measure.r4.MeasureDefAndR4MeasureReport;
 import org.opencds.cqf.fhir.cr.measure.r4.R4MultiMeasureService;
-import org.opencds.cqf.fhir.utility.monad.Eithers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +114,11 @@ public class MeasureEvaluator {
         boolean tracingEnabled = DebugSections.needsTracing(debugSections);
         evaluationSettings.getCqlOptions().getCqlEngineOptions().setTracingEnabled(tracingEnabled);
         evaluationSettings.getCqlOptions().getCqlEngineOptions().setDetailedTracingEnabled(tracingEnabled);
+        // Link rebuilds MeasureReport.evaluatedResource from the contained resources (BlobStorageService),
+        // so the engine's per-expression tracking of retrieved resources is pure overhead, and on engine 5
+        // it dominates evaluation time for patients with many resources.
+        evaluationSettings.getCqlOptions().getCqlEngineOptions().getOptions()
+                .add(CqlEngine.Options.DisableEvaluatedResourcesCollection);
 
         this.bundle = bundle;
         if (!this.bundle.hasEntry()) {
@@ -168,36 +179,71 @@ public class MeasureEvaluator {
         return new MeasureEvaluationResult(measureReport, debugInfo);
     }
 
+    /**
+     * Builds the repository a single evaluation runs against: the measure bundle's artifacts plus the
+     * subject's clinical data. cqf-fhir 4.11+ no longer accepts additional data separately, so both go
+     * into one in-memory repository, which rejects two resources with the same type and id. A patient
+     * resource that shares a type and id with a measure artifact is therefore dropped, with a warning,
+     * so the artifact the measure was compiled against is the one evaluated.
+     */
+    private IRepository buildRepository(Bundle additionalData) {
+        Bundle merged = new Bundle();
+        merged.setType(Bundle.BundleType.COLLECTION);
+        Set<String> artifactKeys = new HashSet<>();
+        for (Bundle.BundleEntryComponent entry : bundle.getEntry()) {
+            if (entry.hasResource()) {
+                merged.addEntry().setResource(entry.getResource());
+                artifactKeys.add(repositoryKey(entry.getResource()));
+            }
+        }
+        if (additionalData != null) {
+            for (Bundle.BundleEntryComponent entry : additionalData.getEntry()) {
+                if (!entry.hasResource()) {
+                    continue;
+                }
+                if (artifactKeys.contains(repositoryKey(entry.getResource()))) {
+                    logger.warn("Ignoring {} in the evaluation data: a measure artifact has the same type and id",
+                            LogUtils.sanitize(repositoryKey(entry.getResource())));
+                    continue;
+                }
+                merged.addEntry().setResource(entry.getResource());
+            }
+        }
+        return new LinkInMemoryFhirRepository(fhirContext, merged);
+    }
+
+    private static String repositoryKey(Resource resource) {
+        return resource.fhirType() + "/" + resource.getIdElement().getIdPart();
+    }
+
+    private MeasureReference measureReference() {
+        if (measure.hasUrl()) {
+            return new MeasureReference.ByCanonicalUrl(measure.getUrl());
+        }
+        if (measure.getIdElement().hasIdPart()) {
+            return new MeasureReference.ById(measure.getIdElement().toUnqualifiedVersionless());
+        }
+        throw new IllegalArgumentException("The Measure must have a url or an id");
+    }
+
     private MeasureDefAndR4MeasureReport doEvaluateWithDef(
             DateTimeType periodStart,
             DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
-        IRepository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
+        IRepository repository = buildRepository(additionalData);
         R4MultiMeasureService measureService = new R4MultiMeasureService(repository, options, null, new MeasurePeriodValidator());
         ZonedDateTime start = periodStart != null && periodStart.getValue() != null
                 ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
         ZonedDateTime end = periodEnd != null && periodEnd.getValue() != null
                 ? periodEnd.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
-        return measureService.evaluateSingleMeasureCaptureDef(
-                Eithers.forRight3(measure),
-                start,
-                end,
-                null,
-                subject.asStringValue(),
-                null,
-                null,
-                null,
-                null,
-                additionalData,
-                null,
-                null,
-                null);
+        return LinkMeasureServiceAccess.evaluateSingleMeasureCaptureDef(measureService,
+                measureReference(), start, end, null, subject.asStringValue(), null, repository, null, null, null);
     }
 
     private static MeasureEvaluationResult.DebugInfo buildDebugInfo(
             MeasureDef measureDef,
-            Map<String, EvaluationResult> evaluationResults,
+            Map<String, CqlEvaluationResult> evaluationResults,
             Set<DebugSections> sections) {
         MeasureEvaluationResult.DebugInfo debugInfo = new MeasureEvaluationResult.DebugInfo();
 
@@ -235,9 +281,10 @@ public class MeasureEvaluator {
         // When the budget reaches zero we stop appending frames and mark the response truncated.
         int[] remainingTraceFrames = { MAX_TRACE_FRAMES };
 
-        for (Map.Entry<String, EvaluationResult> evalEntry : evaluationResults.entrySet()) {
+        for (Map.Entry<String, CqlEvaluationResult> evalEntry : evaluationResults.entrySet()) {
             String evalSubjectId = evalEntry.getKey();
-            EvaluationResult evalResult = evalEntry.getValue();
+            CqlEvaluationResult cqlResult = evalEntry.getValue();
+            EvaluationResult evalResult = cqlResult.getResult();
 
             // Expression results — requires debug logging on the engine.
             if (sections.contains(DebugSections.EXPRESSIONS) && evalResult.getExpressionResults() != null) {
@@ -330,7 +377,7 @@ public class MeasureEvaluator {
                 }
                 debugLog.append("\n--- Subject: ").append(evalSubjectId).append(" ---\n");
                 try {
-                    debugLog.append(EvaluationResultFormatter.format(evalResult, 0, true));
+                    debugLog.append(EvaluationResultFormatter.format(cqlResult, 0, true));
                 } catch (Exception e) {
                     debugLog.append("(Error formatting evaluation result: ").append(e.getMessage()).append(")\n");
                 }
@@ -428,6 +475,11 @@ public class MeasureEvaluator {
         if (value == null) {
             return "null";
         }
+        // CQL engine 5 returns its own runtime values (ClassInstance, engine String/Boolean/List, ...)
+        // rather than HAPI types; cqf-fhir's formatter renders them compactly (Type/id for resources).
+        if (value instanceof Value) {
+            return EvaluationResultFormatter.formatExpressionValue(value);
+        }
         if (value instanceof IBaseResource resource) {
             return resource.getIdElement().toUnqualifiedVersionless().getValue();
         }
@@ -475,26 +527,14 @@ public class MeasureEvaluator {
             DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
-        IRepository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
+        IRepository repository = buildRepository(additionalData);
         R4MultiMeasureService measureService = new R4MultiMeasureService(repository, options, null, new MeasurePeriodValidator());
         ZonedDateTime start = periodStart != null && periodStart.getValue() != null
                 ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
         ZonedDateTime end = periodEnd != null && periodEnd.getValue() != null
                 ? periodEnd.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
         MeasureReport measureReport = measureService.evaluate(
-                Eithers.forRight3(measure),
-                start,
-                end,
-                null,
-                subject.asStringValue(),
-                null,
-                null,
-                null,
-                null,
-                additionalData,
-                null,
-                null,
-                null);
+                measureReference(), start, end, null, subject.asStringValue(), null, null, null, null);
         addIndividualMeasureReportProfile(measureReport);
         return measureReport;
     }
