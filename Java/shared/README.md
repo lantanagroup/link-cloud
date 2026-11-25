@@ -119,8 +119,9 @@ on one row cannot be told apart in the event; .NET has the same limit.
 
 What the listener does not see:
 
-- An update made by a query (`@Modifying`, JPQL or native) rather than through a loaded entity. The rubric publish and
-  retire endpoints update that way, so their events say what happened in the note and carry no property changes.
+- An update made by a query (`@Modifying`, JPQL or native) rather than through a loaded entity. The event of an
+  endpoint that updates that way carries no captured property changes: say what happened in the note, or record the
+  value by hand with `audit.change(name, before, after)`.
 - Collections of rows or elements kept in their own table (`@OneToMany`, `@ElementCollection`). A changed row of a
   `@OneToMany` is reported as that row's own update; rows added to or removed from either are not reported.
 - Creates and deletes: property changes describe updates only.
@@ -145,6 +146,5 @@ A slice in a module with no `bootstrap.yml` (as in this module's own tests) also
 `spring.cloud.azure.appconfiguration.enabled=false`. See `audit/slice/AuditSliceTest.java`.
 
 A slice that mocks its repositories saves nothing, so its events carry no captured property changes. To assert them,
-run the controller over a real repository: `@WebMvcTest` with `@AutoConfigureDataJpa` and an embedded database, as
-Validation's `CategoryControllerAuditJpaTest` does. Do not wrap such a test in a transaction; a change is reported
-only when its transaction commits.
+run the controller over a real repository: `@WebMvcTest` with `@AutoConfigureDataJpa` and an embedded database. Do
+not wrap such a test in a transaction; a change is reported only when its transaction commits.
