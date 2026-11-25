@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 public class AuditDiffTest {
     private final AuditDiff diff = new AuditDiff(new AuditMasking(List.of()));
@@ -270,6 +271,72 @@ public class AuditDiffTest {
         }
     }
 
+    /** A marked field whose getter has another name, beside a property with its own field and a computed one. */
+    public static class Mixed {
+        @AuditMask
+        private final String socialSecurityNumber;
+        private final String name;
+
+        public Mixed(String socialSecurityNumber, String name) {
+            this.socialSecurityNumber = socialSecurityNumber;
+            this.name = name;
+        }
+
+        public String getSsn() {
+            return socialSecurityNumber;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getInitial() {
+            return name.substring(0, 1);
+        }
+    }
+
+    /** A marked field that no getter can be showing: the only getter has a field of its own name. */
+    public static class Sealed {
+        @AuditMask
+        private final String pin;
+        private final String label;
+
+        public Sealed(String pin, String label) {
+            this.pin = pin;
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
+
+    public static class HeldDetail {
+        private final String value;
+
+        public HeldDetail(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+    }
+
+    /** A marked field holding an object, shown by a getter of another name. */
+    public static class Holder {
+        @AuditMask
+        private final HeldDetail secretInner;
+
+        public Holder(HeldDetail secretInner) {
+            this.secretInner = secretInner;
+        }
+
+        public HeldDetail getPayload() {
+            return secretInner;
+        }
+    }
+
     private final Logger diffLogger = (Logger) LoggerFactory.getLogger(AuditDiff.class);
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
     private Level previousLevel;
@@ -307,20 +374,63 @@ public class AuditDiffTest {
         Assertions.assertTrue(logged(Level.WARN).isEmpty());
     }
 
+    /**
+     * The mark cannot be matched to the getter, so the getter that may be showing the value is masked: the
+     * value must not get out because of how a getter is named.
+     */
     @Test
-    public void auditMaskOnFieldWithNoMatchingProperty_warnsOncePerClass() {
-        diff.diff(new Renamed("111-11-1111"), new Renamed("222-22-2222"));
-        diff.diff(new Renamed("333-33-3333"), new Renamed("444-44-4444"));
+    public void auditMaskOnFieldWithNoMatchingProperty_masksTheGetterThatMayShowIt_andWarnsOncePerClass() {
+        List<PropertyChange> first = diff.diff(new Renamed("111-11-1111"), new Renamed("222-22-2222"));
+        List<PropertyChange> second = diff.diff(new Renamed("333-33-3333"), new Renamed("444-44-4444"));
 
+        List<PropertyChange> masked =
+                List.of(new PropertyChange("Ssn", AuditMasking.REDACTED, AuditMasking.REDACTED));
+        Assertions.assertEquals(masked, first);
+        Assertions.assertEquals(masked, second);
         List<ILoggingEvent> warnings = logged(Level.WARN);
         Assertions.assertEquals(1, warnings.size());
         String message = warnings.get(0).getFormattedMessage();
         Assertions.assertTrue(message.contains(Renamed.class.getName()), message);
         Assertions.assertTrue(message.contains("socialSecurityNumber"), message);
         Assertions.assertTrue(message.contains("getter"), message);
+        Assertions.assertTrue(message.contains("[Ssn]"), message);
+        Assertions.assertFalse(message.contains("masks nothing"), message);
         for (String value : List.of("111-11-1111", "222-22-2222", "333-33-3333", "444-44-4444")) {
             Assertions.assertFalse(message.contains(value), message);
         }
+    }
+
+    /** Only a property that could be the unmatched field's getter is masked: one with no field of its own name. */
+    @Test
+    public void auditMaskOnFieldWithNoMatchingProperty_leavesAPropertyWithItsOwnFieldAsItIs() {
+        List<PropertyChange> changes =
+                diff.diff(new Mixed("111-11-1111", "Ada"), new Mixed("222-22-2222", "Grace"));
+
+        Assertions.assertEquals(Set.of(
+                new PropertyChange("Name", "Ada", "Grace"),
+                new PropertyChange("Ssn", AuditMasking.REDACTED, AuditMasking.REDACTED),
+                new PropertyChange("Initial", AuditMasking.REDACTED, AuditMasking.REDACTED)), Set.copyOf(changes));
+        Assertions.assertEquals(3, changes.size());
+    }
+
+    /** A marked field that no getter can be showing masks nothing else, and there is nothing to warn about. */
+    @Test
+    public void auditMaskOnFieldWithNoGetterThatCouldShowIt_masksNothingElse_andDoesNotWarn() {
+        Assertions.assertEquals(List.of(new PropertyChange("Label", "Main", "Spare")),
+                diff.diff(new Sealed("1111", "Main"), new Sealed("2222", "Spare")));
+        Assertions.assertTrue(logged(Level.WARN).isEmpty());
+    }
+
+    /** The same holds for a getter that returns an object: everything read inside it is masked. */
+    @Test
+    public void auditMaskOnFieldHoldingAnObject_shownByAGetterOfAnotherName_masksWhatIsInside() {
+        AuditDiff.ObjectChanges changes = diff.objectChanges(
+                new Holder(new HeldDetail("111-11-1111")), new Holder(new HeldDetail("222-22-2222")), "7", false);
+
+        Assertions.assertNotNull(changes);
+        Assertions.assertEquals(
+                List.of(new PropertyChange("Value", AuditMasking.REDACTED, AuditMasking.REDACTED, "HeldDetail", "7")),
+                changes.changes());
     }
 
     @Test

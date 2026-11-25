@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,6 +43,7 @@ final class AuditDiff {
     private final Map<Class<?>, List<Compared>> compared = new ConcurrentHashMap<>();
     // "class#property#suffix" of each foreign-key or converted property seen, with how it is reported.
     private final Map<String, Compared> described = new ConcurrentHashMap<>();
+    private final Map<Class<?>, MaskedFields> maskedFields = new ConcurrentHashMap<>();
     // "class#property" of each getter that has failed once, so a getter that always fails warns only once.
     private final Set<String> failedGetters = ConcurrentHashMap.newKeySet();
 
@@ -210,7 +210,8 @@ final class AuditDiff {
             PropertyDescriptor descriptor = BeanUtils.getPropertyDescriptor(type, javaName);
             Method getter = descriptor == null ? null : descriptor.getReadMethod();
             boolean masked = isMaskedByAnnotation(field) || isMaskedByAnnotation(getter)
-                    || masking.isMasked(wireName) || masking.isMasked(propertyName);
+                    || masking.isMasked(wireName) || masking.isMasked(propertyName)
+                    || mayShowMaskedField(type, javaName);
             return new Compared(javaName, wireName, masked);
         });
     }
@@ -260,15 +261,16 @@ final class AuditDiff {
      * Null when the value cannot be read this way, and the caller reports the column as one value instead: it
      * is not an object with getters (a map, a tree of JSON nodes, a list of simple values, a record), or
      * something inside it is not, or a list of objects changed length, where reading by position would hide
-     * the item added or removed. Never throws.
+     * the item added or removed. What comes back also says which properties were read, so the caller can tell
+     * whether the read accounts for everything that differs in what is stored. Never throws.
      *
      * @param masked whether every value is masked, because the column as a whole is
      */
     ObjectChanges objectChanges(Object before, Object after, String rowKey, boolean masked) {
         try {
             ObjectWalk walk = new ObjectWalk();
-            return walk(before, after, rowKey, masked, walk, 0) ? new ObjectChanges(walk.changes, walk.passedOver)
-                    : null;
+            return walk(before, after, rowKey, masked, walk, 0, "")
+                    ? new ObjectChanges(walk.changes, walk.passedOver, Set.copyOf(walk.read)) : null;
         } catch (RuntimeException | StackOverflowError e) {
             return null;
         }
@@ -280,17 +282,29 @@ final class AuditDiff {
      * @param changes    the fields that changed
      * @param passedOver whether a field that is never reported, such as a timestamp, changed too. When nothing
      *                   else did, that is the whole of the difference, and there is nothing to report.
+     * @param read       the path of every property that was read through a getter, reported or not: the
+     *                   property names leading to it, each after a slash, with positions in a list left
+     *                   out, which is how {@link AuditJson#differingPaths} writes a path
      */
-    record ObjectChanges(List<PropertyChange> changes, boolean passedOver) {
+    record ObjectChanges(List<PropertyChange> changes, boolean passedOver, Set<String> read) {
+        /**
+         * Whether the read went through everything at these paths. False when it did not, or cannot be told:
+         * something stored there has no getter, and its change would be missing from the changes.
+         */
+        boolean accountsFor(Set<String> paths) {
+            return paths != null && read.containsAll(paths);
+        }
     }
 
     private static final class ObjectWalk {
         private final List<PropertyChange> changes = new ArrayList<>();
         private boolean passedOver;
+        private final Set<String> read = new HashSet<>();
     }
 
     /** Reads one object, or one list of objects, into the walk; false when it cannot be read field by field. */
-    private boolean walk(Object before, Object after, String rowKey, boolean masked, ObjectWalk walk, int depth) {
+    private boolean walk(Object before, Object after, String rowKey, boolean masked, ObjectWalk walk, int depth,
+                         String path) {
         if (before == null && after == null) {
             return true;
         }
@@ -308,7 +322,7 @@ final class AuditDiff {
             }
             for (int i = 0; i < oldItems.size(); i++) {
                 String itemKey = rowKey == null ? String.valueOf(i + 1) : rowKey + "|" + (i + 1);
-                if (!walk(oldItems.get(i), newItems.get(i), itemKey, masked, walk, depth + 1)) {
+                if (!walk(oldItems.get(i), newItems.get(i), itemKey, masked, walk, depth + 1, path)) {
                     return false;
                 }
             }
@@ -329,6 +343,8 @@ final class AuditDiff {
             if (getter == null || "class".equals(name)) {
                 continue;
             }
+            String propertyPath = path + "/" + AuditJson.pathName(name);
+            walk.read.add(propertyPath);
             Object oldValue = before == null ? null : ReflectionUtils.invokeMethod(getter, before);
             Object newValue = after == null ? null : ReflectionUtils.invokeMethod(getter, after);
             Compared property = simple.get(name);
@@ -346,7 +362,8 @@ final class AuditDiff {
                 } else if (isListOfSimpleValues(oldValue) && isListOfSimpleValues(newValue)) {
                     oldValue = AuditValues.jsonArray(oldValue);
                     newValue = AuditValues.jsonArray(newValue);
-                } else if (walk(oldValue, newValue, rowKey, masked || property.masked(), walk, depth + 1)) {
+                } else if (walk(oldValue, newValue, rowKey, masked || property.masked(), walk, depth + 1,
+                        propertyPath)) {
                     continue;
                 } else {
                     return false;
@@ -553,28 +570,28 @@ final class AuditDiff {
     /**
      * The properties of the class that are compared, scanned once per class. {@code @AuditMask} on a field
      * masks the property whose name equals the field's ignoring case (field {@code eMail}, property
-     * {@code EMail}); an annotated field that names no property of the class is reported once, here.
+     * {@code EMail}). An annotated field that names no property of the class cannot be matched to the getter
+     * that shows it, so every property that might be that getter is masked instead, and the class is reported
+     * once, here: see {@link #mayShowMaskedField}.
      */
     private List<Compared> compare(Class<?> type) {
-        List<Field> maskedFields = new ArrayList<>();
-        ReflectionUtils.doWithFields(type, maskedFields::add,
-                field -> AnnotatedElementUtils.hasAnnotation(field, AuditMask.class));
-        Set<Field> unmatchedFields = new LinkedHashSet<>(maskedFields);
+        MaskedFields fields = maskedFields.computeIfAbsent(type, AuditDiff::scanMaskedFields);
 
         List<Compared> result = new ArrayList<>();
         List<String> maskedByAnnotation = new ArrayList<>();
+        List<String> maskedForAnUnmatchedField = new ArrayList<>();
         for (PropertyDescriptor descriptor : BeanUtils.getPropertyDescriptors(type)) {
             String javaName = descriptor.getName();
-            boolean fieldMasked = false;
-            for (Field field : maskedFields) {
-                if (field.getName().equalsIgnoreCase(javaName)) {
-                    fieldMasked = true;
-                    unmatchedFields.remove(field);
-                }
-            }
+            boolean fieldMasked = fields.masked().contains(javaName.toLowerCase(Locale.ROOT));
             Method getter = descriptor.getReadMethod();
-            if (getter == null || "class".equals(javaName)
-                    || !BeanUtils.isSimpleValueType(descriptor.getPropertyType())) {
+            if (getter == null || "class".equals(javaName)) {
+                continue;
+            }
+            boolean guarded = mayShowMaskedField(type, javaName);
+            if (guarded) {
+                maskedForAnUnmatchedField.add(AuditValues.propertyName(javaName));
+            }
+            if (!BeanUtils.isSimpleValueType(descriptor.getPropertyType())) {
                 continue;
             }
             String wireName = AuditValues.propertyName(javaName);
@@ -589,18 +606,61 @@ final class AuditDiff {
             if (annotated) {
                 maskedByAnnotation.add(wireName);
             }
-            boolean masked = annotated || masking.isMasked(wireName);
+            boolean masked = annotated || guarded || masking.isMasked(wireName);
             result.add(new Compared(javaName, wireName, masked));
         }
         if (!maskedByAnnotation.isEmpty()) {
             logger.info("Audit masks properties of {} through @AuditMask: {}", type.getName(), maskedByAnnotation);
         }
-        if (!unmatchedFields.isEmpty()) {
-            logger.warn("@AuditMask on field(s) {} of {} matches no property of that class, so it masks nothing; "
-                            + "put @AuditMask on the getter instead",
-                    unmatchedFields.stream().map(Field::getName).toList(), type.getName());
+        if (!maskedForAnUnmatchedField.isEmpty()) {
+            logger.warn("@AuditMask on field(s) {} of {} matches no property of that class, so it cannot be told "
+                            + "which getter shows the value. Every property with no field of its own name is "
+                            + "masked until @AuditMask is put on the getter instead: {}",
+                    fields.unmatched(), type.getName(), maskedForAnUnmatchedField);
         }
         return List.copyOf(result);
+    }
+
+    /**
+     * Whether a property might be showing a field that is marked {@code @AuditMask} under another name. A field
+     * that is marked and names no property of its class (field {@code socialSecurityNumber}, getter
+     * {@code getSsn}) cannot be matched to its getter, so the mark cannot be put where it belongs. Rather than
+     * let the value through, every property that could be that getter is masked: one with no field of its own
+     * name. A property that has such a field shows that field and is left as it is, which is what keeps a
+     * marked field with no getter at all from masking the rest of its class.
+     */
+    private boolean mayShowMaskedField(Class<?> type, String javaName) {
+        MaskedFields fields = maskedFields.computeIfAbsent(type, AuditDiff::scanMaskedFields);
+        return !fields.unmatched().isEmpty() && !fields.all().contains(javaName.toLowerCase(Locale.ROOT));
+    }
+
+    /** The fields of a class, read once: all of them, and those marked {@code @AuditMask}. */
+    private static MaskedFields scanMaskedFields(Class<?> type) {
+        Set<String> all = new HashSet<>();
+        Set<String> masked = new HashSet<>();
+        List<Field> marked = new ArrayList<>();
+        ReflectionUtils.doWithFields(type, field -> {
+            all.add(field.getName().toLowerCase(Locale.ROOT));
+            if (AnnotatedElementUtils.hasAnnotation(field, AuditMask.class)) {
+                masked.add(field.getName().toLowerCase(Locale.ROOT));
+                marked.add(field);
+            }
+        }, field -> !Modifier.isStatic(field.getModifiers()));
+        Set<String> properties = new HashSet<>();
+        for (PropertyDescriptor descriptor : BeanUtils.getPropertyDescriptors(type)) {
+            properties.add(descriptor.getName().toLowerCase(Locale.ROOT));
+        }
+        List<String> unmatched = marked.stream().map(Field::getName)
+                .filter(name -> !properties.contains(name.toLowerCase(Locale.ROOT))).toList();
+        return new MaskedFields(Set.copyOf(all), Set.copyOf(masked), unmatched);
+    }
+
+    /**
+     * @param all       the names of the class's fields, lower-cased
+     * @param masked    those marked {@code @AuditMask}, lower-cased
+     * @param unmatched the marked ones that name no property of the class, as written
+     */
+    private record MaskedFields(Set<String> all, Set<String> masked, List<String> unmatched) {
     }
 
     private static boolean isBookkeeping(AnnotatedElement element) {

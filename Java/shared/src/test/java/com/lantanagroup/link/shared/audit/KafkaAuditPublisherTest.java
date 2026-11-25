@@ -284,6 +284,52 @@ class KafkaAuditPublisherTest {
         Assertions.assertEquals(0L, failedCount());
     }
 
+    /** No level of the log is handed the exception, whose message would reach it as it stands. */
+    @Test
+    void failedSend_handsNoExceptionToTheLogger_atAnyLevel() {
+        Level previous = publisherLogger.getLevel();
+        publisherLogger.setLevel(Level.DEBUG);
+        try {
+            TestProducer producer = new TestProducer(false);
+            producer.onSend = () -> {
+                throw new TimeoutException("Topic not present\r\n2026-11-25 ERROR forged entry");
+            };
+
+            publisher(new TestFactory(producer), FIVE_SECONDS).publish(updateEvent());
+
+            Assertions.assertEquals(1, errors().size());
+            List<ILoggingEvent> debug = logs.list.stream().filter(e -> e.getLevel() == Level.DEBUG).toList();
+            Assertions.assertEquals(1, debug.size());
+            Assertions.assertTrue(debug.get(0).getFormattedMessage().contains("thrown at "),
+                    debug.get(0).getFormattedMessage());
+            for (ILoggingEvent logged : logs.list) {
+                String message = logged.getFormattedMessage();
+                Assertions.assertNull(logged.getThrowableProxy(), message);
+                Assertions.assertFalse(message.contains("\n") || message.contains("\r"), message);
+            }
+        } finally {
+            publisherLogger.setLevel(previous);
+        }
+    }
+
+    @Test
+    void destroyThatThrows_isLoggedAsOneEscapedLine_andNothingPropagates() {
+        TestFactory factory = new TestFactory(new TestProducer(true));
+        factory.onDestroy = new IllegalStateException("close failed\r\n2026-11-25 ERROR forged entry");
+        KafkaAuditPublisher publisher = publisher(factory, FIVE_SECONDS);
+        publisher.publish(updateEvent());
+
+        Assertions.assertDoesNotThrow(publisher::destroy);
+
+        List<ILoggingEvent> warnings = logs.list.stream().filter(e -> e.getLevel() == Level.WARN).toList();
+        Assertions.assertEquals(1, warnings.size());
+        String message = warnings.get(0).getFormattedMessage();
+        Assertions.assertTrue(
+                message.contains("IllegalStateException: close failed\\r\\n2026-11-25 ERROR forged entry"), message);
+        Assertions.assertFalse(message.contains("\n") || message.contains("\r"), message);
+        Assertions.assertNull(warnings.get(0).getThrowableProxy());
+    }
+
     @Test
     void destroy_destroysTheProducerFactory() {
         TestFactory factory = new TestFactory(new TestProducer(true));
@@ -364,6 +410,45 @@ class KafkaAuditPublisherTest {
         Assertions.assertEquals("kafka:9092", config.get(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
         Assertions.assertEquals("SASL_SSL", config.get("security.protocol"));
         Assertions.assertEquals(before, service, "the service's map is not changed");
+    }
+
+    /** A transactional factory refuses a send made outside a transaction, which every audit send is. */
+    @Test
+    void producerConfig_dropsAnInheritedTransactionalId_soTheFactoryIsNotTransactional() {
+        Map<String, Object> service = new HashMap<>();
+        service.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        service.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, "validation-tx");
+
+        Map<String, Object> config = KafkaAuditPublisher.producerConfig(service, Duration.ofSeconds(3));
+
+        Assertions.assertFalse(config.containsKey(ProducerConfig.TRANSACTIONAL_ID_CONFIG));
+        Assertions.assertEquals("localhost:9092", config.get(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
+        Assertions.assertFalse(KafkaAuditPublisher.producerFactory(config).transactionCapable());
+        Assertions.assertEquals("validation-tx", service.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG),
+                "the service's own configuration is not changed");
+    }
+
+    /** What a service sets for its own JSON serialiser must not reach the audit one, which is set up in code. */
+    @Test
+    void producerFactory_doesNotApplyInheritedJsonSerializerSettings() {
+        Map<String, Object> service = new HashMap<>();
+        service.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        service.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, true);
+        service.put(JsonSerializer.TYPE_MAPPINGS, "event:" + AuditEventMessage.class.getName());
+        DefaultKafkaProducerFactory<String, AuditEventMessage> factory =
+                (DefaultKafkaProducerFactory<String, AuditEventMessage>) KafkaAuditPublisher.producerFactory(
+                        KafkaAuditPublisher.producerConfig(service, Duration.ofSeconds(3)));
+        try {
+            // Creating the producer is where the factory would configure the serialisers.
+            Producer<String, AuditEventMessage> producer = Assertions.assertDoesNotThrow(() -> factory.createProducer());
+            producer.close(Duration.ZERO);
+
+            RecordHeaders headers = new RecordHeaders();
+            factory.getValueSerializer().serialize(Topics.AUDITABLE_EVENT_OCCURRED, headers, updateEvent());
+            Assertions.assertNull(headers.lastHeader("__TypeId__"));
+        } finally {
+            factory.destroy();
+        }
     }
 
     @Test
@@ -472,6 +557,7 @@ class KafkaAuditPublisherTest {
     private static final class TestFactory implements ProducerFactory<String, AuditEventMessage>, DisposableBean {
         private final Producer<String, AuditEventMessage> producer;
         private volatile boolean destroyed;
+        private volatile RuntimeException onDestroy;
         private final AtomicInteger created = new AtomicInteger();
 
         TestFactory(Producer<String, AuditEventMessage> producer) {
@@ -492,6 +578,9 @@ class KafkaAuditPublisherTest {
         @Override
         public void destroy() {
             destroyed = true;
+            if (onDestroy != null) {
+                throw onDestroy;
+            }
         }
     }
 }

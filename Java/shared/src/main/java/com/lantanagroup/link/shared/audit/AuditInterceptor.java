@@ -17,7 +17,8 @@ import java.util.Map;
  * Records an audit event for each successful call of a controller method marked {@link Auditable}. It acts
  * in {@code afterCompletion}, which runs once the handler has returned (so after its transaction, if any, has
  * committed) and the final status is known. A call succeeded when it did not end in an exception and its
- * status is 200 to 299. Nothing here throws into the request: a failure is counted and logged.
+ * status is 200 to 299. An exception that an {@code @ExceptionHandler} resolved is not one the call ended in:
+ * Spring reports none, so the status that handler chose decides, and a 2xx one is recorded. Nothing here throws into the request: a failure is counted and logged.
  * <p>
  * Before the handler runs it marks the request as one whose saves are worth watching, which is what lets a
  * persistence listener collect property changes for audited requests only.
@@ -76,11 +77,14 @@ public final class AuditInterceptor implements HandlerInterceptor {
             String resource = auditable == null ? null : auditable.resource();
             AuditAction action = auditable == null ? null : auditable.action();
             metrics.publishFailed(resource);
+            // The exception is described, not handed to the logger: its message, or that of a cause, may carry
+            // text from the request, which must not reach the log unescaped.
             if (event == null) {
-                logger.error("Audit event for {} {} could not be recorded", action, resource, e);
+                logger.error("Audit event for {} {} could not be recorded ({}, thrown at {})", action, resource,
+                        AuditJson.describe(e), AuditJson.thrownAt(e));
             } else {
-                logger.error("Audit event for {} {} could not be recorded: {}", action, resource,
-                        AuditJson.logLine(event), e);
+                logger.error("Audit event for {} {} could not be recorded ({}, thrown at {}): {}", action,
+                        resource, AuditJson.describe(e), AuditJson.thrownAt(e), AuditJson.logLine(event));
             }
         }
     }

@@ -119,6 +119,9 @@ public class HibernateAuditChangeListenerTest {
         private String apiKey;
         @AuditMask
         private String email;
+        // Written when the row is created and never by an update.
+        @jakarta.persistence.Column(updatable = false)
+        private String origin;
         private Instant updatedAt;
         @Version
         private long revision;
@@ -143,6 +146,14 @@ public class HibernateAuditChangeListenerTest {
         private Owner reviewer;
 
         public Widget() {
+        }
+
+        public String getOrigin() {
+            return origin;
+        }
+
+        public void setOrigin(String origin) {
+            this.origin = origin;
         }
 
         Widget(Long id, String name) {
@@ -1044,6 +1055,78 @@ public class HibernateAuditChangeListenerTest {
 
         Assertions.assertDoesNotThrow(() -> listener().onPostUpdate(event));
         Assertions.assertTrue(captured().isEmpty());
+    }
+
+    /** The warnings a registrar that cannot attach logs, taken while the action runs. */
+    private static java.util.List<ch.qos.logback.classic.spi.ILoggingEvent> registrarWarnings(Runnable action) {
+        ch.qos.logback.classic.Logger registrarLogger = (ch.qos.logback.classic.Logger)
+                org.slf4j.LoggerFactory.getLogger(HibernateAuditRegistrar.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs =
+                new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        registrarLogger.addAppender(logs);
+        registrarLogger.setAdditive(false);
+        try {
+            action.run();
+        } finally {
+            registrarLogger.detachAppender(logs);
+            registrarLogger.setAdditive(true);
+        }
+        return logs.list.stream().filter(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN).toList();
+    }
+
+    private static void assertOneEscapedWarning(java.util.List<ch.qos.logback.classic.spi.ILoggingEvent> warnings) {
+        Assertions.assertEquals(1, warnings.size());
+        String message = warnings.get(0).getFormattedMessage();
+        Assertions.assertTrue(
+                message.contains("IllegalStateException: no registry\\r\\n2026-11-25 ERROR forged entry"), message);
+        Assertions.assertFalse(message.contains("\n") || message.contains("\r"), message);
+        Assertions.assertNull(warnings.get(0).getThrowableProxy());
+    }
+
+    /** A unit it cannot attach to is reported in one escaped line, and the service still starts. */
+    @Test
+    public void registrarThatCannotAttach_warnsInOneEscapedLine_andDoesNotThrow() {
+        EntityManagerFactory factory = Mockito.mock(EntityManagerFactory.class);
+        Mockito.when(factory.unwrap(Mockito.any()))
+                .thenThrow(new IllegalStateException("no registry\r\n2026-11-25 ERROR forged entry"));
+        DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
+        beans.registerSingleton("entityManagerFactory", factory);
+
+        assertOneEscapedWarning(registrarWarnings(() ->
+                new HibernateAuditRegistrar(beans.getBeanProvider(EntityManagerFactory.class), listener())
+                        .afterSingletonsInstantiated()));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void registrarThatCannotLookUpTheUnits_warnsInOneEscapedLine_andDoesNotThrow() {
+        org.springframework.beans.factory.ObjectProvider<EntityManagerFactory> factories =
+                Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        Mockito.when(factories.iterator())
+                .thenThrow(new IllegalStateException("no registry\r\n2026-11-25 ERROR forged entry"));
+
+        assertOneEscapedWarning(registrarWarnings(() ->
+                new HibernateAuditRegistrar(factories, listener()).afterSingletonsInstantiated()));
+    }
+
+    /**
+     * A column the row does not write keeps its stored value whatever the object is given, so beside a change
+     * that is written it must not be reported as one.
+     */
+    @Test
+    public void columnTheUpdateDoesNotWrite_isNotReported_besideOneThatIs() {
+        serveRequest(true);
+
+        inTransaction(session -> {
+            Widget widget = session.find(Widget.class, 1L);
+            widget.setOrigin("elsewhere");
+            widget.setName("Renamed");
+        });
+
+        Assertions.assertEquals(List.of(new PropertyChange("Name", "First", "Renamed", "Widget", "1")), captured());
+        inTransaction(session ->
+                Assertions.assertNull(session.find(Widget.class, 1L).getOrigin(), "the database kept its value"));
     }
 
     @Test

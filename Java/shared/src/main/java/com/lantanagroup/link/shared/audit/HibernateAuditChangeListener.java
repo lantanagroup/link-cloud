@@ -4,6 +4,8 @@ import jakarta.persistence.PersistenceUnitUtil;
 import org.hibernate.bytecode.enhance.spi.LazyPropertyInitializer;
 import org.hibernate.event.spi.PostCommitUpdateEventListener;
 import org.hibernate.event.spi.PostUpdateEvent;
+import org.hibernate.metamodel.mapping.AttributeMapping;
+import org.hibernate.metamodel.mapping.EmbeddableMappingType;
 import org.hibernate.persister.entity.EntityPersister;
 import org.hibernate.type.BasicType;
 import org.hibernate.type.ComponentType;
@@ -52,7 +54,9 @@ import java.util.Set;
  * its entity and the owning row as its row, the way .NET reports an owned type.</li>
  * </ul>
  * What it does not see: an update made by a query (JPQL or native) rather than through a loaded entity, a row
- * whose earlier values Hibernate never loaded, and collections kept in a table of their own.
+ * whose earlier values Hibernate never loaded, and collections kept in a table of their own. A column the
+ * update does not write ({@code updatable = false}), on the row or in an embedded object, is passed over: the
+ * database kept its value, whatever the object was given.
  */
 final class HibernateAuditChangeListener implements PostCommitUpdateEventListener {
     private static final Logger logger = LoggerFactory.getLogger(HibernateAuditChangeListener.class);
@@ -94,6 +98,13 @@ final class HibernateAuditChangeListener implements PostCommitUpdateEventListene
             // The version changes on every update.
             if (persister.isVersioned()) {
                 skipped.add(persister.getVersionProperty());
+            }
+            // What the row does not write was not stored, whatever value the object was given.
+            boolean[] updatable = persister.getPropertyUpdateability();
+            for (int i = 0; updatable != null && i < updatable.length; i++) {
+                if (!updatable[i]) {
+                    skipped.add(i);
+                }
             }
             state.changes().addAll(changes(event, diff.rowKey(type, idProperty, event.getId()), type, idProperty,
                     persister.getPropertyNames(), persister.getPropertyTypes(), persister.getPropertyUpdateability(),
@@ -150,8 +161,10 @@ final class HibernateAuditChangeListener implements PostCommitUpdateEventListene
                 }
                 Object[] innerBefore = values(embedded, before[i]);
                 Object[] innerAfter = values(embedded, after[i]);
+                Set<Integer> innerSkipped = unfetched(innerBefore, innerAfter);
+                innerSkipped.addAll(notWritten(embedded));
                 changes.addAll(changes(event, rowKey, embedded.getReturnedClass(), null, embedded.getPropertyNames(),
-                        embedded.getSubtypes(), null, innerBefore, innerAfter, unfetched(innerBefore, innerAfter),
+                        embedded.getSubtypes(), null, innerBefore, innerAfter, innerSkipped,
                         masked || diff.isMasked(type, names[i])));
             } catch (RuntimeException e) {
                 // This embedded object is left out; the rest of the row is still reported.
@@ -165,6 +178,28 @@ final class HibernateAuditChangeListener implements PostCommitUpdateEventListene
     /** The values of an embedded object's properties. One that is absent has no value for any of them. */
     private static Object[] values(ComponentType embedded, Object value) {
         return value == null ? new Object[embedded.getSubtypes().length] : embedded.getPropertyValues(value);
+    }
+
+    /**
+     * The positions of an embedded object's properties that an update does not write, which the row's own
+     * updatability does not say: the embedded object counts as written when any column of it is.
+     */
+    private static Set<Integer> notWritten(ComponentType embedded) {
+        Set<Integer> positions = new HashSet<>();
+        try {
+            EmbeddableMappingType mapping = embedded.getMappingModelPart().getEmbeddableTypeDescriptor();
+            String[] names = embedded.getPropertyNames();
+            for (int i = 0; i < names.length; i++) {
+                AttributeMapping attribute = mapping.findAttributeMapping(names[i]);
+                if (attribute != null && !attribute.getAttributeMetadata().isUpdatable()) {
+                    positions.add(i);
+                }
+            }
+        } catch (RuntimeException e) {
+            // It cannot be told which are written, so each is compared: a change is not left out on a guess.
+            positions.clear();
+        }
+        return positions;
     }
 
     /** The positions of any lazy property that was never fetched. */
@@ -211,9 +246,11 @@ final class HibernateAuditChangeListener implements PostCommitUpdateEventListene
      * Whether one changed is told from the JSON Hibernate writes for it, not from the values: a class kept in
      * such a column rarely says when two of its objects are equal, and Hibernate rebuilds the earlier one from
      * its JSON, so the values alone would say every save changed it. An object is then read field by field.
-     * Where that is not possible, or finds nothing although the JSON differs (a field with no getter), the
-     * column is reported as one value, the JSON before and after. One value shows everything in it, so it is
-     * masked whole when anything inside it would have been masked field by field.
+     * Where that is not possible, or does not account for everything that differs in the JSON (a field with no
+     * getter changed, alone or beside others), the column is reported as one value, the JSON before and after:
+     * the fields that were read are not reported beside it, or their change would appear twice. One value
+     * shows everything in it, so it is masked whole when anything inside it would have been masked field by
+     * field.
      */
     private List<PropertyChange> jsonColumns(PostUpdateEvent event, String rowKey, Class<?> type, String[] names,
                                              Type[] types, Object[] before, Object[] after, Set<Integer> skipped,
@@ -238,7 +275,8 @@ final class HibernateAuditChangeListener implements PostCommitUpdateEventListene
                 }
                 boolean columnMasked = masked || diff.isMasked(type, names[i]);
                 AuditDiff.ObjectChanges fields = diff.objectChanges(before[i], after[i], rowKey, columnMasked);
-                if (fields != null && (!fields.changes().isEmpty() || fields.passedOver())) {
+                if (fields != null && (!fields.changes().isEmpty() || fields.passedOver())
+                        && fields.accountsFor(AuditJson.differingPaths(oldJson, newJson))) {
                     changes.addAll(fields.changes());
                     continue;
                 }

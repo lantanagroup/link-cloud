@@ -78,6 +78,9 @@ public class HibernateAuditEmbeddedAndArrayTest {
     public static class Address {
         private String street;
         private String city;
+        // Written when the row is created and never by an update.
+        @jakarta.persistence.Column(updatable = false)
+        private String region;
         @AuditMask
         private String phone;
         @Convert(converter = TagsConverter.class)
@@ -94,6 +97,14 @@ public class HibernateAuditEmbeddedAndArrayTest {
         Address(String street, String city) {
             this.street = street;
             this.city = city;
+        }
+
+        public String getRegion() {
+            return region;
+        }
+
+        public void setRegion(String region) {
+            this.region = region;
         }
 
         public String getStreet() {
@@ -446,6 +457,20 @@ public class HibernateAuditEmbeddedAndArrayTest {
         inTransaction(session -> session.find(Station.class, 1L).getAddress().setCity("Leeds"));
 
         Assertions.assertEquals(List.of(new PropertyChange("City", "York", "Leeds", "Address", "1")), captured());
+    }
+
+    /** A column of an embedded object that the row does not write is not a change, whatever the object holds. */
+    @Test
+    public void embeddedColumnTheUpdateDoesNotWrite_isNotReported_besideOneThatIs() {
+        inTransaction(session -> {
+            Address address = session.find(Station.class, 1L).getAddress();
+            address.setRegion("North");
+            address.setCity("Leeds");
+        });
+
+        Assertions.assertEquals(List.of(new PropertyChange("City", "York", "Leeds", "Address", "1")), captured());
+        inTransaction(session -> Assertions.assertNull(
+                session.find(Station.class, 1L).getAddress().getRegion(), "the database kept its value"));
     }
 
     @Test

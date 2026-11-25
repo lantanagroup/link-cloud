@@ -69,6 +69,9 @@ public class AuditInterceptorTest {
         }
     }
 
+    static class ToleratedException extends RuntimeException {
+    }
+
     static class ConflictException extends RuntimeException {
     }
 
@@ -107,6 +110,12 @@ public class AuditInterceptorTest {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such thing");
         }
 
+        @PutMapping("/things/{id}/tolerated")
+        @Auditable(action = AuditAction.UPDATE, resource = "Thing")
+        public String tolerated(@PathVariable String id) {
+            throw new ToleratedException();
+        }
+
         @PutMapping("/things/{id}/conflict")
         @Auditable(action = AuditAction.UPDATE, resource = "Thing")
         public String conflict(@PathVariable String id) {
@@ -142,6 +151,11 @@ public class AuditInterceptorTest {
         @ExceptionHandler(ConflictException.class)
         public ResponseEntity<String> conflict(ConflictException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("conflict");
+        }
+
+        @ExceptionHandler(ToleratedException.class)
+        public ResponseEntity<String> tolerated(ToleratedException e) {
+            return ResponseEntity.ok("tolerated");
         }
     }
 
@@ -204,7 +218,10 @@ public class AuditInterceptorTest {
         Assertions.assertEquals(Level.ERROR, logged.getLevel());
         Assertions.assertTrue(logged.getFormattedMessage().contains("Thing"));
         Assertions.assertTrue(logged.getFormattedMessage().contains("UPDATE"));
-        Assertions.assertNotNull(logged.getThrowableProxy());
+        // The exception is described in the line and not handed to the logger, whose output would carry its
+        // message as it stands.
+        Assertions.assertNull(logged.getThrowableProxy());
+        Assertions.assertTrue(logged.getFormattedMessage().contains("thrown at "), logged.getFormattedMessage());
     }
 
     @Test
@@ -252,6 +269,15 @@ public class AuditInterceptorTest {
         mockMvc().perform(put("/things/t-5/conflict")).andExpect(status().isConflict());
 
         Assertions.assertTrue(publisher.events.isEmpty());
+    }
+
+    /** The status decides: Spring reports no exception once a handler has resolved it, so a 2xx is a success. */
+    @Test
+    public void exceptionResolvedByExceptionHandlerTo200_recordsOneEvent() throws Exception {
+        mockMvc().perform(put("/things/t-14/tolerated")).andExpect(status().isOk());
+
+        Assertions.assertEquals(1, publisher.events.size());
+        Assertions.assertEquals("t-14", single().resourceId());
     }
 
     @Test
@@ -339,6 +365,24 @@ public class AuditInterceptorTest {
         String message = logs.list.get(0).getFormattedMessage();
         Assertions.assertTrue(message.contains(AuditJson.logLine(attempted.get(0))), message);
         Assertions.assertTrue(message.contains("t-12"), message);
+    }
+
+    /** An exception message can carry text from the request; it must not split or forge a log entry. */
+    @Test
+    public void failureWhoseMessageHasLineBreaks_isLoggedAsOneEscapedLine() throws Exception {
+        AuditPublisher throwing = event -> {
+            throw new IllegalStateException("rejected",
+                    new IllegalArgumentException("bad id 't-13'\r\n2026-11-25 ERROR forged entry"));
+        };
+
+        mockMvc(interceptor(new AuditEventFactory(properties(), CLOCK), throwing))
+                .perform(put("/things/t-13")).andExpect(status().isOk());
+
+        assertOneErrorLogged();
+        String message = logs.list.get(0).getFormattedMessage();
+        Assertions.assertFalse(message.contains("\n") || message.contains("\r"), message);
+        Assertions.assertTrue(message.contains("IllegalStateException: rejected caused by "
+                + "IllegalArgumentException: bad id 't-13'\\r\\n2026-11-25 ERROR forged entry"), message);
     }
 
     @Test

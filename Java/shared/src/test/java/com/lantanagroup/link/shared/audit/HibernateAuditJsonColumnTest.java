@@ -257,6 +257,80 @@ public class HibernateAuditJsonColumnTest {
         }
     }
 
+    /** A timestamp, which is never reported, beside a field that is written to the JSON without a getter. */
+    public static class Stamped {
+        private Date updatedAt;
+        @com.fasterxml.jackson.annotation.JsonProperty
+        private String unseen;
+
+        public Stamped() {
+        }
+
+        Stamped(Date updatedAt, String unseen) {
+            this.updatedAt = updatedAt;
+            this.unseen = unseen;
+        }
+
+        public Date getUpdatedAt() {
+            return updatedAt;
+        }
+
+        public void setUpdatedAt(Date updatedAt) {
+            this.updatedAt = updatedAt;
+        }
+
+        void changeUnseen(String unseen) {
+            this.unseen = unseen;
+        }
+    }
+
+    /** A field with a getter beside one that is not written to the JSON at all: it is private and has none. */
+    public static class Tally {
+        private int count;
+        private String scratch;
+
+        public Tally() {
+        }
+
+        Tally(int count) {
+            this.count = count;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public void setCount(int count) {
+            this.count = count;
+        }
+
+        void scribble(String scratch) {
+            this.scratch = scratch;
+        }
+    }
+
+    /** A property stored under another name than its getter's. */
+    public static class Alias {
+        private String label;
+
+        public Alias() {
+        }
+
+        Alias(String label) {
+            this.label = label;
+        }
+
+        @com.fasterxml.jackson.annotation.JsonProperty("caption")
+        public String getLabel() {
+            return label;
+        }
+
+        @com.fasterxml.jackson.annotation.JsonProperty("caption")
+        public void setLabel(String label) {
+            this.label = label;
+        }
+    }
+
     @Embeddable
     public static class Extras {
         private String note;
@@ -308,6 +382,14 @@ public class HibernateAuditJsonColumnTest {
         private Flags flags;
         @JdbcTypeCode(SqlTypes.JSON)
         private Half half;
+        @JdbcTypeCode(SqlTypes.JSON)
+        private List<Half> halves;
+        @JdbcTypeCode(SqlTypes.JSON)
+        private Stamped stamped;
+        @JdbcTypeCode(SqlTypes.JSON)
+        private Tally tally;
+        @JdbcTypeCode(SqlTypes.JSON)
+        private Alias alias;
         @JdbcTypeCode(SqlTypes.JSON)
         private Access access;
         @JdbcTypeCode(SqlTypes.JSON)
@@ -397,6 +479,38 @@ public class HibernateAuditJsonColumnTest {
             this.half = half;
         }
 
+        public List<Half> getHalves() {
+            return halves;
+        }
+
+        public void setHalves(List<Half> halves) {
+            this.halves = halves;
+        }
+
+        public Stamped getStamped() {
+            return stamped;
+        }
+
+        public void setStamped(Stamped stamped) {
+            this.stamped = stamped;
+        }
+
+        public Tally getTally() {
+            return tally;
+        }
+
+        public void setTally(Tally tally) {
+            this.tally = tally;
+        }
+
+        public Alias getAlias() {
+            return alias;
+        }
+
+        public void setAlias(Alias alias) {
+            this.alias = alias;
+        }
+
         public Access getAccess() {
             return access;
         }
@@ -472,6 +586,10 @@ public class HibernateAuditJsonColumnTest {
             flags.mode = "strict";
             full.setFlags(flags);
             full.setHalf(new Half("s-1", "u-1"));
+            full.setHalves(new ArrayList<>(List.of(new Half("s-1", "u-1"), new Half("s-2", "u-2"))));
+            full.setStamped(new Stamped(new Date(1_000_000L), "u-1"));
+            full.setTally(new Tally(1));
+            full.setAlias(new Alias("First"));
             full.setAccess(new Access("ada", "s3cret"));
             full.setVault(new Vault("Main", "1234"));
             full.setRaw("{\"a\":1}");
@@ -722,6 +840,87 @@ public class HibernateAuditJsonColumnTest {
         Assertions.assertTrue(change.newPropertyValue().contains("u-2"), change.newPropertyValue());
     }
 
+    /**
+     * A field with a getter changing in the same save must not hide the one without: the column is reported as
+     * one value, which shows both, and the field with the getter is not reported beside it.
+     */
+    @Test
+    public void fieldWithNoGetterChangingBesideOneWithAGetter_isReportedAsOneValue() {
+        inTransaction(session -> {
+            Half half = session.find(Plan.class, 1L).getHalf();
+            half.setSeen("s-2");
+            half.changeUnseen("u-2");
+        });
+
+        PropertyChange change = single();
+        Assertions.assertEquals("Half", change.propertyName());
+        Assertions.assertEquals("Plan", change.entity());
+        Assertions.assertEquals("1", change.rowKey());
+        String before = change.initialPropertyValue();
+        String after = change.newPropertyValue();
+        Assertions.assertTrue(before.contains("s-1") && before.contains("u-1"), before);
+        Assertions.assertTrue(after.contains("s-2") && after.contains("u-2"), after);
+    }
+
+    /** A timestamp is never reported, but the field with no getter that changed beside it still is. */
+    @Test
+    public void fieldWithNoGetterChangingBesideATimestamp_isReportedAsOneValue() {
+        inTransaction(session -> {
+            Stamped stamped = session.find(Plan.class, 1L).getStamped();
+            stamped.setUpdatedAt(new Date(2_000_000L));
+            stamped.changeUnseen("u-2");
+        });
+
+        PropertyChange change = single();
+        Assertions.assertEquals("Stamped", change.propertyName());
+        Assertions.assertEquals("Plan", change.entity());
+        Assertions.assertTrue(change.newPropertyValue().contains("u-2"), change.newPropertyValue());
+    }
+
+    /** Inside an item of a list as well: the list is reported as one value, which shows the item whole. */
+    @Test
+    public void fieldWithNoGetterChangingInAnItemOfAList_isReportedAsTheWholeList() {
+        inTransaction(session -> {
+            Half item = session.find(Plan.class, 1L).getHalves().get(1);
+            item.setSeen("s-9");
+            item.changeUnseen("u-9");
+        });
+
+        PropertyChange change = single();
+        Assertions.assertEquals("Halves", change.propertyName());
+        Assertions.assertEquals("Plan", change.entity());
+        Assertions.assertEquals("1", change.rowKey());
+        String after = change.newPropertyValue();
+        Assertions.assertTrue(after.contains("s-9") && after.contains("u-9"), after);
+    }
+
+    /** What is not written to the JSON is no change to it: the field with the getter is reported on its own. */
+    @Test
+    public void fieldThatIsNotStoredChangingBesideOneWithAGetter_leavesTheReportFieldByField() {
+        inTransaction(session -> {
+            Tally tally = session.find(Plan.class, 1L).getTally();
+            tally.setCount(2);
+            tally.scribble("working");
+        });
+
+        Assertions.assertEquals(List.of(new PropertyChange("Count", "1", "2", "Tally", "1")), captured());
+    }
+
+    /**
+     * A getter is matched to what is stored by name. One stored under another name cannot be matched, so its
+     * change is reported as the column's one value: coarser, but nothing that changed is left out.
+     */
+    @Test
+    public void propertyStoredUnderAnotherNameThanItsGetters_isReportedAsOneValue() {
+        inTransaction(session -> session.find(Plan.class, 1L).getAlias().setLabel("Second"));
+
+        PropertyChange change = single();
+        Assertions.assertEquals("Alias", change.propertyName());
+        Assertions.assertEquals("Plan", change.entity());
+        Assertions.assertTrue(change.initialPropertyValue().contains("First"), change.initialPropertyValue());
+        Assertions.assertTrue(change.newPropertyValue().contains("Second"), change.newPropertyValue());
+    }
+
     /** A record is shown as one value, which would show the component that is masked. */
     @Test
     public void recordWithAMaskedComponent_isMaskedWhole() {
@@ -730,6 +929,28 @@ public class HibernateAuditJsonColumnTest {
         Assertions.assertEquals(
                 List.of(new PropertyChange("Access", AuditMasking.REDACTED, AuditMasking.REDACTED, "Plan", "1")),
                 captured());
+    }
+
+    /** The same when a field with a getter changed beside it: one masked value, and no row for the other. */
+    @Test
+    public void maskedFieldWithNoGetterChangingBesideOneWithAGetter_isMaskedWhole() {
+        inTransaction(session -> {
+            Vault vault = session.find(Plan.class, 1L).getVault();
+            vault.setLabel("Spare");
+            vault.changePin("9999");
+        });
+
+        Assertions.assertEquals(
+                List.of(new PropertyChange("Vault", AuditMasking.REDACTED, AuditMasking.REDACTED, "Plan", "1")),
+                captured());
+    }
+
+    /** A masked field with no getter does not mask the fields beside it that have getters of their own. */
+    @Test
+    public void fieldBesideAMaskedFieldWithNoGetter_isStillShown() {
+        inTransaction(session -> session.find(Plan.class, 1L).getVault().setLabel("Spare"));
+
+        Assertions.assertEquals(List.of(new PropertyChange("Label", "Main", "Spare", "Vault", "1")), captured());
     }
 
     /** The one value an unseen change falls back to would show the masked field, getter or no getter. */

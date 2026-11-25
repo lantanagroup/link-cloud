@@ -16,7 +16,9 @@ local
 
 `com.lantanagroup.link.shared.audit` lets a controller method emit the `AuditableEventOccurred` event the .NET
 services send. A marked method that returns 2xx publishes one event after the response is complete; any other status
-or an exception publishes nothing, and a failed publish never fails the request.
+publishes nothing, and so does an exception nothing handles. The status is what decides: an exception that an
+`@ExceptionHandler` turns into a 2xx response is a successful call, and publishes. A failed publish never fails
+the request.
 
 **Adopting it.** The shared jar registers `AuditAutoConfiguration` itself. A service sets one property in its
 `application.yml`, or the application fails to start once any method is marked:
@@ -63,6 +65,11 @@ public void delete(@PathVariable String type, @PathVariable String name) {
 **Property changes.** An Update event carries what changed as old and new value pairs, unless the endpoint sets
 `propertyChanges = false`.
 
+Put `@AuditMask` on a field or on its getter. On a field it masks the property of the same name, whatever the case. A
+marked field whose getter has another name (field `socialSecurityNumber`, getter `getSsn()`) cannot be matched to
+that getter, so every property of the class that has no field of its own name is masked, and a WARN names them, until
+the annotation is moved to the getter.
+
 *A service on JPA gets them without asking.* Where the service has a Hibernate persistence unit, the mechanism
 attaches a listener to it (`HibernateAuditChangeListener`, the counterpart of the .NET
 `AuditPropertyChangeInterceptor`) and reads the changes from the saves an audited request makes. Each change names
@@ -93,9 +100,11 @@ on the column it masks every field inside. Three things to know:
 
 - Fields are whatever the getters expose. A value that has none (a record, a class of public fields, a `Map`, a list
   of simple values, plain text) is reported as one value, the JSON before and after. A stored field with no getter is
-  not reported on its own: when it is all that changed, the column is reported as one value; when a field with a
-  getter changed in the same save, only that one is reported. A getter that computes its value is reported like a
-  stored field.
+  not reported on its own: when one changed, alone or beside fields that have getters, the column is reported as
+  one value and nothing is reported field by field beside it. A getter is matched to what is stored by name,
+  whatever the case or separators (`startHour` stored as `start_hour`); a property stored under a different name
+  (`@JsonProperty("x")` on `getY()`) is reported as one value too. A getter that computes its value is reported
+  like a stored field.
 - A list of objects that gained or lost an item is reported as one value too, so the item shows. The .NET
   interceptor reads modified entries only, so there an added or removed item is not reported.
 - One value shows everything stored in it, so where anything inside is masked (`@AuditMask` on a field, getter or
@@ -105,9 +114,11 @@ An array or a list of simple values kept in one column (`String[]`, or a `List<S
 reported as a JSON array of its elements, `["A","B"]`, as .NET reports one. That is how it reads whatever the database
 keeps: SQL Server has no array type, so there Hibernate stores it as binary.
 
-A value replaced with an equal one is not reported. Where the stored value is large enough to swamp the event, or
-holds anything that must not leave the service, mask the property with `@AuditMask` or by name, or set
-`propertyChanges = false` on the endpoint: a masked column is masked whole.
+A value replaced with an equal one is not reported. Nor is a column the update does not write
+(`updatable = false`), on the row or in an embedded object, whatever the object was given: the database kept its
+value. Where the stored value is large enough to swamp the event, or holds anything that must not leave the
+service, mask the property with `@AuditMask` or by name, or set `propertyChanges = false` on the endpoint: a masked
+column is masked whole.
 
 An embedded object (`@Embedded`) is reported the way .NET reports an owned type: each field of it that changed is a
 change of its own, with the embedded class as its `Entity` and the owning row's key as its `RowKey`. A station whose

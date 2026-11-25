@@ -8,7 +8,6 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.core.NestedExceptionUtils;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
@@ -67,7 +66,9 @@ public final class KafkaAuditPublisher implements AuditPublisher, DisposableBean
      * The audit producer's configuration: a copy of the service's producer configuration, so it connects and
      * authenticates as the service's own producers do, with the settings audit delivery depends on stated
      * explicitly. Inherited serialisers, {@code retries} and {@code max.in.flight.requests.per.connection} are
-     * dropped, so nothing inherited can make the idempotent producer invalid. The given map is not changed.
+     * dropped, so nothing inherited can make the idempotent producer invalid. An inherited
+     * {@code transactional.id} is dropped too: it would make the factory transactional, and an audit event is
+     * sent outside any transaction, which such a factory refuses. The given map is not changed.
      */
     public static Map<String, Object> producerConfig(Map<String, Object> serviceProducerConfig, Duration responseTimeout) {
         Map<String, Object> config = serviceProducerConfig == null
@@ -77,6 +78,7 @@ public final class KafkaAuditPublisher implements AuditPublisher, DisposableBean
         config.remove(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG);
         config.remove(ProducerConfig.RETRIES_CONFIG);
         config.remove(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION);
+        config.remove(ProducerConfig.TRANSACTIONAL_ID_CONFIG);
 
         config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, responseTimeout.toMillis());
         config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
@@ -89,9 +91,14 @@ public final class KafkaAuditPublisher implements AuditPublisher, DisposableBean
         return config;
     }
 
-    /** A producer factory on the given configuration, with the audit key and value serialisers. */
+    /**
+     * A producer factory on the given configuration, with the audit key and value serialisers. The serialisers
+     * are set up in code and the factory is told not to configure them from the properties: a service's own
+     * {@code spring.json.*} settings, copied with the rest, would otherwise be applied to the audit serialiser,
+     * which refuses to be configured both ways and so would fail every send.
+     */
     public static ProducerFactory<String, AuditEventMessage> producerFactory(Map<String, Object> config) {
-        return new DefaultKafkaProducerFactory<>(config, new StringSerializer(), valueSerializer());
+        return new DefaultKafkaProducerFactory<>(config, new StringSerializer(), valueSerializer(), false);
     }
 
     /** The audit value serialiser: the wire mapper, with no type-info headers. */
@@ -144,30 +151,6 @@ public final class KafkaAuditPublisher implements AuditPublisher, DisposableBean
                 action(event), event.resource(), TimeUnit.NANOSECONDS.toMillis(responseTimeoutNanos));
     }
 
-    /**
-     * The failure and, when it differs, its most specific cause, escaped as the event line is. Spring Kafka
-     * fails the send future with a {@code KafkaProducerException} whose message does not include the cause,
-     * so the cause is what says why. An exception message can carry record text (a serialiser's message
-     * quotes the value), so control and non-ASCII characters are escaped and the line cannot be forged.
-     */
-    private static String describe(Throwable failure) {
-        StringBuilder text = new StringBuilder(summary(failure));
-        Throwable cause = NestedExceptionUtils.getMostSpecificCause(failure);
-        if (cause != failure) {
-            text.append(" caused by ").append(summary(cause));
-        }
-        return AuditJson.escape(text.toString());
-    }
-
-    private static String summary(Throwable failure) {
-        String name = failure.getClass().getSimpleName();
-        if (name.isEmpty()) {
-            name = failure.getClass().getName();
-        }
-        String message = failure.getMessage();
-        return message == null ? name : name + ": " + message;
-    }
-
     private static String action(AuditEventMessage event) {
         return event == null || event.action() == null ? null : event.action().wireName();
     }
@@ -180,8 +163,10 @@ public final class KafkaAuditPublisher implements AuditPublisher, DisposableBean
             metrics.publishFailed(event == null ? null : event.resource());
             logger.error("Audit event {} {} could not be published ({}): {}",
                     action(event), event == null ? null : event.resource(),
-                    describe(failure), AuditJson.logLine(event));
-            logger.debug("Audit publish failure", failure);
+                    AuditJson.describe(failure), AuditJson.logLine(event));
+            // Where it was thrown stands in for the stack trace: the exception is never handed to the logger,
+            // whose output would carry its message as it stands.
+            logger.debug("Audit publish failure was thrown at {}", AuditJson.thrownAt(failure));
         } catch (RuntimeException e) {
             // Nothing in the audit path may throw into a request, not even a failing logger.
         }
@@ -231,7 +216,7 @@ public final class KafkaAuditPublisher implements AuditPublisher, DisposableBean
                 try {
                     disposable.destroy();
                 } catch (Exception e) {
-                    logger.warn("Could not close the audit Kafka producer: {}", e.toString());
+                    logger.warn("Could not close the audit Kafka producer: {}", AuditJson.describe(e));
                 }
             }
         }

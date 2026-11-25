@@ -33,7 +33,7 @@ public final class AuditMetrics {
         try {
             publishFailed.add(1L, Attributes.of(RESOURCE, resource == null ? UNKNOWN_RESOURCE : resource));
         } catch (RuntimeException e) {
-            logger.debug("Could not record the {} counter", PUBLISH_FAILED, e);
+            logger.debug("Could not record the {} counter: {}", PUBLISH_FAILED, AuditJson.describe(e));
         }
     }
 }

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class AuditJsonTest {
     private static final List<String> WIRE_NAMES = List.of(
@@ -107,5 +108,53 @@ public class AuditJsonTest {
         List<String> names = new ArrayList<>();
         node.fieldNames().forEachRemaining(names::add);
         return names;
+    }
+
+    @Test
+    public void differingPaths_namesEachFieldThatDiffers_lowerCased() {
+        Assertions.assertEquals(Set.of("/seen", "/inner/endhour"), AuditJson.differingPaths(
+                "{\"Seen\":\"a\",\"same\":1,\"inner\":{\"startHour\":1,\"endHour\":5}}",
+                "{\"Seen\":\"b\",\"same\":1,\"inner\":{\"startHour\":1,\"endHour\":7}}"));
+    }
+
+    /** A naming strategy may store a property under another spelling of its name. */
+    @Test
+    public void differingPaths_ignoresCaseAndSeparatorsInAName() {
+        Assertions.assertEquals(Set.of("/starthour"),
+                AuditJson.differingPaths("{\"start_hour\":1}", "{\"start_hour\":2}"));
+        Assertions.assertEquals("starthour", AuditJson.pathName("startHour"));
+    }
+
+    @Test
+    public void differingPaths_leavesOutPositionsInAnArray() {
+        Assertions.assertEquals(Set.of("/items/name"), AuditJson.differingPaths(
+                "{\"items\":[{\"name\":\"a\"},{\"name\":\"b\"}]}",
+                "{\"items\":[{\"name\":\"a\"},{\"name\":\"c\"}]}"));
+        Assertions.assertEquals(Set.of("/tags"), AuditJson.differingPaths(
+                "{\"tags\":[\"a\",\"b\"]}", "{\"tags\":[\"a\",\"c\"]}"));
+    }
+
+    @Test
+    public void differingPaths_arrayThatChangedLength_differsAsAWhole() {
+        Assertions.assertEquals(Set.of("/items"), AuditJson.differingPaths(
+                "{\"items\":[{\"name\":\"a\"}]}", "{\"items\":[{\"name\":\"a\"},{\"name\":\"b\"}]}"));
+    }
+
+    @Test
+    public void differingPaths_absentAndNullAreTheSame() {
+        Assertions.assertEquals(Set.of(), AuditJson.differingPaths("{\"a\":null,\"b\":1}", "{\"b\":1}"));
+    }
+
+    @Test
+    public void differingPaths_objectSetOrCleared_namesEachFieldItHolds() {
+        Assertions.assertEquals(Set.of("/seen", "/unseen"),
+                AuditJson.differingPaths(null, "{\"seen\":\"s\",\"unseen\":\"u\",\"empty\":null}"));
+        Assertions.assertEquals(Set.of("/inner/a"), AuditJson.differingPaths("{\"inner\":{\"a\":1}}", "{\"inner\":null}"));
+    }
+
+    @Test
+    public void differingPaths_sameText_isEmpty_andUnreadableTextIsNull() {
+        Assertions.assertEquals(Set.of(), AuditJson.differingPaths("{\"a\":[1,2]}", "{\"a\":[1,2]}"));
+        Assertions.assertNull(AuditJson.differingPaths("{not json", "{}"));
     }
 }

@@ -36,7 +36,7 @@ final class HibernateAuditRegistrar implements SmartInitializingSingleton {
                 }
             }
         } catch (RuntimeException e) {
-            logger.warn("Audit could not look up the service's persistence units: {}", e.toString());
+            logger.warn("Audit could not look up the service's persistence units: {}", AuditJson.describe(e));
         }
         if (attached > 0) {
             logger.info("Audit captures property changes from {} Hibernate persistence unit(s)", attached);
@@ -57,7 +57,7 @@ final class HibernateAuditRegistrar implements SmartInitializingSingleton {
             return true;
         } catch (RuntimeException e) {
             logger.warn("Audit could not attach to a persistence unit, so updates through it are recorded "
-                    + "without property changes: {}", e.toString());
+                    + "without property changes: {}", AuditJson.describe(e));
             return false;
         }
     }
