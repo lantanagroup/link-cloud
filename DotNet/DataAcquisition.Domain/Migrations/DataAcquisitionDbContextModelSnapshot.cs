@@ -951,7 +951,8 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
 
                     b.Property<bool?>("IsReference")
                         .HasColumnType("bit")
@@ -975,6 +976,9 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FacilityId")
+                        .HasDatabaseName("IX_FhirQuery_FacilityId");
 
                     b.HasIndex(new[] { "DataAcquisitionLogId" }, "IX_FhirQuery_DataAcquisitionLogId");
 

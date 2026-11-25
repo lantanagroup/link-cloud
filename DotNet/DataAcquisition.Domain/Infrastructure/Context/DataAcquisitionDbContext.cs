@@ -127,6 +127,14 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
+            // Same bound as SftpAcquisitionLog.FacilityId. Required so SQL Server can index the column.
+            entity.Property(e => e.FacilityId)
+                .IsRequired()
+                .HasMaxLength(DataAcquisitionConstants.DatabaseSettings.MaxFacilityIdLength);
+
+            entity.HasIndex(e => e.FacilityId)
+                .HasDatabaseName("IX_FhirQuery_FacilityId");
+
             entity.Property(b => b.QueryType)
             .HasConversion(new EnumToStringConverter<FhirQueryType>());
 
