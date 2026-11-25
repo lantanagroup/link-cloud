@@ -1010,7 +1010,87 @@
             return escapeHtml(toLabel(key));
         }
 
+        async function resolveFacilityConfiguration(parsed) {
+            const mode = String(
+                parsed.facilityConfigurationMode ??
+                parsed.FacilityConfigurationMode ??
+                ''
+            ).trim().toLowerCase();
+
+            if (mode !== 'facility')
+                return;
+
+            try {
+                const response = await fetch(`${manifestUrl}?id=${runId}`);
+
+                if (!response.ok || response.status === 204)
+                    return;
+
+                const manifest = await response.json();
+
+                if (!manifest)
+                    return;
+
+                const applyComponent = (idKey, nameKey, id, name) => {
+                    if (id) {
+                        parsed[idKey] = id;
+                    }
+
+                    if (typeof name === 'string' && name.trim()) {
+                        parsed[nameKey] = name.trim();
+                    } else if (id) {
+                        // Allow the existing name resolver to resolve the applied ID.
+                        delete parsed[nameKey];
+                    }
+                };
+
+                applyComponent(
+                    'queryPlanTemplateId',
+                    'queryPlanTemplateName',
+                    manifest.appliedQueryPlanTemplateId,
+                    manifest.appliedQueryPlanName
+                );
+
+                applyComponent(
+                    'normalizationSuiteId',
+                    'normalizationSuiteName',
+                    manifest.appliedNormalizationSuiteId,
+                    manifest.appliedNormalizationSuiteName
+                );
+
+                applyComponent(
+                    'organizationResourceMapTemplateId',
+                    'organizationResourceMapTemplateName',
+                    manifest.appliedOrganizationResourceMapTemplateId,
+                    manifest.appliedOrganizationResourceMapName
+                );
+
+                // New manifests record the Query Plan name even when built-in
+                // defaults are used. Older manifests may lack this metadata.
+                if (manifest.appliedQueryPlanName) {
+                    if (!manifest.appliedNormalizationSuiteId &&
+                        !manifest.appliedNormalizationSuiteName) {
+                        parsed.normalizationSuiteId = null;
+                        parsed.NormalizationSuiteId = null;
+                        parsed.normalizationSuiteName = 'Not configured';
+                    }
+
+                    if (!manifest.appliedOrganizationResourceMapTemplateId &&
+                        !manifest.appliedOrganizationResourceMapName) {
+                        parsed.organizationResourceMapTemplateId = null;
+                        parsed.OrganizationResourceMapTemplateId = null;
+                        parsed.organizationResourceMapTemplateName = 'Not configured';
+                    }
+                }
+            } catch (error) {
+                console.warn('Unable to resolve facility configuration.', error);
+            }
+        }
+
+        let configRenderVersion = 0;
+
         async function renderConfigProperties(rawJson) {
+            const renderVersion = ++configRenderVersion;
             const container = document.getElementById('runConfigProps');
             if (!container) return;
             container.innerHTML = '';
@@ -1029,6 +1109,8 @@
             try { parsed = JSON.parse(rawJson); } catch { return; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
 
+            await resolveFacilityConfiguration(parsed);
+
             const queryPlanTemplateId = (parsed.queryPlanTemplateId ?? parsed.QueryPlanTemplateId ?? '').toString().trim();
             if (queryPlanTemplateId && !parsed.queryPlanTemplateName)
                 parsed.queryPlanTemplateName = await resolveTemplateName(queryPlanGetJsonUrl, queryPlanTemplateId);
@@ -1040,6 +1122,10 @@
             const organizationResourceMapTemplateId = (parsed.organizationResourceMapTemplateId ?? parsed.OrganizationResourceMapTemplateId ?? '').toString().trim();
             if (organizationResourceMapTemplateId && !parsed.organizationResourceMapTemplateName)
                 parsed.organizationResourceMapTemplateName = await resolveTemplateName(orgResourceMapGetJsonUrl, organizationResourceMapTemplateId);
+
+            // Ignore outdated renders if a newer configuration render has started.
+            if (renderVersion !== configRenderVersion)
+                return;
 
             const importedIdCount = Array.isArray(parsed.importedPatientIds) ? parsed.importedPatientIds.length : 0;
             const importedBundleCount = Array.isArray(parsed.importedPatientBundles) ? parsed.importedPatientBundles.length : 0;
@@ -2723,6 +2809,7 @@
                 if (r.ok && r.status !== 204) {
                     manifestButtonVisible = true;
                     tryShowManifestButton();
+                    renderConfigProperties(runConfigurationJson);
                 }
             }).catch(() => {});
         }

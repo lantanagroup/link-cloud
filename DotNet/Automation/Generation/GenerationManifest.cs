@@ -161,6 +161,15 @@ public sealed class GenerationManifest
         = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>
+    /// Query plan template resolved for this run.
+    /// Null when no template ID is available.
+    /// </summary>
+    public Guid? AppliedQueryPlanTemplateId { get; set; }
+
+    /// <summary>Display name of <see cref="AppliedQueryPlanTemplateId"/>.</summary>
+    public string? AppliedQueryPlanName { get; set; }
+
+    /// <summary>
     /// Suite the FHIR generator was given for this run. Null when no suite was selected.
     /// </summary>
     public Guid? AppliedNormalizationSuiteId { get; set; }
@@ -753,6 +762,8 @@ public sealed class GenerationManifest
                 .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
             PatientOriginByPatient = patientOrigins,
+            AppliedQueryPlanTemplateId = AppliedQueryPlanTemplateId,
+            AppliedQueryPlanName = AppliedQueryPlanName,
             AppliedNormalizationSuiteId = AppliedNormalizationSuiteId,
             AppliedNormalizationSuiteName = AppliedNormalizationSuiteName,
             AppliedOrganizationResourceMapTemplateId = AppliedOrganizationResourceMapTemplateId,
