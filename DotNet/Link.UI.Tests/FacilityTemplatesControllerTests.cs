@@ -319,7 +319,7 @@ public class FacilityTemplatesControllerTests
 
         var controller = File.ReadAllText(Repo("DotNet/Link.UI/Controllers/FacilityTemplatesController.cs"));
         controller.Should().NotContain("IConfiguration").And.NotContain("GetValue").And.NotContain("appsettings");
-        controller.Should().Contain("store.CountAsync").And.Contain("store.GetPageAsync");
+        controller.Should().Contain("store.CountFilteredAsync").And.Contain("store.GetFilteredPageAsync");
 
         var view = File.ReadAllText(Repo("DotNet/Link.UI/Views/FacilityTemplates/Index.cshtml"));
         view.Should().Contain("luHoldConfirm.ask");
@@ -412,13 +412,21 @@ public class FacilityTemplatesControllerTests
             return Task.FromResult(Items.ToList());
         }
 
-        public Task<long> CountAsync(CancellationToken ct = default)
+        public Task<long> CountFilteredAsync(string? search, string? vendor, string? kind, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             return Task.FromResult((long)Items.Count);
         }
 
-        public Task<List<FacilityTemplate>> GetPageAsync(int skip, int take, CancellationToken ct = default)
+        public Task<List<FacilityTemplate>> GetFilteredPageAsync(
+            int skip,
+            int take,
+            string? search,
+            string? vendor,
+            string? kind,
+            string sortBy = "name",
+            string sortDir = "asc",
+            CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             Pages.Add((skip, take));

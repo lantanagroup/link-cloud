@@ -38,10 +38,10 @@ public class FacilityTemplatesController : AutomationTemplateController
         if (!FacilityTemplateListRules.PageSizes.Contains(pageSize))
             pageSize = FacilityTemplateListRules.DefaultPageSize;
 
-        var totalCount = await store.CountAsync(ct);
+        var totalCount = await store.CountFilteredAsync(null, null, null, ct);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
         page = Math.Min(page, totalPages);
-        var templates = await store.GetPageAsync((page - 1) * pageSize, pageSize, ct);
+        var templates = await store.GetFilteredPageAsync((page - 1) * pageSize, pageSize, null, null, null, ct: ct);
 
         ViewBag.CurrentPage = page;
         ViewBag.PageSize = pageSize;
