@@ -6,7 +6,7 @@ public interface IFacilityTemplateStore
 {
     Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default);
     Task<long> CountFilteredAsync(string? search, string? vendor, string? kind, CancellationToken ct = default);
-    Task<List<FacilityTemplate>> GetFilteredPageAsync(int skip, int take, string? search, string? vendor, string? kind, string sortBy = "name", string sortDir = "asc", CancellationToken ct = default); 
+    Task<List<FacilityTemplate>> GetFilteredPageAsync(int skip, int take, string? search, string? vendor, string? kind, string sortBy = "name", string sortDir = "asc", CancellationToken ct = default);
     Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<FacilityTemplate?> GetDefaultAsync(CancellationToken ct = default);
     Task UpsertAsync(FacilityTemplate template, CancellationToken ct = default);

@@ -55,7 +55,7 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
         new(Database, NullLogger<MongoSnapshotStore>.Instance);
 
     public MongoFacilityTemplateStore CreateFacilityTemplateStore() =>
-    new(Database);
+        new(Database);
 
     public MongoIndexManager CreateIndexManager() =>
         new(Database, NullLogger<MongoIndexManager>.Instance);

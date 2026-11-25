@@ -24,10 +24,10 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
     }
 
     public async Task<long> CountFilteredAsync(
-    string? search,
-    string? vendor,
-    string? kind,
-    CancellationToken ct = default)
+        string? search,
+        string? vendor,
+        string? kind,
+        CancellationToken ct = default)
     {
         var filter = BuildFilter(search, vendor, kind);
 
@@ -73,9 +73,9 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
         {
             "vendor" => descending
                 ? lightweightDocs.OrderByDescending(
-                    d => d.VendorName, StringComparer.Ordinal)
+                    d => d.VendorName, StringComparer.OrdinalIgnoreCase)
                 : lightweightDocs.OrderBy(
-                    d => d.VendorName, StringComparer.Ordinal),
+                    d => d.VendorName, StringComparer.OrdinalIgnoreCase),
 
             "kind" => descending
                 ? lightweightDocs.OrderByDescending(d => d.IsSystem)
@@ -83,13 +83,13 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
 
             _ => descending
                 ? lightweightDocs.OrderByDescending(
-                    d => d.Name, StringComparer.Ordinal)
+                    d => d.Name, StringComparer.OrdinalIgnoreCase)
                 : lightweightDocs.OrderBy(
-                    d => d.Name, StringComparer.Ordinal)
+                    d => d.Name, StringComparer.OrdinalIgnoreCase)
         };
 
         var pageIds = ordered
-            .ThenBy(d => d.Name, StringComparer.Ordinal)
+            .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(d => d.Id)
             .Skip(skip)
             .Take(take)
