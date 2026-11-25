@@ -36,8 +36,9 @@ public sealed class MigrationSnapshotTests
                     $"Pending: {string.Join("; ", pendingChanges.Select(Describe))}");
     }
 
-    // EF Core 8 has no public HasPendingModelChanges(); this is what 'dotnet ef migrations
-    // has-pending-model-changes' does. On EF Core 9 or later, use context.Database.HasPendingModelChanges().
+    // This is what 'dotnet ef migrations has-pending-model-changes' does. It is used instead of
+    // context.Database.HasPendingModelChanges() because that only answers yes or no, while the failure
+    // message names each pending operation.
     private static IReadOnlyList<MigrationOperation> GetPendingChanges(DbContext context)
     {
         var snapshotModel = context.GetService<IMigrationsAssembly>().ModelSnapshot?.Model;

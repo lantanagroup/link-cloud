@@ -17,7 +17,7 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using MongoDB.Driver;
 using System.Reflection;
 
@@ -315,7 +315,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
         | ForwardedHeaders.XForwardedHost;
 
     // In container/cloud proxy scenarios, allow forwarded headers from the front-end proxy.
-    options.KnownNetworks.Clear();
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 

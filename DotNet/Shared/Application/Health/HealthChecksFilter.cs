@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
@@ -37,7 +37,7 @@ public class HealthChecksFilter : IDocumentFilter
         var pathItem = new OpenApiPathItem();
         var operation = new OpenApiOperation
         {
-            Tags = new List<OpenApiTag> { new OpenApiTag { Name = "Health" } },
+            Tags = new HashSet<OpenApiTagReference> { new OpenApiTagReference("Health", openApiDocument) },
             Summary = "Health check endpoint",
             Description = "Returns the health status of the service and its dependencies"
         };
@@ -49,27 +49,27 @@ public class HealthChecksFilter : IDocumentFilter
         // Create response schema
         var healthCheckResponseSchema = new OpenApiSchema
         {
-            Type = "object",
-            Properties = new Dictionary<string, OpenApiSchema>
+            Type = JsonSchemaType.Object,
+            Properties = new Dictionary<string, IOpenApiSchema>
             {
-                ["status"] = new OpenApiSchema { Type = "string", Description = "Overall health status" },
-                ["totalDuration"] = new OpenApiSchema { Type = "string", Description = "Total duration of health checks" },
+                ["status"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "Overall health status" },
+                ["totalDuration"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "Total duration of health checks" },
                 ["entries"] = new OpenApiSchema
                 {
-                    Type = "object",
+                    Type = JsonSchemaType.Object,
                     Properties = registrations.ToDictionary(
                         r => r.Name,
-                        _ => new OpenApiSchema
+                        _ => (IOpenApiSchema)new OpenApiSchema
                         {
-                            Type = "object",
-                            Properties = new Dictionary<string, OpenApiSchema>
+                            Type = JsonSchemaType.Object,
+                            Properties = new Dictionary<string, IOpenApiSchema>
                             {
-                                ["status"] = new OpenApiSchema { Type = "string" },
-                                ["description"] = new OpenApiSchema { Type = "string" },
-                                ["duration"] = new OpenApiSchema { Type = "string" },
+                                ["status"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                                ["description"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                                ["duration"] = new OpenApiSchema { Type = JsonSchemaType.String },
                                 ["data"] = new OpenApiSchema
                                 {
-                                    Type = "object",
+                                    Type = JsonSchemaType.Object,
                                     AdditionalPropertiesAllowed = true
                                 }
                             }
@@ -106,7 +106,7 @@ public class HealthChecksFilter : IDocumentFilter
             }
         };
 
-        pathItem.AddOperation(OperationType.Get, operation);
+        pathItem.AddOperation(HttpMethod.Get, operation);
         openApiDocument.Paths.Add(routePattern, pathItem);
     }
 }

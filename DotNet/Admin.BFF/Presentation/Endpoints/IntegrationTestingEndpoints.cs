@@ -8,7 +8,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
@@ -41,13 +40,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             _logger.LogInformation("Anonymous access is {state}", _authenticationSchemaConfig.Value.EnableAnonymousAccess ? "enabled" : "disabled");
 
 
-            var integrationEndpoints = app.MapGroup("/api/integration").WithOpenApi(x => new OpenApiOperation(x)
-            {
-                Tags = new List<OpenApiTag> { new() { Name = "Integration" } },
-                Description = _authenticationSchemaConfig.Value.EnableAnonymousAccess ?
-                        "This endpoint allows anonymous access in the current configuration." :
-                        "This endpoint requires authentication."
-            });
+            var integrationEndpoints = app.MapGroup("/api/integration")
+                .WithTags("Integration");
 
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
@@ -61,11 +55,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Integration Testing - Produce Patient Event",
-                    Description = "Produces a new patient event that will be sent to the broker. Allows for testing processes outside of scheduled events."
-                });
+                .WithSummary("Integration Testing - Produce Patient Event")
+                .WithDescription("Produces a new patient event that will be sent to the broker. Allows for testing processes outside of scheduled events.");
 
             integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
                 .AddEndpointFilter<ValidationFilter<ReportScheduled>>()
@@ -73,11 +64,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Integration Testing - Produce Report Scheduled Event",
-                    Description = "Produces a new report scheduled event that will be sent to the broker. Allows for testing processes outside of scheduled events."
-                });
+                .WithSummary("Integration Testing - Produce Report Scheduled Event")
+                .WithDescription("Produces a new report scheduled event that will be sent to the broker. Allows for testing processes outside of scheduled events.");
 
             integrationEndpoints.MapPost("/data-acquisition-requested", CreateDataAcquisitionRequested)
                 .AddEndpointFilter<ValidationFilter<DataAcquisitionRequested>>()
@@ -85,33 +73,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Integration Testing - Produce Data Acquisition Requested Event",
-                    Description = "Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events."
-                });
+                .WithSummary("Integration Testing - Produce Data Acquisition Requested Event")
+                .WithDescription("Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events.");
 
             integrationEndpoints.MapPost("/patient-acquired", CreatePatientAcquired)
                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
-               .WithOpenApi(x => new OpenApiOperation(x)
-               {
-                   Summary = "Integration Testing - Produce Data Acquisition Requested Event",
-                   Description = "Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events."
-               });
+               .WithSummary("Integration Testing - Produce Data Acquisition Requested Event")
+               .WithDescription("Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events.");
 
             integrationEndpoints.MapPost("/patient-list-acquired", CreatePatientListAcquired)
               .Produces<EventProducerResponse>(StatusCodes.Status200OK)
               .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
               .Produces(StatusCodes.Status401Unauthorized)
               .ProducesProblem(StatusCodes.Status500InternalServerError)
-              .WithOpenApi(x => new OpenApiOperation(x)
-              {
-                  Summary = "Integration Testing - Produce Data Acquisition Requested Event",
-                  Description = "Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events."
-              });
+              .WithSummary("Integration Testing - Produce Data Acquisition Requested Event")
+              .WithDescription("Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events.");
 
 
             integrationEndpoints.MapPost("/start-consumers", CreateConsumersRequested)
@@ -119,32 +98,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
-               .WithOpenApi(x => new OpenApiOperation(x)
-               {
-                   Summary = "Integration Testing - Start Consumers",
-                   Description = "Integration Testing - Starts consumers"
-               });
+               .WithSummary("Integration Testing - Start Consumers")
+               .WithDescription("Integration Testing - Starts consumers");
 
             integrationEndpoints.MapPost("/read-consumers", ReadConsumersRequested)
                .Produces<Dictionary<string, string>>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
-               .WithOpenApi(x => new OpenApiOperation(x)
-               {
-                   Summary = "Integration Testing - Read Consumers",
-                   Description = "Integration Testing - Read Consumers."
-               });
+               .WithSummary("Integration Testing - Read Consumers")
+               .WithDescription("Integration Testing - Read Consumers.");
 
 
             integrationEndpoints.MapPost("/stop-consumers", DeleteConsumersRequested)
                .Produces<object>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
-               .WithOpenApi(x => new OpenApiOperation(x)
-               {
-                   Summary = "Integration Testing - Stop Consumers.",
-                   Description = "Integration Testing - Stop Consumers."
-               });
+               .WithSummary("Integration Testing - Stop Consumers.")
+               .WithDescription("Integration Testing - Stop Consumers.");
 
             _logger.LogApiRegistration(nameof(IntegrationTestingEndpoints));
 

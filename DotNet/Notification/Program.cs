@@ -37,7 +37,7 @@ using System.Reflection;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -233,19 +233,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                 Scheme = JwtBearerDefaults.AuthenticationScheme
             });
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
             {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },
-                    new List<string>()
-                }
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
             });
 
             #endregion

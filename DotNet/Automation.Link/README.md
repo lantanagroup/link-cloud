@@ -271,7 +271,7 @@ Primary consumers:
 
 ## 11. Notes
 
-- Targets `.NET 8`.
+- Targets `.NET 10`.
 - Designed for DI-based composition in host applications/tests.
 - Uses global usings to re-export core `Automation` types (`IAutomationOutput`,
   `ConsoleAutomationOutput`, `RetryHelper`, etc.), so host code does not need to import both

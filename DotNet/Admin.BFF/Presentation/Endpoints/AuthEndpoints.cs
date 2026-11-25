@@ -6,7 +6,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
@@ -25,42 +24,30 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public void RegisterEndpoints(WebApplication app)
         {
             var authEndpoints = app.MapGroup("/api")
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Tags = new List<OpenApiTag> { new() { Name = "Auth" } }
-                });
+                .WithTags("Auth");
 
             authEndpoints.MapGet("/login", Login)
                 .AllowAnonymous()
                 .Produces(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Login to Link",
-                    Description = "Initiates the login process for link"
-                });
+                .WithSummary("Login to Link")
+                .WithDescription("Initiates the login process for link");
 
             authEndpoints.MapGet("/user", GetUser)
                 .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
                 .Produces<UserResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Get user information",
-                    Description = "Retrieves information about the current logged in user"
-                });
+                .WithSummary("Get user information")
+                .WithDescription("Retrieves information about the current logged in user");
 
             authEndpoints.MapGet("/logout", Logout)
                 .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
                 .Produces<object>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Logout of Link",
-                    Description = "Initiates the logout process for link"
-                });
+                .WithSummary("Logout of Link")
+                .WithDescription("Initiates the logout process for link");
 
             _logger.LogApiRegistration(nameof(AuthEndpoints));
         }

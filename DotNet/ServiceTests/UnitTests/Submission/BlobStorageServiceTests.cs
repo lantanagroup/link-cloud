@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -43,22 +44,44 @@ namespace UnitTests.Submission
         }
 
         [Fact]
-        public void Constructor_ShippedAppSettingsWithoutConnectionString_ThrowsArgumentException()
+        public void AddBlobStorageSettings_ShippedAppSettingsWithoutConnectionStrings_FailsStartupValidation()
         {
-            // The shipped nulls bind as empty strings on .NET 8, so the null check that skips an unconfigured
-            // container is passed and the client rejects the empty container name. On .NET 10 they stay null
-            // and the service starts with no containers; see ConfigurationNullBindingTests.
+            // The shipped appsettings leave both connection strings null for each environment to supply.
+            using var provider = BuildProvider(new Dictionary<string, string?>());
+
+            var exception = Assert.Throws<AggregateException>(() => provider.GetRequiredService<IStartupValidator>().Validate());
+
+            var failures = exception.InnerExceptions
+                .Cast<OptionsValidationException>()
+                .SelectMany(failure => failure.Failures)
+                .ToList();
+            Assert.Equal(2, failures.Count);
+            Assert.Contains("InternalBlobStorage:ConnectionString is required.", failures);
+            Assert.Contains("ExternalBlobStorage:ConnectionString is required.", failures);
+        }
+
+        [Fact]
+        public void AddBlobStorageSettings_ConnectionStringsSupplied_PassesStartupValidation()
+        {
+            using var provider = BuildProvider(new Dictionary<string, string?>
+            {
+                ["InternalBlobStorage:ConnectionString"] = "UseDevelopmentStorage=true",
+                ["ExternalBlobStorage:ConnectionString"] = "UseDevelopmentStorage=true"
+            });
+
+            provider.GetRequiredService<IStartupValidator>().Validate();
+        }
+
+        private static ServiceProvider BuildProvider(Dictionary<string, string?> overrides)
+        {
             var configuration = new ConfigurationBuilder()
                 .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "Resources", "Submission", "appsettings.json"))
+                .AddInMemoryCollection(overrides)
                 .Build();
-            var internalSettings = new InternalBlobStorageSettings();
-            var externalSettings = new ExternalBlobStorageSettings();
-            configuration.GetSection(InternalBlobStorageSettings.Key).Bind(internalSettings);
-            configuration.GetSection(ExternalBlobStorageSettings.Key).Bind(externalSettings);
 
-            Assert.Throws<ArgumentException>(() => new BlobStorageService(NullLogger<BlobStorageService>.Instance,
-                                                                          Options.Create(internalSettings),
-                                                                          Options.Create(externalSettings)));
+            return new ServiceCollection()
+                .AddBlobStorageSettings(configuration)
+                .BuildServiceProvider();
         }
     }
 }

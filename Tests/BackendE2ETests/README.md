@@ -158,7 +158,7 @@ full pipeline internals in test code.
 
 ## 9. Notes
 
-- Targets `.NET 8`.
+- Targets `.NET 10`.
 - Tests are `[Fact]` classes with `IClassFixture<BackendE2ETestFixture>`.
 - Scenario ids are deterministic and seeded by `Automation.UI` `ScenarioSeedService`.
 - If a scenario fails, inspect `Automation.UI` run details/logs first, since that host performs

@@ -105,12 +105,17 @@ public class CernerCclExtractParser(ILogger<CernerCclExtractParser> logger) : IF
         var lineNumber = 0;
         var isFirstLine = true;
 
-        while (!reader.EndOfStream)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lineNumber++;
 
             var line = await reader.ReadLineAsync(cancellationToken);
+            if (line is null)
+            {
+                break;
+            }
+
+            lineNumber++;
             if (string.IsNullOrWhiteSpace(line))
             {
                 continue;

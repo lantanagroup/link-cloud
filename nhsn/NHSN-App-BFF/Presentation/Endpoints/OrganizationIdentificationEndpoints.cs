@@ -17,11 +17,7 @@ public sealed class OrganizationIdentificationEndpoints : IApi
             .WithName("GetLocationCandidates")
             .Produces<IReadOnlyList<LocationCandidateResponse>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Candidate FHIR Locations for the Organization Identification step's search.";
-                operation.Description = "Backs the Cerner \"Site\" location search. Results are simulated.";
-                return operation;
-            });
+            .WithSummary("Candidate FHIR Locations for the Organization Identification step's search.")
+            .WithDescription("Backs the Cerner \"Site\" location search. Results are simulated.");
     }
 }

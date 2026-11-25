@@ -197,13 +197,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Account
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Account
       - script: |
           cd DotNet/Account
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -231,13 +227,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd nhsn/NHSN-App-BFF
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: nhsn/NHSN-App-BFF
       - script: |
           cd nhsn/NHSN-App-BFF
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -266,13 +258,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Audit
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Audit
       - script: |
           cd DotNet/Audit
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -301,13 +289,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Census
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Census
       - script: |
           cd DotNet/Census
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -336,13 +320,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/DataAcquisition
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/DataAcquisition
       - script: |
           cd DotNet/DataAcquisition
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -371,13 +351,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/MockDmrpApi
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/MockDmrpApi
       - script: |
           cd DotNet/MockDmrpApi
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -406,13 +382,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Normalization
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Normalization
       - script: |
           cd DotNet/Normalization
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -441,13 +413,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/QueryDispatch
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/QueryDispatch
       - script: |
           cd DotNet/QueryDispatch
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -476,13 +444,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Report
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Report
       - script: |
           cd DotNet/Report
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -511,13 +475,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Submission
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Submission
       - script: |
           cd DotNet/Submission
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
@@ -546,13 +506,9 @@ stages:
           echo "Generating schema from commit:"
           git rev-parse HEAD
         displayName: Check out current_release
-      - script: |
-          cd DotNet/Tenant
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
+      - template: templates/install-dotnet-ef.yml
+        parameters:
+          projectDir: DotNet/Tenant
       - script: |
           cd DotNet/Tenant
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts

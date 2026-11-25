@@ -32,7 +32,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Serilog;
@@ -225,19 +225,9 @@ static void RegisterServices(WebApplicationBuilder builder)
             In = ParameterLocation.Header
         });
 
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Id = "Bearer",
-                        Type = ReferenceType.SecurityScheme
-                    }
-                },
-                new List<string>()
-            }
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
         });
 
         options.DocumentFilter<HealthChecksFilter>();

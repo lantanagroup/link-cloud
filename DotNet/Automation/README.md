@@ -628,7 +628,7 @@ infrastructure coupling.
 
 ## 12. Notes
 
-- Targets `.NET 8`.
+- Targets `.NET 10`.
 - No dependency on Link-specific projects such as `Shared` or `LinkSdk`.
 - Uses `Hl7.Fhir.R4` for FHIR model types and `System.Text.Json` for serialization.
 - `FhirGenerationPipeline` is the recommended entry point for any non-trivial dataset;

@@ -7,7 +7,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
@@ -27,31 +26,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         {
             var tokenEndpoints = app.MapGroup("/api/auth")
                 .RequireAuthorization([LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName])
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Tags = new List<OpenApiTag> { new() { Name = "Link Bearer Services" } }
-                });
+                .WithTags("Link Bearer Services");
 
             tokenEndpoints.MapGet("/token", (Delegate)CreateToken)
                 .Produces<string>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Generate link bearer token.",
-                    Description = "Generates a bearer token for the current user to use with Link Services."
-                });
+                .WithSummary("Generate link bearer token.")
+                .WithDescription("Generates a bearer token for the current user to use with Link Services.");
 
             tokenEndpoints.MapGet("/refresh-key", (Delegate)RefreshKey)
                 .RequireAuthorization([PolicyNames.IsLinkAdmin])
                 .Produces<KeyRefreshedResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Refresh link bearer token signing key.",
-                    Description = "Refreshes the signing key for link bearer tokens."
-                });
+                .WithSummary("Refresh link bearer token signing key.")
+                .WithDescription("Refreshes the signing key for link bearer tokens.");
 
             _logger.LogApiRegistration(nameof(BearerServiceEndpoints));
         }

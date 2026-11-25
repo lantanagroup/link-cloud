@@ -1,5 +1,5 @@
 {
-  "runtime": "Net80",
+  "runtime": "Net100",
   "documentGenerator": {
     "fromDocument": {
       "url": "Contracts/dmrp-openapi.yaml"

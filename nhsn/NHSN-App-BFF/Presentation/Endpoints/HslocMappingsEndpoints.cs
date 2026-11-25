@@ -19,12 +19,8 @@ public class HslocMappingsEndpoints : IApi
             .WithName("GetHslocMappings")
             .Produces<IReadOnlyList<HslocMapping>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "The facility's local Location-to-HSLOC code mappings.";
-                operation.Description = "Empty until the facility has saved any mappings.";
-                return operation;
-            });
+            .WithSummary("The facility's local Location-to-HSLOC code mappings.")
+            .WithDescription("Empty until the facility has saved any mappings.");
 
         group.MapPut("/", async (
                 IReadOnlyList<HslocMapping> mappings,
@@ -37,11 +33,7 @@ public class HslocMappingsEndpoints : IApi
             .WithName("SaveHslocMappings")
             .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Replace the facility's Location-to-HSLOC code mappings.";
-                operation.Description = "Replaces the whole set for the facility — not an append.";
-                return operation;
-            });
+            .WithSummary("Replace the facility's Location-to-HSLOC code mappings.")
+            .WithDescription("Replaces the whole set for the facility — not an append.");
     }
 }

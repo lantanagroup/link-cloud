@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 using System.Xml.Linq;
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+using System.Text.Json.Nodes;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace LantanaGroup.Link.Shared.Application.Swagger;
@@ -36,7 +36,7 @@ public sealed class EnumDescriptionSchemaFilter : ISchemaFilter
     /// </summary>
     private static readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, string>> Summaries = new();
 
-    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
         var type = Nullable.GetUnderlyingType(context.Type) ?? context.Type;
 
@@ -45,13 +45,19 @@ public sealed class EnumDescriptionSchemaFilter : ISchemaFilter
             return;
         }
 
+        // Swashbuckle hands over the interface; only the concrete schema can be changed.
+        if (schema is not OpenApiSchema enumSchema)
+        {
+            return;
+        }
+
         var documentation = SummariesFor(type.Assembly);
-        var names = new OpenApiArray();
+        var names = new JsonArray();
         var lines = new StringBuilder();
 
         foreach (var name in Enum.GetNames(type))
         {
-            names.Add(new OpenApiString(name));
+            names.Add(JsonValue.Create(name));
 
             var value = Convert.ToInt64(Enum.Parse(type, name));
             lines.Append("\n- `").Append(value).Append("` **").Append(name).Append('*').Append('*');
@@ -63,11 +69,12 @@ public sealed class EnumDescriptionSchemaFilter : ISchemaFilter
         }
 
         // Read by NSwag and AutoRest to generate a named client enum rather than a bare integer.
-        schema.Extensions["x-enumNames"] = names;
+        enumSchema.Extensions ??= new Dictionary<string, IOpenApiExtension>();
+        enumSchema.Extensions["x-enumNames"] = new JsonNodeExtension(names);
 
-        schema.Description = string.IsNullOrWhiteSpace(schema.Description)
+        enumSchema.Description = string.IsNullOrWhiteSpace(enumSchema.Description)
             ? lines.ToString().TrimStart('\n')
-            : schema.Description.TrimEnd() + "\n" + lines;
+            : enumSchema.Description.TrimEnd() + "\n" + lines;
     }
 
     private static IReadOnlyDictionary<string, string> SummariesFor(Assembly assembly)

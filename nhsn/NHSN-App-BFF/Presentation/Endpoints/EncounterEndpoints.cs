@@ -17,28 +17,18 @@ public class EncounterEndpoints : IApi
             .WithName("GetEncounterCodes")
             .Produces<IReadOnlyList<EncounterCode>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "CPT/SNOMED reference codes for the Encounter Mapping step, read live from Terminology.";
-                operation.Description =
-                    "Returns every code loaded under each configured CodeSystem; the UI filters it " +
-                    "client-side.";
-                return operation;
-            });
+            .WithSummary("CPT/SNOMED reference codes for the Encounter Mapping step, read live from Terminology.")
+            .WithDescription("Returns every code loaded under each configured CodeSystem; the UI filters it " +
+                "client-side.");
 
         group.MapGet("/encounter-codes/lookup", async (string system, string code, IReferenceDataService referenceData, CancellationToken cancellationToken) =>
                 Results.Ok(await referenceData.LookupEncounterCodeAsync(system.Sanitize(), code.Sanitize(), cancellationToken)))
             .WithName("LookupEncounterCode")
             .Produces<EncounterCodeDetail?>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "The source CodeSystem's name/version for one encounter code.";
-                operation.Description =
-                    "CodeSystem/$lookup, for the reference tab's detail panel. Returns a null body " +
-                    "when Terminology has no CodeSystem loaded for `system`, or `code` is not one " +
-                    "of its members — not an error condition.";
-                return operation;
-            });
+            .WithSummary("The source CodeSystem's name/version for one encounter code.")
+            .WithDescription("CodeSystem/$lookup, for the reference tab's detail panel. Returns a null body " +
+                "when Terminology has no CodeSystem loaded for `system`, or `code` is not one " +
+                "of its members — not an error condition.");
     }
 }

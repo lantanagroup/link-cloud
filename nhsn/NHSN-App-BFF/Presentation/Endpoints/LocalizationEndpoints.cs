@@ -7,8 +7,7 @@ public sealed class LocalizationEndpoints : IApi
     public void RegisterEndpoints(WebApplication app)
     {
         var group = app.MapGroup("/api/localization")
-            .WithTags("Localization")
-            .WithOpenApi();
+            .WithTags("Localization");
 
         group.MapGet("/{locale}/{namespaceName}", async (string locale, string namespaceName, HttpContext context, ILocalizationResourceService localizationResourceService, CancellationToken cancellationToken) =>
             {
@@ -29,12 +28,8 @@ public sealed class LocalizationEndpoints : IApi
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status500InternalServerError)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Get localization namespace resources.";
-                operation.Description = "Returns localized JSON payload for the requested locale and namespace with locale fallback to en-US.";
-                return operation;
-            });
+            .WithSummary("Get localization namespace resources.")
+            .WithDescription("Returns localized JSON payload for the requested locale and namespace with locale fallback to en-US.");
     }
 
     private static IResult HandleOkResult(HttpContext context, LocalizationResourceResult result)

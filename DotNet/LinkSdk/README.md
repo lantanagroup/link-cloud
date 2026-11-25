@@ -57,7 +57,7 @@ builder.Services.AddMockDmrpServiceClient(sp => /* the mock's root URL */);
 
 ## Notes
 
-- Targets `.NET 8`.
+- Targets `.NET 10`.
 - All clients are registered as singletons (Flurl clients are thread-safe).
 
 ## Validation reporting

@@ -7,7 +7,6 @@ using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Link.Authorization.Permissions;
 using Link.Authorization.Policies;
-using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
 {
@@ -24,10 +23,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
         {
             var roleEndpoints = app.MapGroup("/api/account/")
                 .RequireAuthorization([PolicyNames.IsLinkAdmin])
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Tags = new List<OpenApiTag> { new() { Name = "Role" } }
-                });
+                .WithTags("Role");
 
             #region Queries
 
@@ -39,11 +35,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Get role by id",
-                    Description = "Retrieves information about a role with the id provided"
-                });
+                .WithSummary("Get role by id")
+                .WithDescription("Retrieves information about a role with the id provided");
 
             roleEndpoints.MapGet("/role/name/{name}", GetRoleByName.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
@@ -53,11 +46,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Get role by name",
-                    Description = "Retrieves information about a role with the name provided"
-                });
+                .WithSummary("Get role by name")
+                .WithDescription("Retrieves information about a role with the name provided");
 
             roleEndpoints.MapGet("/role", GetRoleList.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
@@ -67,11 +57,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Get all roles",
-                    Description = "Retrieves all roles"
-                });
+                .WithSummary("Get all roles")
+                .WithDescription("Retrieves all roles");
 
 
             #endregion
@@ -86,11 +73,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Create user",
-                    Description = "Creates a new user"
-                });
+                .WithSummary("Create user")
+                .WithDescription("Creates a new user");
 
             roleEndpoints.MapPut("/role/{id}", UpdateExistingRole.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
@@ -101,11 +85,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Update role",
-                    Description = "Updates an existing role"
-                });
+                .WithSummary("Update role")
+                .WithDescription("Updates an existing role");
 
             roleEndpoints.MapDelete("/role/{id}", DeleteExistingRole.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
@@ -115,11 +96,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Delete role",
-                    Description = "Deletes an existing role"
-                });
+                .WithSummary("Delete role")
+                .WithDescription("Deletes an existing role");
 
             roleEndpoints.MapPut("/role/{id}/claims", UpdateRoleClaims.Handle)
                 //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
@@ -130,11 +108,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 .Produces(StatusCodes.Status403Forbidden)
                 .Produces(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Summary = "Update role claims",
-                    Description = "Updates the claims for an existing role"
-                });
+                .WithSummary("Update role claims")
+                .WithDescription("Updates the claims for an existing role");
 
             #endregion
 

@@ -24,14 +24,9 @@ public class ReportingPlanEndpoints : IApi
             .WithName("GetAvailableMeasures")
             .Produces<IReadOnlyList<AvailableMeasure>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "The current facility's reporting-plan measures that MeasureEval can evaluate.";
-                operation.Description =
-                    "Cross-references the facility's DMRP reporting plan against MeasureEval's " +
-                    "loaded measure definitions. A facility enrolled only in measures MeasureEval " +
-                    "has no definition for gets an empty list -- correctly, not as an error.";
-                return operation;
-            });
+            .WithSummary("The current facility's reporting-plan measures that MeasureEval can evaluate.")
+            .WithDescription("Cross-references the facility's DMRP reporting plan against MeasureEval's " +
+                "loaded measure definitions. A facility enrolled only in measures MeasureEval " +
+                "has no definition for gets an empty list -- correctly, not as an error.");
     }
 }

@@ -1,7 +1,7 @@
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using LantanaGroup.Link.Shared.Application.Swagger;
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace UnitTests.Shared;
@@ -27,10 +27,11 @@ public class EnumDescriptionSchemaFilterTests
         var schema = Apply(typeof(SampleStatus));
 
         // x-enumNames is what NSwag and AutoRest read to generate a named enum instead of a bare int.
-        var names = Assert.IsType<OpenApiArray>(schema.Extensions["x-enumNames"]);
+        var extension = Assert.IsType<JsonNodeExtension>(schema.Extensions!["x-enumNames"]);
+        var names = Assert.IsType<JsonArray>(extension.Node);
         Assert.Equal(
             ["NotEvaluated", "NothingToEvaluate"],
-            names.Cast<OpenApiString>().Select(value => value.Value));
+            names.Select(value => value!.GetValue<string>()));
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public class EnumDescriptionSchemaFilterTests
     {
         var schema = Apply(typeof(string));
 
-        Assert.False(schema.Extensions.ContainsKey("x-enumNames"));
+        Assert.False(schema.Extensions?.ContainsKey("x-enumNames") ?? false);
         Assert.Null(schema.Description);
     }
 
@@ -58,7 +59,7 @@ public class EnumDescriptionSchemaFilterTests
 
         // A nullable property reaches the filter as Nullable<T>; unwrapping it is what keeps the members
         // documented on the schema the property actually references.
-        Assert.True(schema.Extensions.ContainsKey("x-enumNames"));
+        Assert.True(schema.Extensions?.ContainsKey("x-enumNames") ?? false);
     }
 
     [Fact]
@@ -80,7 +81,21 @@ public class EnumDescriptionSchemaFilterTests
         // still be published, and the filter must not throw and take the whole spec down with it.
         var schema = Apply(typeof(SampleStatus));
 
-        Assert.Equal(2, Assert.IsType<OpenApiArray>(schema.Extensions["x-enumNames"]).Count);
+        var extension = Assert.IsType<JsonNodeExtension>(schema.Extensions!["x-enumNames"]);
+        Assert.Equal(2, Assert.IsType<JsonArray>(extension.Node).Count);
+    }
+
+    [Fact]
+    public void ASchemaReferenceIsLeftAlone()
+    {
+        // Swashbuckle can hand the filter a reference to a schema rather than the schema itself. A reference
+        // cannot be changed, so the filter must skip it rather than throw.
+        var reference = new OpenApiSchemaReference(nameof(SampleStatus));
+
+        new EnumDescriptionSchemaFilter().Apply(reference, Context(typeof(SampleStatus)));
+
+        Assert.Null(reference.Description);
+        Assert.Null(reference.Extensions);
     }
 
     #endregion

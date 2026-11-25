@@ -34,7 +34,7 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using System.Reflection;
@@ -215,19 +215,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                 Scheme = JwtBearerDefaults.AuthenticationScheme
             });
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
             {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },
-                    new List<string>()
-                }
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
             });
 
             #endregion

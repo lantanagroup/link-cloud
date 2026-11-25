@@ -7,11 +7,12 @@ using Microsoft.Extensions.Configuration;
 namespace UnitTests.Shared;
 
 /// <summary>
-/// Pins how the shipped appsettings files' <c>null</c> values reach the services. .NET 8 reads a JSON
-/// <c>null</c> as an empty string; .NET 10 keeps it as <c>null</c>. The string expectations here are meant to
-/// fail on the .NET 10 upgrade, which then changes them as a recorded decision.
+/// Pins how the shipped appsettings files' <c>null</c> values reach the services. Since .NET 10 a JSON
+/// <c>null</c> stays <c>null</c>; .NET 8 read it as an empty string.
 /// </summary>
 /// <remarks>
+/// Every reader of these keys treats <c>null</c> and an empty string alike, apart from Submission's blob
+/// connection strings, which are now checked at startup instead.
 /// The files are linked into the test output by ServiceTests.csproj under Resources/&lt;service&gt;.
 /// </remarks>
 [Trait("Category", "UnitTests")]
@@ -92,19 +93,19 @@ public class ConfigurationNullBindingTests
 
     [Theory]
     [MemberData(nameof(NullKeysByFile))]
-    public void RawValue_NullKeyInShippedAppSettings_ReadsAsEmptyString(string service,
-                                                                        string file,
-                                                                        string[] keys)
+    public void RawValue_NullKeyInShippedAppSettings_ReadsAsNull(string service,
+                                                                 string file,
+                                                                 string[] keys)
     {
         var configuration = Load(service, file);
 
-        Assert.All(keys, key => Assert.Equal(string.Empty, configuration[key]));
+        Assert.All(keys, key => Assert.Null(configuration[key]));
     }
 
     [Theory]
     [InlineData(InternalBlobStorageSettings.Key)]
     [InlineData(ExternalBlobStorageSettings.Key)]
-    public void Bind_SubmissionBlobStorage_StringsBindAsEmpty(string section)
+    public void Bind_SubmissionBlobStorage_StringsBindAsNull(string section)
     {
         var settings = new BlobStorageSettings();
 
@@ -112,14 +113,14 @@ public class ConfigurationNullBindingTests
             .GetSection(section)
             .Bind(settings);
 
-        Assert.Equal(string.Empty, settings.ConnectionString);
-        Assert.Equal(string.Empty, settings.BlobContainerName);
-        Assert.Equal(string.Empty, settings.BlobRoot);
+        Assert.Null(settings.ConnectionString);
+        Assert.Null(settings.BlobContainerName);
+        Assert.Null(settings.BlobRoot);
     }
 
     [Theory]
     [MemberData(nameof(AutomationUiFiles))]
-    public void Bind_AutomationFhirQuery_TimeSpansBindAsNullAndTimeZoneAsEmpty(string file)
+    public void Bind_AutomationFhirQuery_TimeSpansAndTimeZoneBindAsNull(string file)
     {
         var settings = new AutomationConfig();
 
@@ -129,7 +130,7 @@ public class ConfigurationNullBindingTests
 
         Assert.Null(settings.FhirQuery.MinAcquisitionPullTime);
         Assert.Null(settings.FhirQuery.MaxAcquisitionPullTime);
-        Assert.Equal(string.Empty, settings.FhirQuery.TimeZone);
+        Assert.Null(settings.FhirQuery.TimeZone);
     }
 
     [Fact]

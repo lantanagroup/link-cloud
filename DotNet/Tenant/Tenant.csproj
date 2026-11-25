@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UserSecretsId>1875d82f-6b29-4bcf-896b-5d904fc996f5</UserSecretsId>
@@ -29,7 +29,6 @@
 		<PackageReference Include="CronExpressionDescriptor" />
 		<PackageReference Include="Grpc.AspNetCore" />
 		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" />
-		<PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
 		<PackageReference Include="Quartz" />
 		<PackageReference Include="Quartz.Extensions.DependencyInjection" />

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
@@ -63,7 +63,7 @@
 	-->
 	<!--
 		BaseIntermediateOutputPath (obj\) is used rather than IntermediateOutputPath
-		(obj\Debug\net8.0\) because the latter is not defined until targets that are
+		(obj\Debug\net10.0\) because the latter is not defined until targets that are
 		imported after the project body, so it evaluates to empty here.
 	-->
 	<PropertyGroup>
@@ -81,8 +81,8 @@
 			Outputs="$(DmrpGeneratedFile)">
 		<MakeDir Directories="$(DmrpGeneratedDir)" />
 		<Message Importance="high" Text="MockDmrpApi: generating API contract from $(DmrpSpecFile)" />
-		<!-- $(NSwagExe_Net80) already expands to: dotnet "<path>\dotnet-nswag.dll". Do not quote it. -->
-		<Exec Command="$(NSwagExe_Net80) run nswag.json /variables:OutputPath=$(DmrpGeneratedFile)"
+		<!-- $(NSwagExe_Net100) already expands to: dotnet "<path>\dotnet-nswag.dll". Do not quote it. -->
+		<Exec Command="$(NSwagExe_Net100) run nswag.json /variables:OutputPath=$(DmrpGeneratedFile)"
 			  WorkingDirectory="$(MSBuildProjectDirectory)" />
 	</Target>
 

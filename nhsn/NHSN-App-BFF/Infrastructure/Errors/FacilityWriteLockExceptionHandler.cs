@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +11,13 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Errors;
 public sealed class FacilityWriteLockExceptionHandler : IExceptionHandler
 {
     private readonly IProblemDetailsService _problemDetailsService;
+    private readonly ILogger<FacilityWriteLockExceptionHandler> _logger;
 
-    public FacilityWriteLockExceptionHandler(IProblemDetailsService problemDetailsService)
+    public FacilityWriteLockExceptionHandler(IProblemDetailsService problemDetailsService,
+                                             ILogger<FacilityWriteLockExceptionHandler> logger)
     {
         _problemDetailsService = problemDetailsService;
+        _logger = logger;
     }
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
@@ -22,6 +26,12 @@ public sealed class FacilityWriteLockExceptionHandler : IExceptionHandler
         {
             return false;
         }
+
+        // .NET 10 no longer logs an exception a handler takes care of, so log it here.
+        _logger.LogWarning(lockException,
+                           "Facility write lock not acquired for {FacilityId} within {TimeoutMs}ms; returned 409.",
+                           lockException.FacilityId.SanitizeForLog(),
+                           lockException.TimeoutMs);
 
         httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
 

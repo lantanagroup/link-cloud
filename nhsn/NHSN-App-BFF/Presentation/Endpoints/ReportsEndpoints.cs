@@ -38,20 +38,15 @@ public class ReportsEndpoints : IApi
             .Produces<ReportSummary>(StatusCodes.Status200OK)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Request an ad hoc test report.";
-                operation.Description =
-                    "Answers with the requested report and a Pending status. The id is assigned " +
-                    "synchronously and the report is generated behind it, so the status here is " +
-                    "always Pending -- read the report list or detail for progress. A report " +
-                    "already in flight does not refuse a second one; Link only reports a schedule " +
-                    "complete once it has been submitted, and these bypass submission, so " +
-                    "\"pending\" never clears and refusing on it would block every report after " +
-                    "the first. Requested reports bypass submission: this is a test report for a " +
-                    "facility that is not enrolled yet.";
-                return operation;
-            });
+            .WithSummary("Request an ad hoc test report.")
+            .WithDescription("Answers with the requested report and a Pending status. The id is assigned " +
+                "synchronously and the report is generated behind it, so the status here is " +
+                "always Pending -- read the report list or detail for progress. A report " +
+                "already in flight does not refuse a second one; Link only reports a schedule " +
+                "complete once it has been submitted, and these bypass submission, so " +
+                "\"pending\" never clears and refusing on it would block every report after " +
+                "the first. Requested reports bypass submission: this is a test report for a " +
+                "facility that is not enrolled yet.");
 
         group.MapGet("/", async (
                 IReportingService service,
@@ -62,11 +57,7 @@ public class ReportsEndpoints : IApi
             .WithName("ListReports")
             .Produces<Paged<ReportDetail>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Lists the current facility's reports, newest first.";
-                return operation;
-            });
+            .WithSummary("Lists the current facility's reports, newest first.");
 
         group.MapGet("/{reportId}", async (
                 string reportId,
@@ -80,11 +71,7 @@ public class ReportsEndpoints : IApi
             .Produces<ReportDetail>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Reads one report's full detail.";
-                return operation;
-            });
+            .WithSummary("Reads one report's full detail.");
 
         group.MapGet("/{reportId}/patients", async (
                 string reportId,
@@ -94,11 +81,7 @@ public class ReportsEndpoints : IApi
             .WithName("GetReportPatients")
             .Produces<List<ReportPatientEntry>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Reads the per-patient rows behind the Report Details patient table.";
-                return operation;
-            });
+            .WithSummary("Reads the per-patient rows behind the Report Details patient table.");
 
         group.MapGet("/{reportId}/patients/{patientId}/mapping-evidence", async (
                 string reportId,
@@ -113,11 +96,7 @@ public class ReportsEndpoints : IApi
             .Produces<PatientMappingEvidence>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Reads the real evidence behind one patient's Location Org / HSLOC / Encounter mapping indicators.";
-                return operation;
-            });
+            .WithSummary("Reads the real evidence behind one patient's Location Org / HSLOC / Encounter mapping indicators.");
 
         group.MapGet("/location-org-mappings", async (
                 IReportingService service,
@@ -126,16 +105,11 @@ public class ReportsEndpoints : IApi
             .WithName("GetFacilityLocationOrgMappings")
             .Produces<List<LocationOrgMapping>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Reads every Location Org mapping DataAcquisition has recorded for the current facility.";
-                operation.Description =
-                    "Facility-scoped, not report-scoped -- found and missing/unmatched Locations alike. " +
-                    "The Location Org evidence modal fetches this once per report-detail view and joins " +
-                    "it against the Locations parsed from each patient's report, rather than one call per " +
-                    "Location. Empty list when the facility has no mappings yet.";
-                return operation;
-            });
+            .WithSummary("Reads every Location Org mapping DataAcquisition has recorded for the current facility.")
+            .WithDescription("Facility-scoped, not report-scoped -- found and missing/unmatched Locations alike. " +
+                "The Location Org evidence modal fetches this once per report-detail view and joins " +
+                "it against the Locations parsed from each patient's report, rather than one call per " +
+                "Location. Empty list when the facility has no mappings yet.");
 
         group.MapGet("/{reportId}/query-plan", async (
                 string reportId,
@@ -149,11 +123,7 @@ public class ReportsEndpoints : IApi
             .Produces<QueryPlan>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Reads the facility's configured DataAcquisition query plan for this report's vendor.";
-                return operation;
-            });
+            .WithSummary("Reads the facility's configured DataAcquisition query plan for this report's vendor.");
 
         group.MapGet("/{reportId}/acquisition-logs", async (
                 string reportId,
@@ -163,11 +133,7 @@ public class ReportsEndpoints : IApi
             .WithName("GetAcquisitionLogs")
             .Produces<List<AcquisitionLogEntry>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Reads DataAcquisition's acquisition log entries recorded for this report.";
-                return operation;
-            });
+            .WithSummary("Reads DataAcquisition's acquisition log entries recorded for this report.");
 
         group.MapGet("/{reportId}/summary-export", async (
                 string reportId,
@@ -186,11 +152,7 @@ public class ReportsEndpoints : IApi
             .Produces(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Downloads DataAcquisition's summary counts for this report as a JSON file.";
-                return operation;
-            });
+            .WithSummary("Downloads DataAcquisition's summary counts for this report as a JSON file.");
 
         group.MapGet("/{reportId}/patients/{patientId}/export", async (
                 string reportId,
@@ -212,16 +174,11 @@ public class ReportsEndpoints : IApi
             .Produces(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Downloads one patient's generated report for a report type.";
-                operation.Description =
-                    "Streams the ndjson bundle Report itself generated and stored -- the per-measure " +
-                    "report when one has been recorded for this report type, falling back to the " +
-                    "patient's whole aggregate report otherwise. Not found when Report has no entry " +
-                    "for this patient, no report blob recorded yet, or the blob itself is missing.";
-                return operation;
-            });
+            .WithSummary("Downloads one patient's generated report for a report type.")
+            .WithDescription("Streams the ndjson bundle Report itself generated and stored -- the per-measure " +
+                "report when one has been recorded for this report type, falling back to the " +
+                "patient's whole aggregate report otherwise. Not found when Report has no entry " +
+                "for this patient, no report blob recorded yet, or the blob itself is missing.");
 
         group.MapGet("/{reportId}/acknowledgement", async (
                 string reportId,
@@ -234,12 +191,8 @@ public class ReportsEndpoints : IApi
             .WithName("GetReportAccuracyAcknowledgement")
             .Produces<ReportAccuracyAcknowledgementResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Whether this report's accuracy has been acknowledged.";
-                operation.Description = "Accepted is null when nothing has been recorded yet for this report.";
-                return operation;
-            });
+            .WithSummary("Whether this report's accuracy has been acknowledged.")
+            .WithDescription("Accepted is null when nothing has been recorded yet for this report.");
 
         group.MapPut("/{reportId}/acknowledgement", async (
                 string reportId,
@@ -253,12 +206,8 @@ public class ReportsEndpoints : IApi
             .WithName("AcknowledgeReportAccuracy")
             .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Records whether this report's accuracy is acknowledged.";
-                operation.Description = "Append-only -- records a new attestation row rather than editing a prior one.";
-                return operation;
-            });
+            .WithSummary("Records whether this report's accuracy is acknowledged.")
+            .WithDescription("Append-only -- records a new attestation row rather than editing a prior one.");
 
         group.MapGet("/{reportId}/patients/{patientId}/pre-qual-results", async (
                 string reportId,
@@ -269,12 +218,8 @@ public class ReportsEndpoints : IApi
             .WithName("GetPatientPreQualResults")
             .Produces<IReadOnlyList<PreQualIssue>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Real per-patient FHIR validation issues for this report, from Validation's own results.";
-                operation.Description = "Each issue carries the real Validation category it was classified under (or \"Uncategorized\" if none), including whether that category is considered acceptable. An empty list when Validation has not recorded any issues for this patient.";
-                return operation;
-            });
+            .WithSummary("Real per-patient FHIR validation issues for this report, from Validation's own results.")
+            .WithDescription("Each issue carries the real Validation category it was classified under (or \"Uncategorized\" if none), including whether that category is considered acceptable. An empty list when Validation has not recorded any issues for this patient.");
     }
 
     private static Dictionary<string, string[]> Validate(ReportRequest request)

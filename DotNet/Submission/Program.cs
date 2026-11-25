@@ -28,7 +28,7 @@ using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -76,8 +76,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-    builder.Services.Configure<InternalBlobStorageSettings>(builder.Configuration.GetSection(InternalBlobStorageSettings.Key));
-    builder.Services.Configure<ExternalBlobStorageSettings>(builder.Configuration.GetSection(ExternalBlobStorageSettings.Key));
+    builder.Services.AddBlobStorageSettings(builder.Configuration);
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -112,19 +111,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                 Scheme = JwtBearerDefaults.AuthenticationScheme
             });
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
             {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },
-                    new List<string>()
-                }
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
             });
 
             #endregion

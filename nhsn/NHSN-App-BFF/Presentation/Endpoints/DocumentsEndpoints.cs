@@ -30,18 +30,13 @@ public sealed class DocumentsEndpoints : IApi
                 };
             })
             .WithName("GetDocument")
-            .Produces(StatusCodes.Status200OK, contentType: "application/pdf")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
-            .WithOpenApi(operation =>
-            {
-                operation.Summary = "Get a vendor instruction document by key.";
-                operation.Description =
-                    "documentKey comes from the vendor profile (VendorProfile.documentKeys) and is " +
-                    "resolved against a fixed allow-list — it is never used to build a file path " +
-                    "directly.";
-                return operation;
-            });
+            .WithSummary("Get a vendor instruction document by key.")
+            .WithDescription("documentKey comes from the vendor profile (VendorProfile.documentKeys) and is " +
+                "resolved against a fixed allow-list — it is never used to build a file path " +
+                "directly.");
     }
 }

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-amd64 AS base
 # curl is for the compose health checks.
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 USER 1654
@@ -10,7 +10,7 @@ ENV \
 WORKDIR /app
 EXPOSE 8079
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]

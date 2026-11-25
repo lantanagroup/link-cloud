@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Settings;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
@@ -45,22 +45,9 @@ public static class SwaggerOAuthExtension
             }
         });
 
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Id = "OAuth",
-                        Type = ReferenceType.SecurityScheme
-                    },
-                    Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
-                    Name = "Oauth",
-                    In = ParameterLocation.Header
-                },
-                new List<string>()
-            }
+            [new OpenApiSecuritySchemeReference("OAuth", document)] = []
         });
     }
 }
