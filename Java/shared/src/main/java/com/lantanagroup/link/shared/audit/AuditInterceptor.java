@@ -18,6 +18,9 @@ import java.util.Map;
  * in {@code afterCompletion}, which runs once the handler has returned (so after its transaction, if any, has
  * committed) and the final status is known. A call succeeded when it did not end in an exception and its
  * status is 200 to 299. Nothing here throws into the request: a failure is counted and logged.
+ * <p>
+ * Before the handler runs it marks the request as one whose saves are worth watching, which is what lets a
+ * persistence listener collect property changes for audited requests only.
  */
 public final class AuditInterceptor implements HandlerInterceptor {
     private static final Logger logger = LoggerFactory.getLogger(AuditInterceptor.class);
@@ -30,6 +33,23 @@ public final class AuditInterceptor implements HandlerInterceptor {
         this.factory = factory;
         this.publisher = publisher;
         this.metrics = metrics;
+    }
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        try {
+            if (handler instanceof HandlerMethod handlerMethod) {
+                Auditable auditable = handlerMethod.getMethodAnnotation(Auditable.class);
+                // Not narrowed to the annotation's action: a handler may turn a create into an update.
+                if (auditable != null && auditable.propertyChanges()) {
+                    AuditState.stored(request).captureChanges();
+                }
+            }
+        } catch (RuntimeException e) {
+            logger.warn("Audit could not prepare the request, so its event will carry no captured property "
+                    + "changes: {}", e.getClass().getName());
+        }
+        return true;
     }
 
     @Override

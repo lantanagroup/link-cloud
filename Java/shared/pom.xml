@@ -58,6 +58,14 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- Compiled against only: audit captures property changes from Hibernate in a service that has JPA,
+             and a service without it (MeasureEval, on MongoDB) must not get it from here. -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
             <artifactId>hapi-fhir-base</artifactId>
@@ -122,6 +130,13 @@
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Embedded database for the audit property-capture test, which runs against a real Hibernate session -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
 

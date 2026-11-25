@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -23,11 +24,15 @@ import java.time.Duration;
  * {@link Auditable} method creates no producer. Nothing Kafka-related is resolved at startup: the service's
  * {@link KafkaProperties} and {@link SslBundles} are looked up on the first publish, so a controller test slice
  * with no Kafka configuration still starts.
+ * <p>
+ * A service that has Hibernate also gets {@link AuditJpaConfiguration}, which captures property changes from
+ * its saves.
  */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnClass(KafkaTemplate.class)
 @EnableConfigurationProperties(AuditProperties.class)
+@Import(AuditJpaConfiguration.class)
 public class AuditAutoConfiguration {
 
     @Bean

@@ -23,7 +23,11 @@ public interface AuditContext {
     /** A value for a {name} placeholder in the note. */
     void set(String name, Object value);
 
-    /** Records what differs between the two objects, masked. Call it before the save. */
+    /**
+     * Records what differs between the two objects, masked. Call it before the save. For a service without JPA:
+     * where the service has a Hibernate persistence unit the changes are captured from the save itself, and
+     * calling this as well records each of them twice.
+     */
     void changes(Object before, Object after);
 
     /** Records one value by hand, masked by name. */

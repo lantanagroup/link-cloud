@@ -138,6 +138,12 @@ public class AuditInterceptorTest {
         public String plain(@PathVariable String id) {
             return "ok";
         }
+
+        @PutMapping("/things/{id}/replaced")
+        @Auditable(action = AuditAction.UPDATE, resource = "Thing", propertyChanges = false)
+        public String replaced(@PathVariable String id) {
+            return "ok";
+        }
     }
 
     @RestControllerAdvice
@@ -378,5 +384,27 @@ public class AuditInterceptorTest {
         mockMvc().perform(put("/things/t-11")).andExpect(status().isOk());
 
         Assertions.assertEquals("ada@example.com", single().user());
+    }
+
+    @Test
+    public void markedHandler_marksTheRequestForPropertyCapture() throws Exception {
+        MvcResult result = mockMvc().perform(put("/things/t-12")).andExpect(status().isOk()).andReturn();
+
+        Assertions.assertTrue(AuditState.from(result.getRequest()).capturingChanges());
+    }
+
+    @Test
+    public void markedHandlerWithPropertyChangesOff_doesNotMarkTheRequest() throws Exception {
+        MvcResult result = mockMvc().perform(put("/things/t-13/replaced")).andExpect(status().isOk()).andReturn();
+
+        Assertions.assertFalse(AuditState.from(result.getRequest()).capturingChanges());
+        Assertions.assertEquals(1, publisher.events.size());
+    }
+
+    @Test
+    public void unmarkedHandler_leavesNoStateOnTheRequest() throws Exception {
+        MvcResult result = mockMvc().perform(put("/things/t-14/plain")).andExpect(status().isOk()).andReturn();
+
+        Assertions.assertNull(result.getRequest().getAttribute(AuditState.ATTRIBUTE));
     }
 }
