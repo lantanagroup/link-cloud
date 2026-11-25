@@ -510,11 +510,6 @@
     selectionBoxes.forEach(function (box) {
         box.addEventListener('change', updateBulkSelection);
     });
-    const tableShell = document.querySelector('[data-au-table]');
-    if (tableShell) {
-        tableShell.addEventListener('input', updateBulkSelection);
-        tableShell.addEventListener('change', updateBulkSelection);
-    }
     deleteSelectedButton.addEventListener('click', function () {
         const selected = selectedBoxes();
         if (selected.length === 0 || bulkDeleting || !window.luHoldConfirm) return;
