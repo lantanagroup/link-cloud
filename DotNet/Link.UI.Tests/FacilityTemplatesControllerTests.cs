@@ -33,7 +33,7 @@ public class FacilityTemplatesControllerTests
         ((long)sut.ViewBag.TotalCount).Should().Be(30);
         ((int)sut.ViewBag.TotalPages).Should().Be(2);
 
-        var last = await sut.Index(page: 9, pageSize: 25, CancellationToken.None);
+        var last = await sut.Index(page: 9, pageSize: 25, ct: CancellationToken.None);
         var lastPage = last.Should().BeOfType<ViewResult>().Subject.Model.Should().BeAssignableTo<List<FacilityTemplate>>().Subject;
         lastPage.Should().HaveCount(5);
         lastPage.Select(t => t.Name).Should().Equal("T25", "T26", "T27", "T28", "T29");
@@ -51,7 +51,7 @@ public class FacilityTemplatesControllerTests
         templates.Items.Add(Template("Only"));
         var sut = Ready(templates, new FakeScenarios());
 
-        await sut.Index(page: -3, pageSize: pageSize, CancellationToken.None);
+        await sut.Index(page: -3, pageSize: pageSize, ct: CancellationToken.None);
 
         templates.Pages.Should().Equal((0, FacilityTemplateListRules.DefaultPageSize));
         ((int)sut.ViewBag.CurrentPage).Should().Be(1);
@@ -66,13 +66,13 @@ public class FacilityTemplatesControllerTests
         for (var i = 0; i < 12; i++)
             sized.Items.Add(Template("P" + i.ToString("00")));
         var sizedController = Ready(sized, new FakeScenarios());
-        var page = await sizedController.Index(page: 2, pageSize: 10, CancellationToken.None);
+        var page = await sizedController.Index(page: 2, pageSize: 10, ct: CancellationToken.None);
         page.Should().BeOfType<ViewResult>().Subject.Model.Should().BeAssignableTo<List<FacilityTemplate>>().Subject.Should().HaveCount(2);
         sized.Pages.Should().Equal((10, 10));
 
         var empty = new FakeTemplates();
         var emptyController = Ready(empty, new FakeScenarios());
-        var none = await emptyController.Index(page: 4, pageSize: 50, CancellationToken.None);
+        var none = await emptyController.Index(page: 4, pageSize: 50, ct: CancellationToken.None);
         none.Should().BeOfType<ViewResult>().Subject.Model.Should().BeAssignableTo<List<FacilityTemplate>>().Subject.Should().BeEmpty();
         empty.Pages.Should().Equal((0, 50));
         ((int)emptyController.ViewBag.CurrentPage).Should().Be(1);
@@ -92,6 +92,99 @@ public class FacilityTemplatesControllerTests
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         templates.Pages.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Index_counts_and_pages_only_the_filtered_templates()
+    {
+        var templates = new FakeTemplates();
+        for (var i = 0; i < 12; i++)
+            templates.Items.Add(Template("Epic " + i.ToString("00"), vendor: "Epic"));
+        for (var i = 0; i < 8; i++)
+            templates.Items.Add(Template("Cerner " + i.ToString("00"), vendor: "Cerner"));
+        var sut = Ready(templates, new FakeScenarios());
+
+        var result = await sut.Index(page: 9, pageSize: 10, search: "  epic  ", vendor: "  EPIC  ", kind: "custom", ct: CancellationToken.None);
+        var page = result.Should().BeOfType<ViewResult>().Subject.Model.Should().BeAssignableTo<List<FacilityTemplate>>().Subject;
+
+        templates.LastSearch.Should().Be("epic");
+        templates.LastVendor.Should().Be("EPIC");
+        templates.LastKind.Should().Be("Custom");
+        ((long)sut.ViewBag.TotalCount).Should().Be(12);
+        ((int)sut.ViewBag.TotalPages).Should().Be(2);
+        ((int)sut.ViewBag.CurrentPage).Should().Be(2);
+        ((int)sut.ViewBag.PageSize).Should().Be(10);
+        templates.Pages.Should().Equal((10, 10));
+        page.Select(t => t.Name).Should().Equal("Epic 10", "Epic 11");
+    }
+
+    [Fact]
+    public async Task Index_treats_blank_and_unknown_filters_as_the_full_set()
+    {
+        var templates = new FakeTemplates();
+        templates.Items.Add(Template("Alpha", vendor: "Epic", system: true));
+        templates.Items.Add(Template("Beta", vendor: "Cerner"));
+        var sut = Ready(templates, new FakeScenarios());
+
+        var result = await sut.Index(
+            page: 4,
+            search: "   ",
+            vendor: " ",
+            kind: "neither",
+            sortBy: "nope",
+            sortDir: "sideways",
+            ct: CancellationToken.None);
+
+        result.Should().BeOfType<ViewResult>().Subject.Model.Should().BeAssignableTo<List<FacilityTemplate>>().Subject.Should().HaveCount(2);
+        templates.LastSearch.Should().BeEmpty();
+        templates.LastVendor.Should().BeEmpty();
+        templates.LastKind.Should().BeNull();
+        templates.LastSortBy.Should().Be("name");
+        templates.LastSortDir.Should().Be("asc");
+        ((long)sut.ViewBag.TotalCount).Should().Be(2);
+        ((int)sut.ViewBag.CurrentPage).Should().Be(1);
+        ((int)sut.ViewBag.TotalPages).Should().Be(1);
+        templates.Pages.Should().Equal((0, FacilityTemplateListRules.DefaultPageSize));
+    }
+
+    [Fact]
+    public async Task Index_passes_sort_and_limits_filter_length()
+    {
+        var templates = new FakeTemplates();
+        templates.Items.Add(Template("A", vendor: "Zulu"));
+        templates.Items.Add(Template("B", vendor: "Alpha"));
+        templates.Items.Add(Template("C", vendor: "Middle", system: true));
+        var sut = Ready(templates, new FakeScenarios());
+
+        var search = new string('n', 250);
+        var vendor = new string('v', 250);
+        await sut.Index(search: search, vendor: vendor, kind: "SYSTEM", sortBy: "VENDOR", sortDir: "DESC", ct: CancellationToken.None);
+
+        templates.LastSearch.Should().HaveLength(200).And.Be(new string('n', 200));
+        templates.LastVendor.Should().HaveLength(200).And.Be(new string('v', 200));
+        templates.LastKind.Should().Be("System");
+        templates.LastSortBy.Should().Be("vendor");
+        templates.LastSortDir.Should().Be("desc");
+        ((string)sut.ViewBag.SortBy).Should().Be("vendor");
+        ((string)sut.ViewBag.SortDir).Should().Be("desc");
+        ((string?)sut.ViewBag.Kind).Should().Be("System");
+    }
+
+    [Fact]
+    public async Task Index_returns_an_empty_page_when_nothing_matches()
+    {
+        var templates = new FakeTemplates();
+        templates.Items.Add(Template("Alpha", vendor: "Epic"));
+        var sut = Ready(templates, new FakeScenarios());
+
+        var result = await sut.Index(page: 2, search: "missing", kind: "custom", ct: CancellationToken.None);
+        var page = result.Should().BeOfType<ViewResult>().Subject.Model.Should().BeAssignableTo<List<FacilityTemplate>>().Subject;
+
+        page.Should().BeEmpty();
+        ((long)sut.ViewBag.TotalCount).Should().Be(0);
+        ((int)sut.ViewBag.CurrentPage).Should().Be(1);
+        ((int)sut.ViewBag.TotalPages).Should().Be(1);
+        templates.Pages.Should().Equal((0, FacilityTemplateListRules.DefaultPageSize));
     }
 
     [Fact]
@@ -320,6 +413,7 @@ public class FacilityTemplatesControllerTests
         var controller = File.ReadAllText(Repo("DotNet/Link.UI/Controllers/FacilityTemplatesController.cs"));
         controller.Should().NotContain("IConfiguration").And.NotContain("GetValue").And.NotContain("appsettings");
         controller.Should().Contain("store.CountFilteredAsync").And.Contain("store.GetFilteredPageAsync");
+        controller.Should().NotContain("store.CountAsync(").And.NotContain("store.GetPageAsync(");
 
         var view = File.ReadAllText(Repo("DotNet/Link.UI/Views/FacilityTemplates/Index.cshtml"));
         view.Should().Contain("luHoldConfirm.ask");
@@ -328,7 +422,14 @@ public class FacilityTemplatesControllerTests
         view.Should().Contain("au-row-hidden");
         view.Should().Contain("DeleteBulk");
         view.Should().Contain("!t.IsSystem && !t.IsDefault");
+        view.Should().Contain("[\"search\"]").And.Contain("[\"vendor\"]").And.Contain("[\"kind\"]");
+        view.Should().Contain("[\"sortBy\"]").And.Contain("[\"sortDir\"]");
+        view.Should().Contain("auRefreshPage");
+        view.Should().Contain("name=\"search\"").And.Contain("name=\"vendor\"").And.Contain("name=\"kind\"");
+        view.Should().NotContain("data-sort=");
+        view.Should().NotContain("au-data-table.js");
         view.Should().NotContain("confirm(");
+        view.Should().NotContain("btn-outline-");
 
         typeof(FacilityTemplatesController).GetMethod(nameof(FacilityTemplatesController.DeleteBulk))!
             .GetCustomAttribute<ValidateAntiForgeryTokenAttribute>().Should().NotBeNull();
@@ -336,8 +437,8 @@ public class FacilityTemplatesControllerTests
             .GetCustomAttribute<ValidateAntiForgeryTokenAttribute>().Should().NotBeNull();
     }
 
-    private static FacilityTemplate Template(string name, bool system = false, bool isDefault = false) =>
-        new() { Id = Guid.NewGuid(), Name = name, IsSystem = system, IsDefault = isDefault };
+    private static FacilityTemplate Template(string name, bool system = false, bool isDefault = false, string? vendor = null) =>
+        new() { Id = Guid.NewGuid(), Name = name, IsSystem = system, IsDefault = isDefault, VendorName = vendor };
 
     private static List<Guid> DeletedIds(object value) =>
         ((IEnumerable<Guid>)value.GetType().GetProperty("deletedIds")!.GetValue(value)!).ToList();
@@ -402,6 +503,11 @@ public class FacilityTemplatesControllerTests
         public List<FacilityTemplate> Items { get; } = [];
         public List<(int Skip, int Take)> Pages { get; } = [];
         public List<Guid> Deleted { get; } = [];
+        public string? LastSearch { get; private set; }
+        public string? LastVendor { get; private set; }
+        public string? LastKind { get; private set; }
+        public string? LastSortBy { get; private set; }
+        public string? LastSortDir { get; private set; }
         public Exception? DeleteError { get; set; }
         public Guid DeleteErrorId { get; set; }
         public CancellationTokenSource? CancelDuringDelete { get; set; }
@@ -415,7 +521,8 @@ public class FacilityTemplatesControllerTests
         public Task<long> CountFilteredAsync(string? search, string? vendor, string? kind, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            return Task.FromResult((long)Items.Count);
+            Remember(search, vendor, kind);
+            return Task.FromResult((long)Filtered(search, vendor, kind).Count);
         }
 
         public Task<List<FacilityTemplate>> GetFilteredPageAsync(
@@ -429,8 +536,62 @@ public class FacilityTemplatesControllerTests
             CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            Remember(search, vendor, kind, sortBy, sortDir);
             Pages.Add((skip, take));
-            return Task.FromResult(Items.Skip(skip).Take(take).ToList());
+            var ordered = Order(Filtered(search, vendor, kind), sortBy, sortDir);
+            return Task.FromResult(ordered.Skip(skip).Take(take).ToList());
+        }
+
+        private void Remember(string? search, string? vendor, string? kind, string? sortBy = null, string? sortDir = null)
+        {
+            LastSearch = search;
+            LastVendor = vendor;
+            LastKind = kind;
+            if (sortBy is not null)
+                LastSortBy = sortBy;
+            if (sortDir is not null)
+                LastSortDir = sortDir;
+        }
+
+        private List<FacilityTemplate> Filtered(string? search, string? vendor, string? kind)
+        {
+            IEnumerable<FacilityTemplate> rows = Items;
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                rows = rows.Where(item => item.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(vendor))
+            {
+                var term = vendor.Trim();
+                rows = rows.Where(item => string.Equals(item.VendorName, term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (string.Equals(kind, "System", StringComparison.OrdinalIgnoreCase))
+                rows = rows.Where(item => item.IsSystem);
+            else if (string.Equals(kind, "Custom", StringComparison.OrdinalIgnoreCase))
+                rows = rows.Where(item => !item.IsSystem);
+
+            return rows.ToList();
+        }
+
+        private static List<FacilityTemplate> Order(List<FacilityTemplate> rows, string sortBy, string sortDir)
+        {
+            var descending = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+            IOrderedEnumerable<FacilityTemplate> ordered = sortBy.ToLowerInvariant() switch
+            {
+                "vendor" => descending
+                    ? rows.OrderByDescending(item => item.VendorName, StringComparer.Ordinal)
+                    : rows.OrderBy(item => item.VendorName, StringComparer.Ordinal),
+                "kind" => descending
+                    ? rows.OrderByDescending(item => item.IsSystem)
+                    : rows.OrderBy(item => item.IsSystem),
+                _ => descending
+                    ? rows.OrderByDescending(item => item.Name, StringComparer.Ordinal)
+                    : rows.OrderBy(item => item.Name, StringComparer.Ordinal)
+            };
+            return ordered.ThenBy(item => item.Name, StringComparer.Ordinal).ThenBy(item => item.Id).ToList();
         }
 
         public Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default)

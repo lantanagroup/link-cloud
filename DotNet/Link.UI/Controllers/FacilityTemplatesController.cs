@@ -32,21 +32,55 @@ public class FacilityTemplatesController : AutomationTemplateController
     public async Task<IActionResult> Index(
         int page = 1,
         int pageSize = FacilityTemplateListRules.DefaultPageSize,
+        string? search = null,
+        string? vendor = null,
+        string? kind = null,
+        string sortBy = "name",
+        string sortDir = "asc",
         CancellationToken ct = default)
     {
         page = Math.Max(1, page);
         if (!FacilityTemplateListRules.PageSizes.Contains(pageSize))
             pageSize = FacilityTemplateListRules.DefaultPageSize;
 
-        var totalCount = await store.CountFilteredAsync(null, null, null, ct);
+        const int maxFilterLength = 200;
+        search = search?.Trim();
+        vendor = vendor?.Trim();
+        kind = kind?.Trim();
+        if (search is { Length: > maxFilterLength })
+            search = search[..maxFilterLength];
+        if (vendor is { Length: > maxFilterLength })
+            vendor = vendor[..maxFilterLength];
+
+        kind = kind?.ToLowerInvariant() switch
+        {
+            "system" => "System",
+            "custom" => "Custom",
+            _ => null
+        };
+        sortBy = sortBy?.ToLowerInvariant() switch
+        {
+            "vendor" => "vendor",
+            "kind" => "kind",
+            _ => "name"
+        };
+        sortDir = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+
+        var totalCount = await store.CountFilteredAsync(search, vendor, kind, ct);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
         page = Math.Min(page, totalPages);
-        var templates = await store.GetFilteredPageAsync((page - 1) * pageSize, pageSize, null, null, null, ct: ct);
+        var templates = await store.GetFilteredPageAsync(
+            (page - 1) * pageSize, pageSize, search, vendor, kind, sortBy, sortDir, ct);
 
         ViewBag.CurrentPage = page;
         ViewBag.PageSize = pageSize;
         ViewBag.TotalCount = totalCount;
         ViewBag.TotalPages = totalPages;
+        ViewBag.Search = search;
+        ViewBag.Vendor = vendor;
+        ViewBag.Kind = kind;
+        ViewBag.SortBy = sortBy;
+        ViewBag.SortDir = sortDir;
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);

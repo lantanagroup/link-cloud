@@ -9,13 +9,47 @@
     var pageSize = (int)ViewBag.PageSize;
     var totalCount = (long)ViewBag.TotalCount;
     var totalPages = (int)ViewBag.TotalPages;
+    var search = (string?)ViewBag.Search ?? "";
+    var vendor = (string?)ViewBag.Vendor ?? "";
+    var kind = (string?)ViewBag.Kind ?? "";
+    var sortBy = (string?)ViewBag.SortBy ?? "name";
+    var sortDir = (string?)ViewBag.SortDir ?? "asc";
+    string NextSortDir(string column) =>
+        sortBy == column && sortDir == "asc" ? "desc" : "asc";
+    string SortIndicator(string column) =>
+        sortBy == column ? (sortDir == "asc" ? " ▲" : " ▼") : "";
+    string? Shown(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    string SortHref(string column) =>
+        Url.Action("Index", "FacilityTemplates", new
+        {
+            page = 1,
+            pageSize,
+            search = Shown(search),
+            vendor = Shown(vendor),
+            kind = Shown(kind),
+            sortBy = column,
+            sortDir = NextSortDir(column)
+        }) ?? "#";
+    var clearHref = Url.Action("Index", "FacilityTemplates", new { page = 1, pageSize, sortBy, sortDir }) ?? "#";
     var firstRecord = totalCount == 0 ? 0 : (currentPage - 1) * pageSize + 1;
     var lastRecord = Math.Min((long)currentPage * pageSize, totalCount);
-    Dictionary<string, string> PageRoute(int page, int size) => new()
+    Dictionary<string, string> PageRoute(int page, int size)
     {
-        ["page"] = page.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        ["pageSize"] = size.ToString(System.Globalization.CultureInfo.InvariantCulture)
-    };
+        var route = new Dictionary<string, string>
+        {
+            ["page"] = page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["pageSize"] = size.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["sortBy"] = sortBy,
+            ["sortDir"] = sortDir
+        };
+        if (Shown(search) is string searchValue)
+            route["search"] = searchValue;
+        if (Shown(vendor) is string vendorValue)
+            route["vendor"] = vendorValue;
+        if (Shown(kind) is string kindValue)
+            route["kind"] = kindValue;
+        return route;
+    }
     string PieceName<T>(IEnumerable<T> items, Guid? id, Func<T, Guid> idOf, Func<T, string> nameOf) where T : class
     {
         if (!id.HasValue) return "Not configured";
@@ -38,22 +72,52 @@
                 <button type="button" class="btn btn-sm btn-success" id="btnNewFacility">New</button>
             </div>
         </div>
+        <form method="get" asp-controller="FacilityTemplates" asp-action="Index" class="d-flex flex-wrap align-items-end gap-2 px-3 py-2 border-bottom">
+            <div>
+                <label for="facilitySearch" class="form-label small mb-1">Search by name</label>
+                <input type="search" id="facilitySearch" name="search" value="@search" class="form-control form-control-sm" placeholder="Search facility templates..." />
+            </div>
+            <div>
+                <label for="facilityVendorFilter" class="form-label small mb-1">Vendor</label>
+                <input type="text" id="facilityVendorFilter" name="vendor" value="@vendor" class="form-control form-control-sm" placeholder="All vendors" />
+            </div>
+            <div>
+                <label for="facilityKindFilter" class="form-label small mb-1">Kind</label>
+                <select id="facilityKindFilter" name="kind" class="form-select form-select-sm">
+                    <option value="">All kinds</option>
+                    <option value="System" selected="@(kind == "System" ? "selected" : null)">System</option>
+                    <option value="Custom" selected="@(kind == "Custom" ? "selected" : null)">Custom</option>
+                </select>
+            </div>
+            <input type="hidden" name="pageSize" value="@pageSize" />
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+            <input type="hidden" name="sortDir" value="@sortDir" />
+            <button type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
+            <a class="btn btn-sm btn-warning" href="@clearHref">Clear</a>
+        </form>
         <div id="facilityBulkResult" class="alert mx-3 mt-3 mb-0" role="status" aria-live="polite" style="white-space: pre-line" hidden></div>
-        <div class="card-body p-0" data-au-table>
+        <div class="card-body p-0">
             <table class="table au-table mb-0">
                 <thead>
                     <tr>
                         <th data-nocopy style="width:2.5rem">
                             <input type="checkbox" class="form-check-input" id="facilitySelectAll" aria-label="Select all deletable templates on this page" />
                         </th>
-                        <th data-sort="name">Name</th>
-                        <th data-sort="vendor">Vendor</th>
+                        <th><a class="au-sort-header" href="@SortHref("name")">Name@(SortIndicator("name"))</a></th>
+                        <th><a class="au-sort-header" href="@SortHref("vendor")">Vendor@(SortIndicator("vendor"))</a></th>
                         <th>Pieces</th>
-                        <th data-sort="type">Kind</th>
+                        <th><a class="au-sort-header" href="@SortHref("kind")">Kind@(SortIndicator("kind"))</a></th>
                         <th style="width:220px"></th>
                     </tr>
                 </thead>
                 <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No facility templates match the current filters.</td>
+                    </tr>
+                }
                 @foreach (var t in Model)
                 {
                     <tr data-name="@t.Name" data-vendor="@(t.VendorName ?? "")" data-type="@(t.IsSystem ? "System" : "Custom")">
@@ -469,5 +533,4 @@
     restoreBulkDeleteResult();
 })();
 </script>
-<script src="~/js/au-data-table.js" asp-append-version="true"></script>
 <script src="~/js/configuration-deep-link.js" asp-append-version="true"></script>
