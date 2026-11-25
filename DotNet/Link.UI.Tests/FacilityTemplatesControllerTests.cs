@@ -188,6 +188,27 @@ public class FacilityTemplatesControllerTests
     }
 
     [Fact]
+    public async Task Index_sorts_mixed_case_names_and_vendors_case_insensitively()
+    {
+        var templates = new FakeTemplates();
+        templates.Items.Add(Template("alpha", vendor: "Zulu"));
+        templates.Items.Add(Template("zeta", vendor: "alpha"));
+        templates.Items.Add(Template("Zulu", vendor: "zeta"));
+        var sut = Ready(templates, new FakeScenarios());
+
+        (await Names(sut, "name", "asc")).Should().Equal("alpha", "zeta", "Zulu");
+        (await Names(sut, "name", "desc")).Should().Equal("Zulu", "zeta", "alpha");
+        (await Names(sut, "vendor", "asc")).Should().Equal("zeta", "Zulu", "alpha");
+        (await Names(sut, "vendor", "desc")).Should().Equal("alpha", "Zulu", "zeta");
+
+        var tied = new FakeTemplates();
+        tied.Items.Add(Template("zeta", vendor: "Epic"));
+        tied.Items.Add(Template("Zulu", vendor: "Epic"));
+        tied.Items.Add(Template("alpha", vendor: "Epic"));
+        (await Names(Ready(tied, new FakeScenarios()), "vendor", "asc")).Should().Equal("alpha", "zeta", "Zulu");
+    }
+
+    [Fact]
     public async Task DeleteBulk_deletes_the_selected_custom_templates()
     {
         var first = Template("Alpha");
@@ -437,6 +458,15 @@ public class FacilityTemplatesControllerTests
             .GetCustomAttribute<ValidateAntiForgeryTokenAttribute>().Should().NotBeNull();
     }
 
+    private static async Task<List<string>> Names(FacilityTemplatesController sut, string sortBy, string sortDir)
+    {
+        var result = await sut.Index(sortBy: sortBy, sortDir: sortDir, ct: CancellationToken.None);
+        return result.Should().BeOfType<ViewResult>().Subject.Model
+            .Should().BeAssignableTo<List<FacilityTemplate>>().Subject
+            .Select(t => t.Name)
+            .ToList();
+    }
+
     private static FacilityTemplate Template(string name, bool system = false, bool isDefault = false, string? vendor = null) =>
         new() { Id = Guid.NewGuid(), Name = name, IsSystem = system, IsDefault = isDefault, VendorName = vendor };
 
@@ -582,16 +612,16 @@ public class FacilityTemplatesControllerTests
             IOrderedEnumerable<FacilityTemplate> ordered = sortBy.ToLowerInvariant() switch
             {
                 "vendor" => descending
-                    ? rows.OrderByDescending(item => item.VendorName, StringComparer.Ordinal)
-                    : rows.OrderBy(item => item.VendorName, StringComparer.Ordinal),
+                    ? rows.OrderByDescending(item => item.VendorName, StringComparer.OrdinalIgnoreCase)
+                    : rows.OrderBy(item => item.VendorName, StringComparer.OrdinalIgnoreCase),
                 "kind" => descending
                     ? rows.OrderByDescending(item => item.IsSystem)
                     : rows.OrderBy(item => item.IsSystem),
                 _ => descending
-                    ? rows.OrderByDescending(item => item.Name, StringComparer.Ordinal)
-                    : rows.OrderBy(item => item.Name, StringComparer.Ordinal)
+                    ? rows.OrderByDescending(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                    : rows.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
             };
-            return ordered.ThenBy(item => item.Name, StringComparer.Ordinal).ThenBy(item => item.Id).ToList();
+            return ordered.ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ThenBy(item => item.Id).ToList();
         }
 
         public Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default)
