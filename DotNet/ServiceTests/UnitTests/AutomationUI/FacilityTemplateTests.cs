@@ -132,19 +132,6 @@ public class FacilityTemplateTests
         public System.Threading.Tasks.Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default) =>
             System.Threading.Tasks.Task.FromResult(new List<FacilityTemplate> { template });
 
-        public System.Threading.Tasks.Task<long> CountAsync(CancellationToken ct = default) =>
-            System.Threading.Tasks.Task.FromResult(1L);
-
-        public System.Threading.Tasks.Task<List<FacilityTemplate>> GetPageAsync(
-            int skip,
-            int take,
-            CancellationToken ct = default) =>
-            System.Threading.Tasks.Task.FromResult(
-                new List<FacilityTemplate> { template }
-                    .Skip(skip)
-                    .Take(take)
-                    .ToList());
-
         public System.Threading.Tasks.Task<long> CountFilteredAsync(
             string? search,
             string? vendor,
@@ -185,7 +172,7 @@ public class FacilityTemplateTests
                  string.Equals(
                      template.VendorName,
                      vendor.Trim(),
-                     StringComparison.Ordinal)) &&
+                     StringComparison.OrdinalIgnoreCase)) &&
 
                 (string.IsNullOrWhiteSpace(kind) ||
                  (kind.Equals("System", StringComparison.OrdinalIgnoreCase) && template.IsSystem) ||

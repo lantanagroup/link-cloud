@@ -1,5 +1,4 @@
-﻿
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
 using Task = System.Threading.Tasks.Task;
@@ -142,6 +141,39 @@ public sealed class MongoFacilityTemplateStoreTests(
 
         results.Select(t => t.Name)
             .Should().Equal(first, second, third);
+    }
+
+    [Fact]
+    public async Task Sorts_mixed_case_names_and_vendors_case_insensitively()
+    {
+        await _fixture.ResetAsync();
+        var store = _fixture.CreateFacilityTemplateStore();
+
+        await store.UpsertAsync(Template("alpha", "Zulu"));
+        await store.UpsertAsync(Template("zeta", "alpha"));
+        await store.UpsertAsync(Template("Zulu", "zeta"));
+
+        (await store.GetFilteredPageAsync(0, 10, null, null, null, "name", "asc"))
+            .Select(t => t.Name).Should().Equal("alpha", "zeta", "Zulu");
+
+        (await store.GetFilteredPageAsync(0, 10, null, null, null, "name", "desc"))
+            .Select(t => t.Name).Should().Equal("Zulu", "zeta", "alpha");
+
+        (await store.GetFilteredPageAsync(0, 10, null, null, null, "vendor", "asc"))
+            .Select(t => t.Name).Should().Equal("zeta", "Zulu", "alpha");
+
+        (await store.GetFilteredPageAsync(0, 10, null, null, null, "vendor", "desc"))
+            .Select(t => t.Name).Should().Equal("alpha", "Zulu", "zeta");
+
+        await _fixture.ResetAsync();
+        store = _fixture.CreateFacilityTemplateStore();
+
+        await store.UpsertAsync(Template("zeta", "Epic"));
+        await store.UpsertAsync(Template("Zulu", "Epic"));
+        await store.UpsertAsync(Template("alpha", "Epic"));
+
+        (await store.GetFilteredPageAsync(0, 10, null, null, null, "vendor", "asc"))
+            .Select(t => t.Name).Should().Equal("alpha", "zeta", "Zulu");
     }
 
     [Fact]
