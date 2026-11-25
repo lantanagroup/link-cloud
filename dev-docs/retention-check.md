@@ -68,7 +68,8 @@ claims a batch's reports atomically, in one `UPDATE`, and skips those already ta
 
 `RetentionCutoff.From(now, window)` counts the window back from the moment the check runs:
 
-- `now` comes from `TimeProvider`, not from the firing's scheduled time, which can be a recovery instant.
+- `now` comes from `TimeProvider`, not from the firing's scheduled time, which after an outage or a
+  recovery is an earlier firing's time rather than the moment the check runs.
 - It is converted to UTC first, so the offset it arrives with does not matter.
 - Months are calendar months. When the day does not exist in the earlier month, the cutoff is that month's
   last day: three months before 31 May is 28 February, or 29 February in a leap year.

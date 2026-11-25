@@ -150,8 +150,8 @@ public static class CronJobReconciler
             .WithCronSchedule(cron, x => x
                 .InTimeZone(definition.TimeZone)
                 // A firing missed while every instance was down runs once on recovery, rather than being
-                // dropped or run once per missed interval. The run reports the recovery instant as its
-                // scheduled time, not the missed cron time.
+                // dropped or run once per missed interval. Its scheduled time is the earliest missed fire
+                // time where the store has the MISFIRE_ORIG_FIRE_TIME column, otherwise the recovery instant.
                 .WithMisfireHandlingInstructionFireAndProceed())
             .Build();
 }
