@@ -7,12 +7,6 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.kafka.Topics;
-import io.opentelemetry.api.common.AttributeKey;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.metrics.SdkMeterProvider;
-import io.opentelemetry.sdk.metrics.data.LongPointData;
-import io.opentelemetry.sdk.metrics.data.MetricData;
-import io.opentelemetry.sdk.testing.exporter.InMemoryMetricReader;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.MockProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -45,15 +39,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 class KafkaAuditPublisherTest {
-    private static final AttributeKey<String> RESOURCE = AttributeKey.stringKey("resource");
     private static final Instant EVENT_DATE = Instant.parse("2026-11-23T15:04:05.123Z");
     private static final Duration FIVE_SECONDS = Duration.ofSeconds(5);
 
-    private final InMemoryMetricReader reader = InMemoryMetricReader.create();
-    private final OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
-            .setMeterProvider(SdkMeterProvider.builder().registerMetricReader(reader).build())
-            .build();
-    private final AuditMetrics metrics = new AuditMetrics(sdk, "Validation");
+    private final RecordedCounter counter = new RecordedCounter();
+    private final AuditMetrics metrics = new AuditMetrics(counter.openTelemetry(), "Validation");
 
     private final Logger publisherLogger = (Logger) LoggerFactory.getLogger(KafkaAuditPublisher.class);
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
@@ -174,7 +164,7 @@ class KafkaAuditPublisherTest {
         Assertions.assertTrue(producer.errorNext(new TimeoutException("Expiring 1 record(s)")));
 
         Assertions.assertEquals(1L, failedCount());
-        Assertions.assertEquals("Category", point().getAttributes().get(RESOURCE));
+        Assertions.assertEquals(List.of("Category"), counter.resources());
         List<ILoggingEvent> errors = errors();
         Assertions.assertEquals(1, errors.size());
         String message = errors.get(0).getFormattedMessage();
@@ -344,7 +334,7 @@ class KafkaAuditPublisherTest {
         Assertions.assertTrue(message.contains("closed"), message);
         Assertions.assertTrue(message.contains(AuditJson.logLine(late)), message);
         Assertions.assertEquals(1L, failedCount());
-        Assertions.assertEquals("MeasureDefinition", point().getAttributes().get(RESOURCE));
+        Assertions.assertEquals(List.of("MeasureDefinition"), counter.resources());
     }
 
     @Test
@@ -448,19 +438,7 @@ class KafkaAuditPublisherTest {
     }
 
     private long failedCount() {
-        List<MetricData> metrics = List.copyOf(reader.collectAllMetrics());
-        if (metrics.isEmpty()) {
-            return 0L;
-        }
-        return point().getValue();
-    }
-
-    private LongPointData point() {
-        List<MetricData> metrics = List.copyOf(reader.collectAllMetrics());
-        Assertions.assertEquals(1, metrics.size());
-        List<LongPointData> points = List.copyOf(metrics.get(0).getLongSumData().getPoints());
-        Assertions.assertEquals(1, points.size());
-        return points.get(0);
+        return counter.total();
     }
 
     /**

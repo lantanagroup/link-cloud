@@ -5,12 +5,6 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.lantanagroup.link.shared.auth.PrincipalUser;
-import io.opentelemetry.api.common.AttributeKey;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.metrics.SdkMeterProvider;
-import io.opentelemetry.sdk.metrics.data.LongPointData;
-import io.opentelemetry.sdk.metrics.data.MetricData;
-import io.opentelemetry.sdk.testing.exporter.InMemoryMetricReader;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -52,13 +46,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 public class AuditInterceptorTest {
-    private static final AttributeKey<String> RESOURCE = AttributeKey.stringKey("resource");
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-23T15:04:05Z"), ZoneOffset.UTC);
 
-    private final InMemoryMetricReader reader = InMemoryMetricReader.create();
-    private final AuditMetrics metrics = new AuditMetrics(OpenTelemetrySdk.builder()
-            .setMeterProvider(SdkMeterProvider.builder().registerMetricReader(reader).build())
-            .build(), "Test");
+    private final RecordedCounter counter = new RecordedCounter();
+    private final AuditMetrics metrics = new AuditMetrics(counter.openTelemetry(), "Test");
     private final RecordingPublisher publisher = new RecordingPublisher();
     private final ThingController controller =
             new ThingController(new RequestAuditContext(new AuditDiff(new AuditMasking(List.of()))));
@@ -204,19 +195,7 @@ public class AuditInterceptorTest {
     }
 
     private long failures(String resource) {
-        List<MetricData> collected = List.copyOf(reader.collectAllMetrics());
-        long total = 0;
-        for (MetricData metric : collected) {
-            if (!AuditMetrics.PUBLISH_FAILED.equals(metric.getName())) {
-                continue;
-            }
-            for (LongPointData point : metric.getLongSumData().getPoints()) {
-                if (resource.equals(point.getAttributes().get(RESOURCE))) {
-                    total += point.getValue();
-                }
-            }
-        }
-        return total;
+        return counter.total(resource);
     }
 
     private void assertOneErrorLogged() {

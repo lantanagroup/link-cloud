@@ -127,12 +127,6 @@
             <artifactId>opentelemetry-api</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-sdk-testing</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <!-- Embedded database for the audit property-capture test, which runs against a real Hibernate session -->
         <dependency>
             <groupId>com.h2database</groupId>
