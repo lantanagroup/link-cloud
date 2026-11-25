@@ -1,0 +1,206 @@
+@model RubricDryRunPage
+@{
+    var version = Model.Version;
+    var result = Model.Result;
+    var findings = result?.Findings ?? [];
+    var severities = findings.Select(finding => finding.Severity).Where(value => !string.IsNullOrEmpty(value)).Distinct().Order().ToList();
+    var checks = findings.Select(finding => finding.CheckId).Where(value => !string.IsNullOrEmpty(value)).Distinct().Order().ToList();
+    var dimensions = findings.Select(finding => finding.Dimension).Where(value => !string.IsNullOrEmpty(value)).Distinct().Order().ToList();
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("RubricVersion", new { rubricId = Model.RubricId, semver = Model.Semver })!, "Back to version"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Dry run</h1>
+<p>@Model.Semver <span class="text-muted">@Model.RubricId</span></p>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (version is not null)
+{
+    <form method="post" asp-action="PostDryRunRubric" asp-route-rubricId="@Model.RubricId" asp-route-semver="@Model.Semver" enctype="multipart/form-data" data-au-save>
+        @if (!string.IsNullOrWhiteSpace(Model.SampleError))
+        {
+            <div class="alert alert-warning">@Model.SampleError</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Failure))
+        {
+            <div class="alert alert-warning">@Model.Failure</div>
+        }
+        <div class="mb-3">
+            <label class="form-label" for="sampleFile">Sample file</label>
+            <input id="sampleFile" name="sampleFile" type="file" accept=".json,application/json" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sampleText">Sample JSON</label>
+            <textarea id="sampleText" name="sampleText" class="form-control" rows="10">@Model.SampleText</textarea>
+            <p class="form-text">A FHIR JSON resource or bundle. The findings stay on this page and are not stored.</p>
+        </div>
+        <button type="submit" class="btn btn-au-execute">Run</button>
+    </form>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SampleDescription))
+    {
+        <p class="mt-3">@Model.SampleDescription</p>
+    }
+
+    @if (result is not null)
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Result</div>
+            <div class="card-body">
+                <p>
+                    <span class="badge @RubricText.ResultBadge(result.Status)">@RubricText.ResultLabel(result.Status)</span>
+                    @if (result.Score?.Value is not null)
+                    {
+                        <span class="ms-2">Score @result.Score.Value</span>
+                    }
+                </p>
+                @if (!string.IsNullOrWhiteSpace(result.Score?.Interpretation))
+                {
+                    <p>@result.Score.Interpretation</p>
+                }
+                @if (result.Summary is not null)
+                {
+                    <p>@result.Summary.ErrorCount errors, @result.Summary.WarningCount warnings, @result.Summary.InformationCount information.</p>
+                }
+                @if (result.Score?.ByDimension is { Count: > 0 } byDimension)
+                {
+                    <ul>
+                        @foreach (var entry in byDimension)
+                        {
+                            <li>@RubricText.DimensionLabel(entry.Key): @entry.Value</li>
+                        }
+                    </ul>
+                }
+                @if (result.Trace is not null)
+                {
+                    <p class="text-muted">Ran in @result.Trace.DurationMs ms.</p>
+                }
+
+                @if (findings.Count == 0)
+                {
+                    <p class="mb-0">This run reported no findings.</p>
+                }
+                else
+                {
+                    <div class="row g-2 align-items-end mb-2">
+                        <div class="col-md-3">
+                            <label class="form-label" for="findingSeverity">Severity</label>
+                            <select id="findingSeverity" class="form-select">
+                                <option value="">Any</option>
+                                @foreach (var severity in severities)
+                                {
+                                    <option value="@severity">@RubricText.SeverityLabel(severity)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="findingCheck">Check</label>
+                            <select id="findingCheck" class="form-select">
+                                <option value="">Any</option>
+                                @foreach (var check in checks)
+                                {
+                                    <option value="@check">@check</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="findingDimension">Dimension</label>
+                            <select id="findingDimension" class="form-select">
+                                <option value="">Any</option>
+                                @foreach (var dimension in dimensions)
+                                {
+                                    <option value="@dimension">@RubricText.DimensionLabel(dimension)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <p id="findingCount" class="mb-1"></p>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-au-link" id="findingPrev">Previous</button>
+                                <button type="button" class="btn btn-au-link" id="findingNext">Next</button>
+                                <span id="findingPage"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table" id="dryRunFindings">
+                            <thead>
+                                <tr>
+                                    <th>Severity</th>
+                                    <th>Check</th>
+                                    <th>Dimension</th>
+                                    <th>Message</th>
+                                    <th>Location</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var finding in findings)
+                                {
+                                    <tr data-severity="@finding.Severity" data-check="@finding.CheckId" data-dimension="@finding.Dimension">
+                                        <td><span class="badge @RubricText.SeverityBadge(finding.Severity)">@RubricText.SeverityLabel(finding.Severity)</span></td>
+                                        <td>@finding.CheckId</td>
+                                        <td>@RubricText.DimensionLabel(finding.Dimension)</td>
+                                        <td>
+                                            @finding.Message
+                                            @if (!string.IsNullOrEmpty(finding.Code))
+                                            {
+                                                <span class="text-muted">@finding.Code</span>
+                                            }
+                                        </td>
+                                        <td>@finding.Location</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <script>
+                        (function () {
+                            var table = document.getElementById("dryRunFindings");
+                            if (!table || !table.tBodies[0]) return;
+                            var rows = Array.prototype.slice.call(table.tBodies[0].rows);
+                            var pageSize = 20;
+                            var page = 0;
+                            var severity = document.getElementById("findingSeverity");
+                            var check = document.getElementById("findingCheck");
+                            var dimension = document.getElementById("findingDimension");
+                            function selected(node) { return node ? node.value : ""; }
+                            function matches(row) {
+                                return (selected(severity) === "" || row.getAttribute("data-severity") === selected(severity))
+                                    && (selected(check) === "" || row.getAttribute("data-check") === selected(check))
+                                    && (selected(dimension) === "" || row.getAttribute("data-dimension") === selected(dimension));
+                            }
+                            function render() {
+                                var shown = rows.filter(matches);
+                                var pages = Math.max(1, Math.ceil(shown.length / pageSize));
+                                if (page >= pages) page = pages - 1;
+                                if (page < 0) page = 0;
+                                rows.forEach(function (row) { row.hidden = true; });
+                                shown.slice(page * pageSize, page * pageSize + pageSize).forEach(function (row) { row.hidden = false; });
+                                var count = document.getElementById("findingCount");
+                                var label = document.getElementById("findingPage");
+                                if (count) count.textContent = shown.length + " of " + rows.length;
+                                if (label) label.textContent = (page + 1) + " / " + pages;
+                            }
+                            [severity, check, dimension].forEach(function (node) {
+                                if (!node) return;
+                                node.addEventListener("change", function () { page = 0; render(); });
+                            });
+                            var prev = document.getElementById("findingPrev");
+                            var next = document.getElementById("findingNext");
+                            if (prev) prev.addEventListener("click", function () { if (page > 0) page -= 1; render(); });
+                            if (next) next.addEventListener("click", function () { page += 1; render(); });
+                            render();
+                        })();
+                    </script>
+                }
+            </div>
+        </div>
+    }
+}

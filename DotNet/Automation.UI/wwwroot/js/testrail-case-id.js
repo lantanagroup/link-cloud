@@ -1,5 +1,5 @@
 // Parses a TestRail case id. Blank is unset. "123" and "C123" both store 123.
-// Keep the accepted forms in step with Automation.UI/Models/TestRailCaseIdParser.cs.
+// Keep the accepted forms in step with DotNet/Link.UI/Engine/Models/TestRailCaseIdParser.cs.
 (function (root, factory) {
     var api = factory();
     if (typeof module === 'object' && module.exports) {

@@ -17,7 +17,10 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 public static class RunCleanupHelper
 {
     /// <summary>
-    /// Runs all post-run cleanup steps based on the flags in <paramref name="config"/>.
+    /// Runs the cleanup steps whose flags are already on in <paramref name="config"/>.
+    /// Returns immediately unless <paramref name="runSucceeded"/> is true, so a failed
+    /// or cancelled run keeps its data even if a caller passes the flags through.
+    /// The caller also decides facility ownership before turning service cleanup on.
     /// </summary>
     public static async Task CleanupAfterRunAsync(
         TestScenarioConfig config,
@@ -29,13 +32,22 @@ public static class RunCleanupHelper
         FhirDataLoader fhirDataLoader,
         IAutomationOutput output,
         string facilityId,
-        string? reportId)
+        string? reportId,
+        bool runSucceeded,
+        ICensusServiceClient censusClient,
+        CancellationToken cancellationToken = default)
     {
+        if (!runSucceeded)
+            return;
+
         if (config.CleanupServiceData)
         {
             await FacilitySetupHelper.CleanupFacilityAsync(
                 facilityClient, normalizationClient, dataAcqClient, queryDispatchClient,
                 output, facilityId);
+
+            await FacilitySetupHelper.DeleteRunConfigurationsAsync(
+                censusClient, dataAcqClient, output, facilityId, cancellationToken);
 
             await FacilitySetupHelper.SoftDeleteRunDataAsync(
                 reportClient, dataAcqClient, queryDispatchClient,
@@ -153,8 +165,8 @@ public static class RunCleanupHelper
     }
 
     /// <summary>
-    /// Cancellation: abort and quiesce immediately, expunge FHIR so the server
-    /// does not keep mega-patient volume, but leave facility configs for the 14-day tail.
+    /// Cancellation: stop work that is still moving, and leave FHIR resources,
+    /// facility configs, and report schedules in place so the run can be investigated.
     /// </summary>
     public static async Task CleanupCancelledRunAsync(
         IDataAcquisitionServiceClient dataAcqClient,
@@ -168,6 +180,9 @@ public static class RunCleanupHelper
         TimeSpan abortTtl,
         CancellationToken cancellationToken = default)
     {
+        // The loader is unused on purpose. A cancelled run keeps the FHIR resources it created.
+        _ = fhirDataLoader;
+
         if (!string.IsNullOrWhiteSpace(facilityId))
         {
             try
@@ -181,21 +196,13 @@ public static class RunCleanupHelper
                     facilityId,
                     reportId,
                     abortTtl,
-                    cancellationToken);
+                    cancellationToken,
+                    deactivateSchedules: false);
             }
             catch (Exception ex)
             {
                 output.WriteLine($"Warning: abort/quiesce failed during cancel cleanup: {ex.Message}");
             }
-        }
-
-        try
-        {
-            fhirDataLoader.DeleteResourcesWithExpunge(output);
-        }
-        catch (Exception ex)
-        {
-            output.WriteLine($"Warning: FHIR expunge failed during cancel cleanup: {ex.Message}");
         }
     }
 

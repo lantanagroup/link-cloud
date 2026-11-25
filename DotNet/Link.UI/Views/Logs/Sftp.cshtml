@@ -1,0 +1,179 @@
+@model SftpLogListPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "SFTP acquisition log";
+    ViewData["LogsSection"] = "sftp";
+    var query = Model.Query;
+    var search = Model.Search;
+    var bar = Model.Paging;
+    Dictionary<string, string> SortRoute(string column, bool dateColumn) => query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: LogsRules.NextSort(search.SortBy, search.SortDir, column, dateColumn));
+    string Mark(string column) => string.Equals(search.SortBy, column, StringComparison.OrdinalIgnoreCase)
+        ? (search.SortDir == "asc" ? " ↑" : " ↓")
+        : "";
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to logs"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">SFTP acquisition log</h1>
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search" data-au-filter="400" data-au-target="sftpResults">
+            <input type="hidden" name="pageSize" value="@search.PageSize" />
+            <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="status">Status</label>
+                <select id="status" name="status" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var status in LogsRules.Statuses)
+                    {
+                        if (string.Equals(status, query.Status, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@status" selected>@status</option>
+                        }
+                        else
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="acquisitionType">Type</label>
+                <select id="acquisitionType" name="acquisitionType" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var type in FacilityAcquisitionRules.AcquisitionTypes)
+                    {
+                        if (string.Equals(type, query.AcquisitionType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@type" selected>@type</option>
+                        }
+                        else
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Sftp">Clear</a>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.SubType) || !string.IsNullOrWhiteSpace(query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="subType">Subtype</label>
+                        <select id="subType" name="subType" class="form-select">
+                            <option value="">Any</option>
+                            @foreach (var type in FacilityAcquisitionRules.AcquisitionSubTypes)
+                            {
+                                if (string.Equals(type, query.SubType, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="@type" selected>@type</option>
+                                }
+                                else
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <partial name="_AutomationScope" model="query.Scope" />
+                    </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+<p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
+<div id="sftpResults" data-au-refresh="12000">
+@if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+{
+    <p class="small text-muted mt-3">@Model.ScopeNote</p>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Logs</div>
+        <div class="card-body">
+            @if (Model.Logs.Count == 0)
+            {
+                <p class="au-empty mb-0">@(
+                    !LinkUiFeatures.Value.AutomationEnabled ? "No SFTP logs found."
+                    : Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation SFTP logs."
+                    : Link.UI.Services.AutomationMarkRules.IsReal(query.Scope) ? "No real SFTP logs."
+                    : "No SFTP logs found.")</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead>
+                            <tr>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("FacilityId", false)">Facility@(Mark("FacilityId"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("AcquisitionType", false)">Type@(Mark("AcquisitionType"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("SubType", false)">Subtype@(Mark("SubType"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("Status", false)">Status@(Mark("Status"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("ScheduledDate", true)">Scheduled@(Mark("ScheduledDate"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("ProcessDate", true)">Processed@(Mark("ProcessDate"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("RetryAttempts", false)">Retries@(Mark("RetryAttempts"))</a></th>
+                                <th scope="col">Files</th>
+                                <th scope="col"><span class="visually-hidden">Open</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Logs)
+                        {
+                            <tr>
+                                <td>
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
+                                    <partial name="_AutomationBadge" model="row.IsTest" />
+                                </td>
+                                <td>@row.AcquisitionType</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.SubType) ? "—" : row.SubType)</td>
+                                <td><span class="badge @StatusPills.ForLog(row.Status)">@(string.IsNullOrWhiteSpace(row.Status) ? "Unknown" : row.Status)</span></td>
+                                <td class="text-nowrap">@row.Scheduled</td>
+                                <td class="text-nowrap">@row.Processed</td>
+                                <td>@row.RetryAttempts</td>
+                                <td>@row.FileCount</td>
+                                <td class="text-nowrap">
+                                    <div class="lu-row-actions">
+                                        <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="SftpDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                                        @if (row.CanReset)
+                                        {
+                                            <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline">
+                                                <button data-hold="@Hold.Of("Reset this SFTP log for retry?", "Reset this SFTP log for retry?", "The log is queued to retry.", "Hold to reset")" type="submit" class="btn btn-sm btn-au-execute lu-icon-btn" title="Reset" aria-label="Reset"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span class="ms-1">Reset</span></button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "SFTP pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.PageSizes, Route = (page, size) => query.ToRoute(page, pageSize: size) })" />
+            }
+        </div>
+    </div>
+}
+</div>

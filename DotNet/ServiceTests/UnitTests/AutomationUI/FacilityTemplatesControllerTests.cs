@@ -531,21 +531,6 @@ public class FacilityTemplatesControllerTests
             CancellationToken ct = default) =>
             Task.FromResult(_templates.Values.ToList());
 
-        public Task<long> CountAsync(
-            CancellationToken ct = default) =>
-            Task.FromResult((long)_templates.Count);
-
-        public Task<List<FacilityTemplate>> GetPageAsync(
-            int skip,
-            int take,
-            CancellationToken ct = default) =>
-            Task.FromResult(_templates.Values
-                .OrderBy(t => t.Name)
-                .ThenBy(t => t.Id)
-                .Skip(skip)
-                .Take(take)
-                .ToList());
-
         public Task<long> CountFilteredAsync(
             string? search,
             string? vendor,

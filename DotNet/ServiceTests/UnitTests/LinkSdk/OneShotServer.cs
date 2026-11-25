@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -10,6 +10,7 @@ internal sealed class CapturedRequest
     public string Path { get; init; } = string.Empty;
     public string Query { get; init; } = string.Empty;
     public string Body { get; init; } = string.Empty;
+    public string ContentType { get; init; } = string.Empty;
     public string? Authorization { get; init; }
 }
 
@@ -45,6 +46,7 @@ internal sealed class OneShotServer : IDisposable
                 Path = context.Request.Url?.AbsolutePath ?? string.Empty,
                 Query = context.Request.Url?.Query ?? string.Empty,
                 Body = body,
+                ContentType = context.Request.ContentType ?? string.Empty,
                 Authorization = context.Request.Headers["Authorization"]
             };
 

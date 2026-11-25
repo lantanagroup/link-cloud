@@ -1,0 +1,184 @@
+@model NotificationListPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page, int pageSize = 0)
+    {
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(query.NotificationType)) route["notificationType"] = query.NotificationType;
+        if (!string.IsNullOrWhiteSpace(query.CreatedOnStart)) route["createdOnStart"] = query.CreatedOnStart;
+        if (!string.IsNullOrWhiteSpace(query.CreatedOnEnd)) route["createdOnEnd"] = query.CreatedOnEnd;
+        if (!string.IsNullOrWhiteSpace(query.SentOnStart)) route["sentOnStart"] = query.SentOnStart;
+        if (!string.IsNullOrWhiteSpace(query.SentOnEnd)) route["sentOnEnd"] = query.SentOnEnd;
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Notifications</h1>
+<partial name="_Alerts" />
+<p class="text-muted">Search notifications already sent, or send one. A facility id is optional. Recipients are always required. When a facility is set, its saved addresses are added as well.</p>
+<div class="mb-3">
+    <a class="btn btn-au-link" asp-action="Configurations">Email configuration</a>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Send a notification</div>
+    <div class="card-body">
+        <form method="post" data-au-save class="row g-2">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="sendType">Type</label>
+                <select id="sendType" name="NotificationType" class="form-select" required>
+                    <option value="">Choose</option>
+                    @foreach (var type in ConfigurationRules.NotificationTypes)
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="sendFacility">Facility</label>
+                <input id="sendFacility" name="FacilityId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="subject">Subject</label>
+                <input id="subject" name="Subject" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="recipients">Recipients</label>
+                <textarea id="recipients" name="Recipients" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="bcc">Bcc</label>
+                <textarea id="bcc" name="Bcc" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="body">Message</label>
+                <textarea id="body" name="Body" class="form-control" rows="4" maxlength="4000" required></textarea>
+            </div>
+            <div class="col-12">
+                <button data-hold="@Hold.Of("Send this notification?", "Send this notification?", "The notification is sent.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Send</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Separate addresses with commas or new lines. This posts to the notification service.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search">
+            <input type="hidden" name="pageSize" value="@size" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="searchText">Text</label>
+                    <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="notificationType">Type</label>
+                    <select id="notificationType" name="notificationType" class="form-select">
+                        <option value="">Any</option>
+                        @foreach (var type in ConfigurationRules.NotificationTypes)
+                        {
+                            if (string.Equals(type, query.NotificationType, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@type" selected>@type</option>
+                            }
+                            else
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        }
+                        @if (!string.IsNullOrWhiteSpace(query.NotificationType) && !ConfigurationRules.NotificationTypes.Contains(query.NotificationType, StringComparer.OrdinalIgnoreCase))
+                        {
+                            <option value="@query.NotificationType" selected>@query.NotificationType</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="createdOnStart">Created from</label>
+                    <input id="createdOnStart" name="createdOnStart" value="@query.CreatedOnStart" type="date" class="form-control" />
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="createdOnEnd">Created to</label>
+                    <input id="createdOnEnd" name="createdOnEnd" value="@query.CreatedOnEnd" type="date" class="form-control" />
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="sentOnStart">Sent from</label>
+                    <input id="sentOnStart" name="sentOnStart" value="@query.SentOnStart" type="date" class="form-control" />
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="sentOnEnd">Sent to</label>
+                    <input id="sentOnEnd" name="sentOnEnd" value="@query.SentOnEnd" type="date" class="form-control" />
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Notifications">Clear</a>
+                </div>
+            </div>
+            <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(query.FacilityId) ? null : "open")>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                    </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Notifications</div>
+        <div class="card-body">
+            @if (Model.Notifications.Count == 0)
+            {
+                <p class="mb-0">No notifications found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Created</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Facility</th>
+                                <th scope="col">Subject</th>
+                                <th scope="col"><span class="visually-hidden">Open</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Notifications)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@row.CreatedOn</td>
+                                <td>@row.Type</td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></td>
+                                <td>@row.Subject</td>
+                                <td><a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Notification" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Notification pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.NotificationPageSizes, Route = Route })" />
+        </div>
+    </div>
+}

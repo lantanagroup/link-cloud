@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
@@ -6,12 +6,16 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public interface INormalizationServiceClient
 {
-    Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchFacilityOperationsAsync(string facilityId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchFacilityOperationsAsync(string facilityId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default, string? resourceType = null, Guid? operationId = null, string? sortBy = null, string? sortOrder = null);
     Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(Guid vendorVersionId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationAsync(CreateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> UpdateOperationAsync(UpdateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<List<NormalizationResourceApiModel>>> GetResourcesAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<string>> TestOperationAsync(Guid operationId, string facilityId, string resourceJson, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationsAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationAsync(string facilityId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteVendorVersionOperationAsync(Guid vendorVersionId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationSequencesAsync(string facilityId, string resourceType, List<CreateNormalizationOperationSequenceApiModel> sequences, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteOperationSequencesAsync(string facilityId, string? resourceType = null, CancellationToken cancellationToken = default);
@@ -27,8 +31,27 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> UpdateFacilityLocationLocalCodeMappingAsync(string mappingId, UpdateFacilityLocationLocalCodeMappingRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingAsync(string mappingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Searches operations across facilities and vendor versions:
+    /// <c>GET /api/normalization/Operations</c>. Facility id is optional.
+    /// </summary>
+    Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchOperationsAsync(
+        string? facilityId = null,
+        string? operationType = null,
+        string? resourceType = null,
+        Guid? operationId = null,
+        bool includeDisabled = false,
+        Guid? vendorVersionId = null,
+        string? sortBy = null,
+        string? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<NormalizationReportSummaryApiModel>> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpdateHslocCodesAsync(string oldVersion, string newVersion, Stream csvFile, string fileName = "hsloc.csv", CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteHslocCodeAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Deletes every HSLOC code, across all versions: <c>DELETE /api/normalization/HSLOC</c>.</summary>
     Task<LinkApiResponse> DeleteAllHslocCodesAsync(CancellationToken cancellationToken = default);

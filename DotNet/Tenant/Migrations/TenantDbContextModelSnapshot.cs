@@ -672,6 +672,9 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsTest")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 

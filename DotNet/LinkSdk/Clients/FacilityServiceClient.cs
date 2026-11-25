@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
 
@@ -22,6 +23,18 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
             serviceRegistry.Value.TenantServiceApiUrl
                 ?? throw new InvalidOperationException("Tenant service URL is not configured in ServiceRegistry."),
             bearerOptions, tokenServiceSettings, tokenService)
+    {
+        _serviceRegistry = serviceRegistry;
+    }
+
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public FacilityServiceClient(
+        AdminBffRoute route,
+        IOptions<ServiceRegistry> serviceRegistry,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
     {
         _serviceRegistry = serviceRegistry;
     }
@@ -166,6 +179,50 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
             req = req.SetQueryParam("search", search);
         return SendAsync<Dictionary<string, string>>(() => req.GetAsync(cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse<List<FacilitySummary>>> GetFacilitySummariesAsync(
+        string? search = null,
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default)
+    {
+        var req = Request("/Facility/summaries")
+            .SetQueryParam("includeDeleted", includeDeleted);
+        if (!string.IsNullOrWhiteSpace(search))
+            req = req.SetQueryParam("search", search);
+        return SendAsync<List<FacilitySummary>>(() => req.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<List<FacilityFlag>>> GetFacilityFlagsAsync(
+        FacilityFlagRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<FacilityFlag>>(() => Request("/Facility/flags")
+            .PostJsonAsync(request ?? new FacilityFlagRequest(), cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<FacilityModel>>> SearchFacilitiesPageAsync(
+        bool? isTest = null,
+        string? sortBy = null,
+        string? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var req = Request("/Facility")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+        if (isTest is bool test)
+            req = req.SetQueryParam("isTest", test);
+        if (!string.IsNullOrWhiteSpace(sortBy))
+            req = req.SetQueryParam("sortBy", sortBy);
+        if (!string.IsNullOrWhiteSpace(sortOrder))
+            req = req.SetQueryParam("sortOrder", sortOrder);
+        return SendAsync<PagedConfigModel<FacilityModel>>(() => req.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<FacilityCounts>> GetFacilityCountsAsync(
+        FacilityCountRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityCounts>(() => Request("/Facility/counts")
+            .PostJsonAsync(request ?? new FacilityCountRequest(), cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(
         string facilityId,

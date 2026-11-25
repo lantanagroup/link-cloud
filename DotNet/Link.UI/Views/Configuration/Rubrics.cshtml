@@ -1,0 +1,172 @@
+@model RubricListPage
+@{
+    var size = Model.Pager?.PageSize ?? 20;
+    string Href(string? sort, string? direction, int pageNumber)
+    {
+        var query = new List<string> { "page=" + pageNumber, "pageSize=" + size };
+        if (!string.IsNullOrEmpty(sort))
+            query.Add("sort=" + Uri.EscapeDataString(sort));
+        if (!string.IsNullOrEmpty(direction))
+            query.Add("direction=" + Uri.EscapeDataString(direction));
+        if (Model.Search.Length > 0)
+            query.Add("search=" + Uri.EscapeDataString(Model.Search));
+        if (Model.Status.Length > 0)
+            query.Add("status=" + Uri.EscapeDataString(Model.Status));
+        if (Model.Owner.Length > 0)
+            query.Add("owner=" + Uri.EscapeDataString(Model.Owner));
+        return Url.Action("Rubrics") + "?" + string.Join("&", query);
+    }
+    string SortHref(string field)
+    {
+        if (Model.SortBy == field && Model.SortDirection == "desc")
+            return Href("rubricId", "asc", 1);
+        var direction = Model.SortBy == field ? "desc" : "asc";
+        return Href(field, direction, 1);
+    }
+    var owners = Model.Owners.ToList();
+    if (Model.Owner.Length > 0 && !owners.Contains(Model.Owner))
+        owners.Insert(0, Model.Owner);
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Validation rubrics</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-success" asp-action="NewRubric">New rubric</a>
+    <a class="btn btn-au-link" asp-action="ImportRubric">Import</a>
+</div>
+
+<form method="get" asp-action="Rubrics" class="row g-2 align-items-end mb-3">
+    <div class="col-12 col-md-4">
+        <label class="form-label" for="rubricSearch">Search</label>
+        <input id="rubricSearch" name="search" value="@Model.Search" class="form-control" type="search" placeholder="Id, title or owner" autocomplete="off" />
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label" for="rubricStatus">Status</label>
+        <select id="rubricStatus" name="status" class="form-select">
+            <option value="">Any</option>
+            <option value="DRAFT" selected="@(Model.Status == "DRAFT" ? "selected" : null)">Has a draft</option>
+            <option value="PUBLISHED" selected="@(Model.Status == "PUBLISHED" ? "selected" : null)">Has a published version</option>
+            <option value="RETIRED" selected="@(Model.Status == "RETIRED" ? "selected" : null)">Has a retired version</option>
+        </select>
+    </div>
+    @if (owners.Count > 0)
+    {
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="rubricOwner">Owner</label>
+            <select id="rubricOwner" name="owner" class="form-select">
+                <option value="">Any</option>
+                @foreach (var owner in owners)
+                {
+                    <option value="@owner" selected="@(owner == Model.Owner ? "selected" : null)">@owner</option>
+                }
+            </select>
+        </div>
+    }
+    <input type="hidden" name="sort" value="@Model.SortBy" />
+    <input type="hidden" name="direction" value="@Model.SortDirection" />
+    <input type="hidden" name="pageSize" value="@size" />
+    <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-au-execute">Apply</button>
+    </div>
+</form>
+@if (Model.Filtered)
+{
+    <p><a class="btn btn-au-link" href="@Url.Action("Rubrics")">Clear filters</a></p>
+}
+
+@if (string.IsNullOrWhiteSpace(Model.LoadError) && Model.Rows.Count == 0)
+{
+    <div class="au-card card">
+        <div class="card-body">
+            @if (Model.Filtered)
+            {
+                <p><strong>No rubric matches.</strong></p>
+                <p class="mb-0">Change the search or the filters, or clear them to see every rubric.</p>
+            }
+            else
+            {
+                <p><strong>There are no rubrics yet.</strong></p>
+                <p class="mb-0"><a asp-action="NewRubric">Create a rubric</a>, or <a asp-action="ImportRubric">import one</a> from a file.</p>
+            }
+        </div>
+    </div>
+}
+else if (Model.Rows.Count > 0)
+{
+    <div class="au-card card">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0" aria-label="Validation rubrics">
+                <thead>
+                    <tr>
+                        <th><a href="@SortHref("rubricId")">Rubric</a></th>
+                        <th><a href="@SortHref("title")">Title</a></th>
+                        <th><a href="@SortHref("owner")">Owner</a></th>
+                        <th>Published</th>
+                        <th>Draft</th>
+                        <th><a href="@SortHref("updatedAt")">Updated</a></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        var published = RubricText.NewestInStatus(row.Versions, "PUBLISHED");
+                        var draft = RubricText.NewestInStatus(row.Versions, "DRAFT");
+                        var retired = RubricText.NewestInStatus(row.Versions, "RETIRED");
+                        var use = RubricText.PipelineUse(Model.Settings, row.RubricId);
+                        <tr>
+                            <td>
+                                <a asp-action="Rubric" asp-route-rubricId="@row.RubricId">@(string.IsNullOrWhiteSpace(row.Title) ? row.RubricId : row.Title)</a>
+                                <div class="small text-muted">@row.RubricId</div>
+                                @if (use is not null)
+                                {
+                                    <span class="badge @RubricText.InUseBadge" title="@RubricText.PipelineUseTitle(use)">In Use</span>
+                                }
+                            </td>
+                            <td>@(string.IsNullOrWhiteSpace(row.Title) ? "—" : row.Title)</td>
+                            <td>@(string.IsNullOrWhiteSpace(row.Owner) ? "—" : row.Owner)</td>
+                            <td>
+                                @if (published is not null)
+                                {
+                                    <a asp-action="RubricVersion" asp-route-rubricId="@row.RubricId" asp-route-semver="@published.Semver">@published.Semver</a>
+                                }
+                                else if (retired is not null && draft is null)
+                                {
+                                    <span class="badge @RubricText.StatusBadge("RETIRED")">Retired</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (draft is not null)
+                                {
+                                    <a asp-action="RubricVersion" asp-route-rubricId="@row.RubricId" asp-route-semver="@draft.Semver">@draft.Semver</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>@LinkUiTime.Display(row.UpdatedAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @if (Model.Pager is not null)
+    {
+        <partial name="_BottomPager" model="Model.Pager" />
+    }
+}

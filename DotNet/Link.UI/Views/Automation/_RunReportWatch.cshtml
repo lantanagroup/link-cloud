@@ -1,0 +1,3 @@
+@model RunReportWatch
+@* Run-only page: polls until the run's report exists, then the page script moves to the report. *@
+<div id="run-report-watch" data-au-refresh="5000" data-au-refresh-url="@Url.Action("ReportLink", "Automation", new { id = Model.RunId })" @(Model.ReportHref is null && !Model.RunEnded ? null : "data-au-final") data-report-href="@Model.ReportHref" hidden></div>

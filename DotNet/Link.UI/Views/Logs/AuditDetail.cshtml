@@ -1,0 +1,79 @@
+@model AuditDetailPage
+@{
+    ViewData["Title"] = "Audit event";
+    ViewData["LogsSection"] = "audit";
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Audit")!, "Audit events"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Audit event</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Event</div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Id</dt>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Audit event", Value = Model.Id, Compact = true, CopyLabel = "Copy audit id" })" /></dd>
+                <dt class="col-sm-3">When</dt>
+                <dd class="col-sm-9">@Model.When</dd>
+                <dt class="col-sm-3">Facility</dt>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></dd>
+                <dt class="col-sm-3">Service</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Service) ? "—" : Model.Service)</dd>
+                <dt class="col-sm-3">Action</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Action) ? "—" : Model.Action)</dd>
+                <dt class="col-sm-3">User</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.User) ? "—" : Model.User)</dd>
+                <dt class="col-sm-3">Resource</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Resource) ? "—" : Model.Resource)</dd>
+                <dt class="col-sm-3">Correlation</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.CorrelationId) ? "—" : Model.CorrelationId)</dd>
+                <dt class="col-sm-3">Notes</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Notes) ? "—" : Model.Notes)</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Property changes</div>
+        <div class="card-body">
+            @if (Model.Changes.Count == 0)
+            {
+                <p class="mb-0">No property changes.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Property</th>
+                                <th scope="col">Before</th>
+                                <th scope="col">After</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var change in Model.Changes)
+                        {
+                            <tr>
+                                <td>@change.Name</td>
+                                <td>@(string.IsNullOrWhiteSpace(change.Before) ? "—" : change.Before)</td>
+                                <td>@(string.IsNullOrWhiteSpace(change.After) ? "—" : change.After)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

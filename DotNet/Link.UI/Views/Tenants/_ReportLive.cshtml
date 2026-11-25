@@ -1,0 +1,18 @@
+@model ReportDetailModel
+@* Live region for the report page. Polling stops for a confirmed missing report or a terminal status. A failed read stays live so the next poll retries. *@
+@{
+    var final = ReportLiveRules.StopPolling(Model);
+}
+<div id="report-live" data-au-refresh="@ReportProgressService.LiveIntervalMs" data-au-refresh-url="@Url.Action("ReportLive", "Tenants", new { id = Model.FacilityId, reportId = Model.ReportId })" @(final ? "data-au-final" : null)>
+    @if (Model.Report is null)
+    {
+        <div class="au-card card">
+            <div class="card-header">Report</div>
+            <div class="card-body"><p class="mb-0">@(Model.LoadError ?? "That report was not found.")</p></div>
+        </div>
+    }
+    else
+    {
+        <partial name="_ReportBody" model="Model" />
+    }
+</div>

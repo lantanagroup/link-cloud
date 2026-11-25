@@ -1,0 +1,93 @@
+@model VendorListPage
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Vendors</h1>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3 d-none" id="vendorCreate" data-lu-panel data-lu-hide-on-cancel>
+    <div class="card-header">New vendor</div>
+    <div class="card-body">
+        <form method="post" data-au-save asp-action="SaveVendor" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="name">Name</label>
+                <input id="name" name="name" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="secret">Signing key secret name</label>
+                <input id="secret" name="secret" type="password" value="" class="form-control" maxlength="127" autocomplete="new-password" />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The secret name is a Key Vault secret name. Leave it blank when the vendor has no signing key. On an existing vendor, leave it blank to keep the saved name, or check Clear signing key to remove it.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Vendors</span>
+        <button type="button" class="btn btn-sm btn-success" data-lu-reveal="vendorCreate">+ Add</button>
+    </div>
+    <div class="card-body">
+        @if (Model.Vendors.Count == 0)
+        {
+            <p class="mb-0">No vendors yet. Add one to name an EHR vendor.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Signing key secret name</th>
+                            <th scope="col">Versions</th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Vendors)
+                    {
+                        var formId = "vendor-" + row.Id;
+                        <tr>
+                            <td>
+                                <input form="@formId" name="name" value="@row.Name" class="form-control form-control-sm" maxlength="255" required aria-label="Name for @row.Name" />
+                            </td>
+                            <td>
+                                <input form="@formId" name="secret" type="password" value="" class="form-control form-control-sm" maxlength="127" autocomplete="new-password" aria-label="Signing key secret name for @row.Name" />
+                                <div class="form-check mt-1">
+                                    <input form="@formId" class="form-check-input" type="checkbox" id="clear-secret-@row.Id" name="clearSecret" value="true" />
+                                    <label class="form-check-label" for="clear-secret-@row.Id">Clear signing key</label>
+                                </div>
+                            </td>
+                            <td><a asp-action="Versions" asp-route-vendorId="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Versions</a></td>
+                            <td>
+                                <div class="lu-row-actions">
+                                    <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVendor">
+                                        <input type="hidden" name="id" value="@row.Id" />
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Name"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Name"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
+                                    </form>
+                                    <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id">
+                                        <button data-hold="@Hold.Of("Delete this vendor?", "Delete this vendor?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Name"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

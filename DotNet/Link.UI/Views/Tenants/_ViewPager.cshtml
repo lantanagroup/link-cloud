@@ -1,0 +1,18 @@
+@model FacilityViewModel
+@{
+    var bar = Model.Paging;
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
+    var pages = bar.TotalPages == 0 ? 1 : bar.TotalPages;
+}
+
+<partial name="_BottomPager" model="@(new BottomPager
+{
+    Label = "Pages",
+    Page = bar.Page,
+    Pages = pages,
+    Total = bar.TotalCount,
+    PageSize = Model.Query.PageSize,
+    Sizes = FacilityViewRules.PageSizes,
+    Path = Context.Request.Path.ToString(),
+    Route = (page, size) => Model.Query.ToRoute(page: page, pageSize: size).WithOrigin(origin)
+})" />

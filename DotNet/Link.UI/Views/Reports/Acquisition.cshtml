@@ -1,0 +1,48 @@
+@model ReportSectionPage
+@{
+    ViewData["Title"] = "Acquisition log";
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
+    ViewData["ReportId"] = Model.ReportId;
+    ViewData["ReportSection"] = "acquisition";
+    var patientId = ViewData["PatientId"] as string;
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = Model.ReportId })!, "Back to report"))" />
+</div>
+
+<partial name="_ReportNav" />
+<h1 class="h3">Acquisition log</h1>
+<partial name="_ReportIdentity" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound || Model.Report is null)
+{
+    <div class="au-card card"><div class="card-body"><p class="mb-0">That report was not found.</p></div></div>
+}
+else
+{
+    <div data-da-host data-da-autoload="yes" data-header-owns-ids="yes"
+         data-panel-url="@Url.Action("AcquisitionPanel", "Logs")"
+         data-facility-id="@Model.FacilityId"
+         data-report-id="@Model.ReportId"
+         data-patient-id="@patientId">
+        <p class="lu-live-label mb-2">This list updates on its own.</p>
+        <label class="visually-hidden" for="reportDaSearch">Filter logs</label>
+        <input type="search"
+               id="reportDaSearch"
+               data-da-search
+               data-lu-query="logs"
+               class="form-control form-control-sm mb-2"
+               placeholder="Filter by patient, id, status, phase, or resource"
+               autocomplete="off" />
+        <div data-da-list>
+            <p class="text-muted mb-0">Loading logs…</p>
+        </div>
+    </div>
+    <script src="~/js/data-acquisition-logs.js" asp-append-version="true"></script>
+}

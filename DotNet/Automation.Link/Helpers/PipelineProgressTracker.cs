@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
@@ -98,39 +98,12 @@ public class PipelineProgressTracker
                 return;
             }
 
-            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
-
-            var patientsEvaluated = 0;
-            var patientsValidated = 0;
-            var patientsSubmitted = 0;
-
-            foreach (var entry in entries)
-            {
-                if (entry.MeasureReports.Any(mr => !string.IsNullOrWhiteSpace(mr.MeasureReportId)))
-                {
-                    patientsEvaluated++;
-                    completedUnits++;
-                }
-
-                if (string.Equals(entry.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(entry.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase))
-                {
-                    patientsValidated++;
-                    completedUnits++;
-                }
-
-                // Any terminal submission state counts: a bypassed patient ends on NotSubmitted
-                // and is just as finished, so without this the report never reaches 100% and
-                // stall detection eventually fires on a run that completed correctly.
-                if (string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(entry.SubmissionStatus, "NotSubmitted", StringComparison.OrdinalIgnoreCase))
-                {
-                    patientsSubmitted++;
-                    completedUnits++;
-                }
-            }
-
+            // One aggregate call per tick; the per-patient entry list is never read while polling.
+            var summary = await _reader.GetReportEntrySummaryAsync(scheduleId);
+            var patientsEvaluated = summary?.Evaluated ?? 0;
+            var patientsValidated = summary?.Validated ?? 0;
+            var patientsSubmitted = summary?.Submitted ?? 0;
+            completedUnits += patientsEvaluated + patientsValidated + patientsSubmitted;
             stageDetails.Add($"eval={patientsEvaluated}/{_expectedPatientCount}");
             stageDetails.Add($"valid={patientsValidated}/{_expectedPatientCount}");
             stageDetails.Add($"submit={patientsSubmitted}/{_expectedPatientCount}");

@@ -1,0 +1,133 @@
+@model RubricComparePage
+@{
+    var versions = (Model.Rubric?.Versions ?? []).ToList();
+    void Ensure(string semver)
+    {
+        if (semver.Length > 0 && versions.All(version => version.Semver != semver))
+            versions.Insert(0, new RubricVersionSummary { Semver = semver, RubricId = Model.RubricId });
+    }
+    Ensure(Model.From);
+    Ensure(Model.To);
+    var comparison = Model.Comparison;
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Rubric", new { rubricId = Model.RubricId })!, "Back to rubric"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Compare versions</h1>
+<p class="text-muted">@Model.RubricId</p>
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (Model.Configured && !Model.NotFound && versions.Count > 0)
+{
+    <form method="get" asp-action="CompareRubrics" asp-route-rubricId="@Model.RubricId" class="row g-2 align-items-end mb-3">
+        <div class="col-md-4">
+            <label class="form-label" for="compareFrom">From</label>
+            <select id="compareFrom" name="from" class="form-select">
+                @foreach (var version in versions)
+                {
+                    <option value="@version.Semver" selected="@(version.Semver == Model.From ? "selected" : null)">@version.Semver @RubricText.StatusLabel(version.Status)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="compareTo">To</label>
+            <select id="compareTo" name="to" class="form-select">
+                @foreach (var version in versions)
+                {
+                    <option value="@version.Semver" selected="@(version.Semver == Model.To ? "selected" : null)">@version.Semver @RubricText.StatusLabel(version.Status)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+            <button type="submit" class="btn btn-au-execute">Apply</button>
+            @if (!string.IsNullOrEmpty(Model.From) && !string.IsNullOrEmpty(Model.To))
+            {
+                <a class="btn btn-au-link" asp-action="CompareRubrics" asp-route-rubricId="@Model.RubricId" asp-route-from="@Model.To" asp-route-to="@Model.From">Swap</a>
+            }
+        </div>
+    </form>
+}
+
+@if (comparison is not null)
+{
+    <p>
+        <a asp-action="RubricVersion" asp-route-rubricId="@Model.RubricId" asp-route-semver="@Model.From">@Model.From</a>
+        to
+        <a asp-action="RubricVersion" asp-route-rubricId="@Model.RubricId" asp-route-semver="@Model.To">@Model.To</a>
+    </p>
+    @if (comparison.Identical)
+    {
+        <p>These versions have the same definition.</p>
+    }
+    else
+    {
+        @if (comparison.Settings.Count > 0)
+        {
+            <div class="au-card card mb-3">
+                <div class="card-header">Settings</div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        @foreach (var change in comparison.Settings)
+                        {
+                            <li>@change.Label: @(string.IsNullOrEmpty(change.Before) ? "—" : change.Before) → @(string.IsNullOrEmpty(change.After) ? "—" : change.After)</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+        <div class="au-card card mb-3">
+            <div class="card-header">Checks</div>
+            <div class="card-body">
+                @if (comparison.Reordered)
+                {
+                    <p>The checks are in a different order.</p>
+                }
+                @if (comparison.Added.Count > 0)
+                {
+                    <h2 class="h6">Added</h2>
+                    <ul>
+                        @foreach (var check in comparison.Added)
+                        {
+                            <li>@check.Id — @RubricText.CheckSummary(check)</li>
+                        }
+                    </ul>
+                }
+                @if (comparison.Removed.Count > 0)
+                {
+                    <h2 class="h6">Removed</h2>
+                    <ul>
+                        @foreach (var check in comparison.Removed)
+                        {
+                            <li>@check.Id — @RubricText.CheckSummary(check)</li>
+                        }
+                    </ul>
+                }
+                @if (comparison.Changed.Count > 0)
+                {
+                    <h2 class="h6">Changed</h2>
+                    @foreach (var check in comparison.Changed)
+                    {
+                        <p class="mb-1">@check.Id</p>
+                        <ul>
+                            @foreach (var change in check.Changes)
+                            {
+                                <li>@change.Label: @(string.IsNullOrEmpty(change.Before) ? "—" : change.Before) → @(string.IsNullOrEmpty(change.After) ? "—" : change.After)</li>
+                            }
+                        </ul>
+                    }
+                }
+                @if (comparison.UnchangedCount > 0)
+                {
+                    <p class="mb-0">@comparison.UnchangedCount @(comparison.UnchangedCount == 1 ? "check is" : "checks are") unchanged.</p>
+                }
+            </div>
+        </div>
+    }
+}

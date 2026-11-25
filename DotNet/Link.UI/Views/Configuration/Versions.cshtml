@@ -1,0 +1,79 @@
+@model VendorVersionPage
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Vendors")!, "Vendors"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Vendor versions</h1>
+<partial name="_Alerts" />
+<p class="mb-3">Vendor: <strong>@Model.VendorName</strong></p>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3 d-none" id="versionCreate" data-lu-panel data-lu-hide-on-cancel>
+    <div class="card-header">New version for @Model.VendorName</div>
+    <div class="card-body">
+        <form method="post" data-au-save asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="version">New version</label>
+                <input id="version" name="version" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Versions</span>
+        <button type="button" class="btn btn-sm btn-success" data-lu-reveal="versionCreate">+ Add</button>
+    </div>
+    <div class="card-body">
+        @if (Model.Versions.Count == 0)
+        {
+            <p class="mb-0">No versions yet. Add the first version for this vendor.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Version</th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Versions)
+                    {
+                        var formId = "version-" + row.Id;
+                        <tr>
+                            <td>
+                                <input form="@formId" name="version" value="@row.Version" class="form-control form-control-sm" maxlength="255" required aria-label="Version @row.Version" />
+                            </td>
+                            <td>
+                                <div class="lu-row-actions">
+                                    <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
+                                        <input type="hidden" name="versionId" value="@row.Id" />
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Version"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Version"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
+                                    </form>
+                                    <form method="post" data-au-save asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId">
+                                        <button data-hold="@Hold.Of("Delete this version?", "Delete this version?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Version"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
