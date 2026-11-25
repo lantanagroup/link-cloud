@@ -1,0 +1,29 @@
+{
+  "FacilityId": "Hospital1",
+  "ServiceName": "Validation",
+  "CorrelationId": null,
+  "EventDate": "2026-11-23T15:04:05.123Z",
+  "UserId": null,
+  "User": "nurse@hospital.example.org",
+  "Action": "Update",
+  "Resource": "Category",
+  "ResourceId": "missing-required-element",
+  "PatientId": "Patient/123",
+  "PropertyChanges": [
+    {
+      "PropertyName": "Title",
+      "InitialPropertyValue": "Old",
+      "NewPropertyValue": "New",
+      "Entity": null,
+      "RowKey": null
+    },
+    {
+      "PropertyName": "ApiKey",
+      "InitialPropertyValue": "[redacted]",
+      "NewPropertyValue": "[redacted]",
+      "Entity": null,
+      "RowKey": null
+    }
+  ],
+  "Notes": null
+}
