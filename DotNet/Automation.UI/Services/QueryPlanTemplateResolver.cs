@@ -40,7 +40,11 @@ public sealed class QueryPlanTemplateResolver
                 return new QueryPlanResolution(null, "Not configured");
             if (template == null)
                 throw new InvalidOperationException($"Query plan template '{templateId.Value}' was not found.");
-            return new QueryPlanResolution(ToQueryPlanInput(template), template.Name);
+
+            return new QueryPlanResolution(ToQueryPlanInput(template), template.Name)
+            {
+                TemplateId = template.Id
+            };
         }
 
         // Fall back to the default template if no explicit one was provided or it wasn't found.
@@ -49,7 +53,10 @@ public sealed class QueryPlanTemplateResolver
         if (template == null)
             return new QueryPlanResolution(null, "Built-in Default");
 
-        return new QueryPlanResolution(ToQueryPlanInput(template), template.Name);
+        return new QueryPlanResolution(ToQueryPlanInput(template), template.Name)
+        {
+            TemplateId = template.Id
+        };
     }
 
     private static QueryPlanInput ToQueryPlanInput(QueryPlanTemplate template) => new()
@@ -84,4 +91,7 @@ public sealed class QueryPlanTemplateResolver
 /// <see cref="Input"/> is <c>null</c> when the caller should use the built-in
 /// <see cref="QueryPlanDefaults"/>.
 /// </summary>
-public sealed record QueryPlanResolution(QueryPlanInput? Input, string Name);
+public sealed record QueryPlanResolution(QueryPlanInput? Input, string Name)
+{
+    public Guid? TemplateId { get; init; }
+}

@@ -76,6 +76,8 @@ public sealed class GenerationManifestSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, string>? PatientOriginByPatient { get; init; }
 
+    public Guid? AppliedQueryPlanTemplateId { get; init; }
+    public string? AppliedQueryPlanName { get; init; }
     public Guid? AppliedNormalizationSuiteId { get; init; }
     public string? AppliedNormalizationSuiteName { get; init; }
     public Guid? AppliedOrganizationResourceMapTemplateId { get; init; }

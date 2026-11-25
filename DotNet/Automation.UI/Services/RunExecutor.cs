@@ -486,6 +486,10 @@ internal sealed class RunExecutor
 
             patientIds = pipelineResult.PatientIds;
             generationManifest = pipelineResult.Manifest;
+
+            generationManifest.AppliedQueryPlanTemplateId = queryPlanResolution.TemplateId;
+            generationManifest.AppliedQueryPlanName = queryPlanResolution.Name;
+
             StampManifestNormalization(generationManifest, normalizationResolution, organizationResourceMapTemplate);
             WritePatientSourceLog(output, generationManifest);
             generationDurationMs = (long)Math.Max(0, (DateTimeOffset.UtcNow - generationStarted).TotalMilliseconds);
