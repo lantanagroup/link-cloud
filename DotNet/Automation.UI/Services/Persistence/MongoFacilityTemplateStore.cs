@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -22,29 +23,136 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
         return docs.Select(ToModel).ToList();
     }
 
-    public async Task<long> CountAsync(CancellationToken ct = default)
+    public async Task<long> CountFilteredAsync(
+    string? search,
+    string? vendor,
+    string? kind,
+    CancellationToken ct = default)
     {
+        var filter = BuildFilter(search, vendor, kind);
+
         return await _collection.CountDocumentsAsync(
-            FilterDefinition<FacilityTemplateDocument>.Empty,
+            filter,
             cancellationToken: ct);
     }
-
-    public async Task<List<FacilityTemplate>> GetPageAsync(
+    public async Task<List<FacilityTemplate>> GetFilteredPageAsync(
         int skip,
         int take,
+        string? search,
+        string? vendor,
+        string? kind,
+        string sortBy = "name",
+        string sortDir = "asc",
         CancellationToken ct = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
 
-        var docs = await _collection
-            .Find(FilterDefinition<FacilityTemplateDocument>.Empty)
-            .SortBy(d => d.Name)
-            .Skip(skip)
-            .Limit(take)
+        var filter = BuildFilter(search, vendor, kind);
+
+        // Retrieve only fields required for sorting and pagination.
+        // Avoid database-side sorting on VendorName or IsSystem,
+        // which may not be indexed in Cosmos DB for MongoDB RU.
+        var lightweightDocs = await _collection
+            .Find(filter)
+            .Project(d => new
+            {
+                d.Id,
+                d.Name,
+                d.VendorName,
+                d.IsSystem
+            })
             .ToListAsync(ct);
 
-        return docs.Select(ToModel).ToList();
+        var descending = string.Equals(
+            sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+        var normalizedSortBy = sortBy.ToLowerInvariant();
+
+        var ordered = normalizedSortBy switch
+        {
+            "vendor" => descending
+                ? lightweightDocs.OrderByDescending(
+                    d => d.VendorName, StringComparer.Ordinal)
+                : lightweightDocs.OrderBy(
+                    d => d.VendorName, StringComparer.Ordinal),
+
+            "kind" => descending
+                ? lightweightDocs.OrderByDescending(d => d.IsSystem)
+                : lightweightDocs.OrderBy(d => d.IsSystem),
+
+            _ => descending
+                ? lightweightDocs.OrderByDescending(
+                    d => d.Name, StringComparer.Ordinal)
+                : lightweightDocs.OrderBy(
+                    d => d.Name, StringComparer.Ordinal)
+        };
+
+        var pageIds = ordered
+            .ThenBy(d => d.Name, StringComparer.Ordinal)
+            .ThenBy(d => d.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(d => d.Id)
+            .ToList();
+
+        if (pageIds.Count == 0)
+            return [];
+
+        // Load full documents only for the selected page.
+        var pageFilter = Builders<FacilityTemplateDocument>
+            .Filter.In(d => d.Id, pageIds);
+
+        var pageDocs = await _collection
+            .Find(pageFilter)
+            .ToListAsync(ct);
+
+        // MongoDB's $in query does not guarantee result ordering.
+        // Restore the exact order selected during pagination.
+        var docsById = pageDocs.ToDictionary(d => d.Id);
+
+        return pageIds
+            .Where(id => docsById.ContainsKey(id))
+            .Select(id => ToModel(docsById[id]))
+            .ToList();
+    }
+
+    private static FilterDefinition<FacilityTemplateDocument> BuildFilter(
+        string? search,
+        string? vendor,
+        string? kind)
+    {
+        var builder = Builders<FacilityTemplateDocument>.Filter;
+        var filters = new List<FilterDefinition<FacilityTemplateDocument>>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filters.Add(builder.Regex(
+                d => d.Name,
+                new MongoDB.Bson.BsonRegularExpression(
+                    Regex.Escape(search.Trim()), "i")));
+        }
+
+        if (!string.IsNullOrWhiteSpace(vendor))
+        {
+            filters.Add(builder.Regex(
+                d => d.VendorName,
+                new MongoDB.Bson.BsonRegularExpression(
+                    $"^{Regex.Escape(vendor.Trim())}$", "i")));
+        }
+
+        if (string.Equals(kind, "System", StringComparison.OrdinalIgnoreCase))
+        {
+            filters.Add(builder.Eq(d => d.IsSystem, true));
+        }
+        else if (string.Equals(kind, "Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            filters.Add(builder.Eq(d => d.IsSystem, false));
+        }
+
+        return filters.Count == 0
+            ? builder.Empty
+            : builder.And(filters);
     }
 
     public async Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default)
