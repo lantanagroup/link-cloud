@@ -786,19 +786,81 @@ jobs:
       # to handle transient MCR network timeouts.
       - name: Pull Azurite Docker image
         run: |
+          image=$(python3 -c "
+          import sys
+          from pathlib import Path
+          key = sys.argv[1]
+          in_block = False
+          for raw in Path('docker-compose.yml').read_text(encoding='utf-8').splitlines():
+              if not in_block:
+                  if raw.strip() == 'x-dev-images:':
+                      in_block = True
+                  continue
+              stripped = raw.strip()
+              if stripped == '' or stripped.startswith('#'):
+                  continue
+              if raw and not raw[0].isspace():
+                  break
+              name, _, value = stripped.partition(':')
+              if name != key:
+                  continue
+              value = value.strip()
+              if value.startswith('&'):
+                  value = value.split(None, 1)[1].strip()
+              if len(value) >= 2 and value[0] == '\"' and value[-1] == '\"':
+                  value = value[1:-1]
+              if not value or ' ' in value or '@' in value or ':' not in value:
+                  raise SystemExit(f'x-dev-images.{key} is not a name:tag')
+              print(value)
+              raise SystemExit(0)
+          raise SystemExit(f'x-dev-images.{key} is missing')
+          " azurite)
+          echo "Azurite image: $image"
           for i in 1 2 3; do
-            docker pull mcr.microsoft.com/azure-storage/azurite:latest && break
+            docker pull "$image" && break
             echo "Pull attempt $i failed, retrying in 15s..."
             sleep 15
           done
+          docker image inspect "$image" >/dev/null
 
       - name: Pull SQL Server Docker image
         run: |
+          image=$(python3 -c "
+          import sys
+          from pathlib import Path
+          key = sys.argv[1]
+          in_block = False
+          for raw in Path('docker-compose.yml').read_text(encoding='utf-8').splitlines():
+              if not in_block:
+                  if raw.strip() == 'x-dev-images:':
+                      in_block = True
+                  continue
+              stripped = raw.strip()
+              if stripped == '' or stripped.startswith('#'):
+                  continue
+              if raw and not raw[0].isspace():
+                  break
+              name, _, value = stripped.partition(':')
+              if name != key:
+                  continue
+              value = value.strip()
+              if value.startswith('&'):
+                  value = value.split(None, 1)[1].strip()
+              if len(value) >= 2 and value[0] == '\"' and value[-1] == '\"':
+                  value = value[1:-1]
+              if not value or ' ' in value or '@' in value or ':' not in value:
+                  raise SystemExit(f'x-dev-images.{key} is not a name:tag')
+              print(value)
+              raise SystemExit(0)
+          raise SystemExit(f'x-dev-images.{key} is missing')
+          " sql)
+          echo "SQL Server image: $image"
           for i in 1 2 3; do
-            docker pull mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04 && break
+            docker pull "$image" && break
             echo "Pull attempt $i failed, retrying in 15s..."
             sleep 15
           done
+          docker image inspect "$image" >/dev/null
 
       - name: Restore dependencies
         run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj

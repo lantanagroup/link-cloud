@@ -27,6 +27,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Medallion.Threading;
+using Link.LocalDev;
 using Moq;
 using OpenTelemetry.Trace;
 using Testcontainers.MsSql;
@@ -36,10 +37,8 @@ namespace IntegrationTests.DataAcquisition
 {
     public class DataAcquisitionIntegrationTestFixture : IAsyncLifetime
     {
-        // Pinned to a specific tag (rather than :latest) so that the layer
-        // cache in CI is reusable across runs and developer machines pull a
-        // single, reproducible image.
-        private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04";
+        // The same SQL Server image the local compose stack uses.
+        private static readonly string SqlServerImage = DevStackImages.SqlServer.Reference;
 
         // Setting LINK_TESTS_SQL_CONNECTION_STRING points the fixture at an
         // existing SQL Server (LocalDB, docker, devcontainer, etc.) instead of

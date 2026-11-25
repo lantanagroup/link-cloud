@@ -15,7 +15,8 @@ subfolder and is summarised at the end.
 |---|---|
 | `check_health.sh <project> [timeout] [interval]` | Polls docker-compose service health until everything is healthy or the timeout expires. Writes `service-logs/` on failure. |
 | `clean.py` | Deletes or drops SQL tables, Mongo collections, Kafka topics and Redis keys across services. `--drop-tables` drops rather than empties; `--bypass-prompt` skips confirmation. |
-| `clean-docker.bat` | `clean.py` with the local docker-compose connection settings filled in. |
+| `clean-docker.bat` | `clean.py` with the local docker-compose connection settings filled in. Empties data inside a stack that is still running. |
+| `docker-compose.disk-cleanup.ps1` / `.sh` | End-of-session disk cleanup for this compose project: `docker compose -f <this repo> -p <this project> down -v --remove-orphans` (ignores `COMPOSE_FILE` and `COMPOSE_PROJECT_NAME`), dangling images labeled for the project, and (after a prompt or `--prune-build-cache` / `-PruneBuildCache`) `docker builder prune --keep-storage 10GB`. |
 | `seed.py` | Seeds the HAPI tenant through Admin BFF, using the fixtures in `seed_data/`. |
 | `load-sql-data.sql` | Seeds `link-tenant` directly in SQL Server for facility `Test-Hospital`. |
 | `load-mongo-data.js` | Loads measure definitions into `link-measureeval` via mongosh. |

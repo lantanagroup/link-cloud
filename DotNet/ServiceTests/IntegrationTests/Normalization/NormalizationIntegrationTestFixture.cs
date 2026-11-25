@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Blobs;
+using Link.LocalDev;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
@@ -64,11 +65,11 @@ namespace IntegrationTests.Normalization
 
         private IHost _host;
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
-            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .WithImage(DevStackImages.Azurite.Reference)
             .WithCommand("--skipApiVersionCheck")
             .Build();
         private readonly RedisContainer _redisContainer = new RedisBuilder()
-            .WithImage("redis:latest") 
+            .WithImage(DevStackImages.Redis.Reference)
             .Build();
 
         private async Task InitializeDatabase(IResourceManager resourceManager)

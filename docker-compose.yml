@@ -33,6 +33,15 @@
 ## nhsn-app-bff: 8079
 ## nhsn-app-ui: 8090
 
+# Local SQL Server, MongoDB, Redis and Azurite tags. ServiceTests and the Aspire AppHost
+# read this block (DotNet/LocalDev/DevStackImages.cs). The .NET test job's pre-pull steps
+# read the sql and azurite lines from it too. Change a tag here only.
+x-dev-images:
+  sql: &dev-sql-image mcr.microsoft.com/mssql/server:2022-CU28-ubuntu-22.04
+  mongo: &dev-mongo-image mongo:6-jammy
+  redis: &dev-redis-image redis:6.2-alpine
+  azurite: &dev-azurite-image mcr.microsoft.com/azure-storage/azurite:3.35.0
+
 services:
   
   ###########################################
@@ -93,7 +102,7 @@ services:
   ###########################################
 
   redis_cache:
-    image: redis:6.2-alpine
+    image: *dev-redis-image
     restart: always
     ports:
       - '6379:6379'
@@ -115,7 +124,7 @@ services:
   ###########################################
 
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    image: *dev-azurite-image
     ports:
       - "10000:10000"
     container_name: azurite
@@ -170,7 +179,7 @@ services:
   ###########################################
   
   mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: *dev-sql-image
     ports:
       - 1433:1433
     container_name: sql-server
@@ -207,7 +216,7 @@ services:
       - link-nw
 
   mongo:
-    image: mongo:6-jammy
+    image: *dev-mongo-image
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
       - '17017:27017'
@@ -224,7 +233,7 @@ services:
       start_period: 10s
 
   mongo_init:
-    image: mongo:6-jammy
+    image: *dev-mongo-image
     container_name: mongo-init
     depends_on:
         mongo:

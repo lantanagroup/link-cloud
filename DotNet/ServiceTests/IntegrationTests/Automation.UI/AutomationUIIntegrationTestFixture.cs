@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Services;
+using Link.LocalDev;
 using Automation.UI.Services.Persistence;
 using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation.Generation;
@@ -28,9 +29,9 @@ namespace IntegrationTests.AutomationUI;
 /// </summary>
 public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDisposable
 {
-    // Pin an LTS image tag so CI caching is stable and pulls are deterministic.
+    // The same MongoDB image the local compose stack uses.
     private readonly MongoDbContainer _mongo = new MongoDbBuilder()
-        .WithImage("mongo:7.0")
+        .WithImage(DevStackImages.Mongo.Reference)
         .Build();
 
     private MongoClient? _client;

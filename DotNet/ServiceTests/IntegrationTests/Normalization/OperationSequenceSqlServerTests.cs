@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using Link.LocalDev;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
@@ -165,7 +166,7 @@ public sealed class SqlServerCollection : ICollectionFixture<NormalizationSqlSer
 
 public sealed class NormalizationSqlServerFixture : IAsyncLifetime
 {
-    private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04";
+    private static readonly string SqlServerImage = DevStackImages.SqlServer.Reference;
     private MsSqlContainer? _container;
 
     public string ConnectionString { get; private set; } = string.Empty;
