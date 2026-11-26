@@ -20,21 +20,21 @@
     <description>Project/folder of Java modules/services for Link</description>
 
     <properties>
-        <cqf-fhir.version>4.16.0</cqf-fhir.version>
+        <cqf-fhir.version>4.17.0</cqf-fhir.version>
         <!--
           CQL artifacts (engine, cql-to-elm, ...), managed through cql-bom so every org.cqframework jar, including
           those cqf-fhir brings in, stays on one version. 5.7.0 is the first release with
           DisableEvaluatedResourcesCollection, which MeasureEvaluator turns on.
         -->
-        <cql.version>5.7.0</cql.version>
+        <cql.version>5.8.0</cql.version>
         <hapi-fhir.version>8.12.1</hapi-fhir.version>
         <!--
-          Matches cqf-fhir 4.16.0, which is built on kotlin-stdlib 2.3.20 (CQL 5.7.0 uses 2.3.10). Spring
+          Matches cqf-fhir 4.17.0, which is built on kotlin-stdlib 2.3.20 (CQL 5.8.0 uses 2.3.10). Spring
           Boot reads this property for its kotlin-bom import, so it sets the Kotlin version for every module.
         -->
         <kotlin.version>2.3.20</kotlin.version>
         <!--
-          Overrides Boot 3.5.16's 1.6.3. CQL 5.7.0 is built on kotlinx-serialization 1.9.0, and its
+          Overrides Boot 3.5.16's 1.6.3. CQL 5.8.0 is built on kotlinx-serialization 1.9.0, and its
           kotlinx-serialization-json-io dependency (which Boot does not manage) stays at 1.9.0 regardless,
           so leaving Boot's version in place mixes 1.6.3 and 1.9.0 jars on the classpath.
         -->
