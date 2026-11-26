@@ -98,11 +98,8 @@ class MeasureEvaluatorEvaluationTests {
         // test population results
         Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
 
-        // test evaluated resources
-        Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals(1, report.getEvaluatedResource().size());
-        Assertions.assertTrue(report.getEvaluatedResourceFirstRep().hasReference());
-        Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
+        // MeasureEvaluator turns off evaluated-resource collection; Link rebuilds the list downstream
+        Assertions.assertFalse(report.hasEvaluatedResource());
     }
 
     /**
@@ -149,9 +146,8 @@ class MeasureEvaluatorEvaluationTests {
         // test population results
         Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
 
-        // test evaluated resources
-        Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals(2, report.getEvaluatedResource().size());
+        // MeasureEvaluator turns off evaluated-resource collection; Link rebuilds the list downstream
+        Assertions.assertFalse(report.hasEvaluatedResource());
 
         // test extensions, references, and contained
         Assertions.assertTrue(report.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData"));
@@ -256,9 +252,8 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals(1, getPopulation("numerator", report).getCount());
         Assertions.assertEquals(1, getPopulation("denominator", report).getCount());
 
-        // test evaluated resources
-        Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
+        // MeasureEvaluator turns off evaluated-resource collection; Link rebuilds the list downstream
+        Assertions.assertFalse(report.hasEvaluatedResource());
     }
 
     /**
@@ -291,9 +286,8 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals(1, getPopulation("measure-population", report).getCount());
         Assertions.assertEquals(0, getPopulation("measure-population-exclusion", report).getCount());
 
-        // test evaluated resources
-        Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
+        // MeasureEvaluator turns off evaluated-resource collection; Link rebuilds the list downstream
+        Assertions.assertFalse(report.hasEvaluatedResource());
     }
 
 

@@ -111,10 +111,16 @@
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
 
+        <!--
+          Declared directly, not just inherited through cqf-fhir-cr, because MeasureEvaluator uses the engine's
+          own classes: the debug and trace types behind the $evaluate debug sections, its runtime Value type, and
+          CqlEngine.Options to turn off evaluated-resource collection. The version is cql.version in the parent
+          POM, which also sets every other org.cqframework jar through cql-bom; change it there, not here.
+        -->
         <dependency>
             <groupId>org.cqframework</groupId>
             <artifactId>engine</artifactId>
-            <version>4.6.0</version>
+            <version>${cql.version}</version>
         </dependency>
 
         <dependency>
