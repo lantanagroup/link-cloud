@@ -1,10 +1,10 @@
 # The TruffleHog release that .githooks/pre-commit and .github/workflows/secret-scan.yml run, and the
-# SHA-256 of each platform's archive, from trufflehog_3.99.2_checksums.txt on the GitHub release.
+# SHA-256 of each platform's archive, from trufflehog_3.100.1_checksums.txt on the GitHub release.
 # .github/workflows/trufflehog-bump.yml rewrites this file. See dev-docs/secret-scanning.md.
-version=3.99.2
-darwin_amd64=c23a1b10522b8b84cfd04dc88a3a8819d3dc23b20f15e23540ba442b4b2fbeed
-darwin_arm64=b612143d840b4c75d41fe40436c5932efead001951283f18c87013c4145e1675
-linux_amd64=3c7b0d1dc4278294269bfdd7594bca8bb28c78da0a4a06ad202ded37b48deca4
-linux_arm64=929b81efffca752eafd58bf6f17bf725d354f338636a7bbbee65c086d2f9ddf3
-windows_amd64=494672f03ef4c1c07887bd626f2f68cc5f55305ea961685207d349e273a238e8
-windows_arm64=32ea3fc2737743e002a06e19b4c6967e90d2b2fb00be4726629bba1ff52755b4
+version=3.100.1
+darwin_amd64=928cb350c72861077e1e05cca1570513418c54ad22a4fd61141f9fc97634c62f
+darwin_arm64=baf7600403c029adcaabbc7efd262c5e26b7c654fb88d7334eb56682aaa2f000
+linux_amd64=b2460688116f29ce33f1afe16d14fef3fa3db928e74ba55a6c9fed392c60ad69
+linux_arm64=017b4f2124199c164579caff85c07839be1c79f6e5908b0f1dd3bccc775c6452
+windows_amd64=c09bf4660d3d38adb270932bb5cd58ee572867b315cf70dccfe3d217654016ea
+windows_arm64=cc7014d631b900836db8fc0892aa4dd4dc5a8674240ecc50185d740948935ed4
